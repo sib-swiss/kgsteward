@@ -1,0 +1,45 @@
+[project]
+name = "kgsteward"
+version = "1.0.0"
+authors = [
+  { name="Marco Pagni", email="marco.pagni@sib.swiss" },
+]
+description = "Knwowledge Graph Steward - Command line tool to help manage RDF store"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GPL3v3 License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sib-swiss/kgsteward"
+"Bug Tracker" = "https://github.com/sib-swiss/kgsteward/issues"
+# Documentation = https://github.com/sib-swiss/kgsteward/doc
+# Source = https://github.com/sib-swiss/kgsteward/src
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+#[metadata]
+#name = kgsteward
+#version = attr: kgsteward.__version__
+#license = GPL3v3
+#description = Knwowledge Graph Steward - Command line tool to help manage RDF store 
+#url = https://github.com/sib-swiss/kgsteward
+#classifiers =
+#    Programming Language :: Python :: 3
+#    Programming Language :: Python :: 3.8
+#    Programming Language :: Python :: 3.9
+#    Programming Language :: Python :: 3.10
+#    Programming Language :: Python :: 3.11
+#    License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+#    Operating System :: OS Independent
+#project_urls =
+#    Documentation = https://github.com/sib-swiss/kgsteward/doc
+#    Source = https://github.com/sib-swiss/kgsteward/src
+
+
+
