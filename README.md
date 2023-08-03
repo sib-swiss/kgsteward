@@ -1,15 +1,23 @@
-# kgsteward
-## Knwowledge Graph Steward - Command line tool to help manage RDF store (GraphDB)
+# kgsteward - Knowledge Graph Steward
 
-Python3 scripts to help manage RDF store (GraphDB)
+A command line tool to help manage RDF store (GraphDB). Written in python.
 
+## Installation
 
-```shell
-pip3 install --upgrade https://github.com/sib-swiss/kgsteward
-```
+The easiest option is to install `kgsteward` with `pip`:
 
 ```shell
-kgsteward.py -h
+pip3 install git+https://github.com/sib-swiss/kgsteward
+
+# To update your installation to a newer version.
+pip3 install --upgrade git+https://github.com/sib-swiss/kgsteward
 ```
 
+Alternatively, you can also clone/download the content of this repo to your
+local machine, and then run kgsteward using the script `./kgsteward`.
 
+## Running kgsteward
+
+```shell
+kgsteward -h
+```
