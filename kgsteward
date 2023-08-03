@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+
+from src.kgsteward import kgsteward
+
+if __name__ == "__main__":
+    kgsteward.main()

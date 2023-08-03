@@ -1,23 +1,27 @@
-import requests 
 import time
+
+import requests
 from dumper import dump
 
 
-def http_call( request_args, status_code = [ 200 ], echo = True ) :
-    """ A simple wrapper which main purpose is to print out query parameters in case of an unexpected returned code"""
+def http_call(request_args, status_code=[200], echo=True):
+    """A simple wrapper which main purpose is to print out query parameters in
+    case of an unexpected returned code.
+    """
     if echo :
         print( '# ' + request_args['url'], flush=True )
     r = requests.request( **request_args )
-    if not r.status_code in status_code :
+    if r.status_code not in status_code :
         dump( request_args )
         print( r.status_code, flush=True )
         print( r.text if not r.text is None else '', flush=True )
         raise RuntimeError( "HTTP request failed!" )
     return r
 
-class GraphDBclient :
 
-    def __init__( self, graphdb_url, username, password, repository_id ) :
+class GraphDBclient():
+
+    def __init__( self, graphdb_url, username, password, repository_id ):
         self.graphdb_url          = graphdb_url
         self.username             = username
         self.password             = password
@@ -31,13 +35,15 @@ class GraphDBclient :
                 "X-GraphDB-Password"   : self.password
             }
         })
-        if 'Authorization' in r.headers :
+        if 'Authorization' in r.headers:
             self.authorization = r.headers[ 'Authorization' ]
-        else :
-            raise RuntimeError( "Autentication to GrapDB server failed: " + self.graphdb_url )
+        else:
+            raise RuntimeError(
+                f"Authentication to GraphDB server failed: {self.graphdb_url}"
+            )
 
     def rewrite_repository( self, graphdb_config_filename ) :
-        http_call({ 
+        http_call({
             'method' : 'DELETE',
             'url'    : self.graphdb_url + '/rest/repositories/' + self.repository_id,
             'headers' : { 'Authorization' : self.authorization }
@@ -75,7 +81,7 @@ class GraphDBclient :
                 "X-GraphDB-Repository" : self.repository_id,
                 "Authorization"        : self.authorization,
              },
-        })        
+        })
         http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/security/free-access",
@@ -120,9 +126,13 @@ class GraphDBclient :
             'params'  : { 'update': sparql }
         }, status_code_ok, echo )
 
-    def sparql_query_to_tsv( self, sparql, status_code_ok = [ 200 ], echo = True ) :
-        r = self.sparql_query( sparql, accept='text/tab-separated-values', status_code_ok = status_code_ok, echo = echo )
-        return r
+    def sparql_query_to_tsv( self, sparql, status_code_ok=[200], echo=True) :
+        return self.sparql_query(
+            sparql,
+            accept='text/tab-separated-values',
+            status_code_ok=status_code_ok,
+            echo=echo,
+        )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )
@@ -160,4 +170,3 @@ class GraphDBclient :
                 print( "\t" + "!!! empty results !!!" )
             else :
                 print( "\t" + str( n ) + " lines returned" )
-
