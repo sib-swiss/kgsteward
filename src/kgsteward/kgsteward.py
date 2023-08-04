@@ -228,7 +228,7 @@ def main():
 
     buf = set()
     for target in config["graphs"] :
-        if target in rdf_graph_ok :
+        if target["dataset"] in rdf_graph_ok :
             buf.add( target["dataset"] )
         if "parent" in target :
             if target["parent"] == "*" and buf :
