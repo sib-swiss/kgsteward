@@ -27,8 +27,8 @@ class GraphDBclient():
         self.password             = password
         self.repository_id        = repository_id
         self.authorization        = '' # to be set below
-        r = http_call({ 
-            'method'  : 'POST', 
+        r = http_call({
+            'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/login/" + self.username,
             'headers' : {
                 "X-GraphDB-Repository" : self.repository_id,
@@ -52,7 +52,7 @@ class GraphDBclient():
             'method'  : 'POST',
             'url'     :  self.graphdb_url + '/rest/repositories',
             'headers' : { 'Authorization' : self.authorization },
-            'files'   : { 'config' : open( graphdb_config_filename , 'rb' )} 
+            'files'   : { 'config' : open( graphdb_config_filename , 'rb' )}
         }, [ 201 ] )
         http_call({
             'method'  : 'POST',
@@ -105,9 +105,9 @@ class GraphDBclient():
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : { 
+            'headers' : {
                 'Accept'        : accept,
-                'Authorization' : self.authorization 
+                'Authorization' : self.authorization
             },
             'params'  : { 'query': sparql }
         }, status_code_ok, echo )
@@ -119,9 +119,9 @@ class GraphDBclient():
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/statements",
-            'headers' : { 
+            'headers' : {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization' : self.authorization 
+                'Authorization' : self.authorization
             },
             'params'  : { 'update': sparql }
         }, status_code_ok, echo )
@@ -136,7 +136,7 @@ class GraphDBclient():
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )
-        if 'headers' in request_args : 
+        if 'headers' in request_args :
             request_args['headers']['Authorization' ] = self.authorization
         else :
             request_args['headers'] = { 'Authorization' : self.authorization }
@@ -146,11 +146,11 @@ class GraphDBclient():
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : { 
+            'headers' : {
                 'Accept'        : 'text/tab-separated-values',
-                'Authorization' : self.authorization 
+                'Authorization' : self.authorization
             },
-            'params'  : { 
+            'params'  : {
                 'query'   : sparql,
                 "infer"   : True,
                 "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?

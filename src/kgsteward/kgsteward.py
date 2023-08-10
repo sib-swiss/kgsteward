@@ -11,7 +11,7 @@
 
 # https://wimmics.github.io/voidmatic/
 
-# Very useful list of recommendations including vocabulary suggestion and SPARQL example 
+# Very useful list of recommendations including vocabulary suggestion and SPARQL example
 # https://www.w3.org/TR/hcls-dataset/
 # https://eudat.eu/sites/default/files/MichelDumontier.pdf
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4991880/
@@ -65,10 +65,10 @@ def get_user_input():
     parser = argparse.ArgumentParser(
         description = "Manage a GraphDB repository using HTTP requests. "
             "This script rely on three environment variables (GRAPHDB_URL, "
-            "GRAPHDB_USERNAME, GRAPHDB_PASSWORD) and a YAML config file." 
+            "GRAPHDB_USERNAME, GRAPHDB_PASSWORD) and a YAML config file."
     )
     parser.add_argument(
-        'yamlfile', 
+        'yamlfile',
         nargs = 1,
         help  = "Mandatory configuration file in YAML format"
     )
@@ -125,8 +125,8 @@ def get_user_input():
                  "It may fail on SPARQL syntax error!"
     )
     args = parser.parse_args()
-    
-    # Further processing of command line arguments    
+
+    # Further processing of command line arguments
     if args.F :
         args.I = True
         args.D = True
@@ -141,7 +141,7 @@ def replace_env_var(txt):
     m = RE_CATCH_ENV_VAR.match( txt )
     if m:
         val = os.getenv( m.group( 1 ) )
-        if val: 
+        if val:
             txt = RE_CATCH_ENV_VAR.sub( val, txt )
             return replace_env_var( txt ) # recursion
         else:
@@ -156,7 +156,7 @@ def main():
 
     # ---------------------------------------------------------#
     # Read environment variables
-    # FIXME: remove SINERGIA 
+    # FIXME: remove SINERGIA
     # ---------------------------------------------------------#
     GRAPHDB_URL = os.getenv("GRAPHDB_URL")
     if not GRAPHDB_URL:
@@ -172,7 +172,7 @@ def main():
     # --------------------------------------------------------- #
     # Load YAML config
     # --------------------------------------------------------- #
-    
+
 
     with open( args.yamlfile[0], 'r') as f:
         config = yaml.load( f, Loader=yaml.Loader )
@@ -192,7 +192,7 @@ def main():
     # --------------------------------------------------------- #
     # Create a new empty repository
     # turn autocomplete ON
-    # turn free-access ON if required 
+    # turn free-access ON if required
     # --------------------------------------------------------- #
 
     if args.I :
@@ -281,7 +281,7 @@ def main():
     PREFIX dct:  <http://purl.org/dc/terms/>
     PREFIX ex:   <http://example.org/>
     ;
-    INSERT {{ 
+    INSERT {{
         GRAPH {context} {{
             {context} a void:Dataset ;
                 void:triples               ?c   ;
@@ -294,7 +294,7 @@ def main():
     }}
     USING {context}
     WHERE {{
-        SELECT 
+        SELECT
             ( COUNT( * ) AS ?c )
             ( COUNT( DISTINCT( ?s )) AS ?cs )
             ( COUNT( DISTINCT( ?p )) AS ?cp )
@@ -327,10 +327,10 @@ def main():
         if "url" in target :
             for urlx in target["url"] :
                 path = "<" + replace_env_var( urlx ) + ">"
-                gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" ) 
+                gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{ 
-        GRAPH {context} {{ 
+    INSERT DATA {{
+        GRAPH {context} {{
             {context} void:dataDump {path}
         }}
     }}""" )
@@ -340,9 +340,9 @@ def main():
                 path = "<file://" + replace_env_var( filename ) + ">"
                 gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{ 
-        GRAPH {context} {{ 
-            {context} void:dataDump {path} 
+    INSERT DATA {{
+        GRAPH {context} {{
+            {context} void:dataDump {path}
         }}
     }}""" )
 
@@ -354,9 +354,9 @@ def main():
                     path = "<https://zenodo.org/record/" + str( id ) + "/files/" + record["key"] + ">"
                     gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{ 
-        GRAPH {context} {{ 
-            {context} void:dataDump {path} 
+    INSERT DATA {{
+        GRAPH {context} {{
+            {context} void:dataDump {path}
         }}
     }}""" )
 
@@ -399,21 +399,21 @@ def main():
     if args.Q:
         r = gdb.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
         for item in r.json() :
-            print( f"DELETE: {item['name']}" ) # GraphDB builtin queries cannot be deleted 
+            print( f"DELETE: {item['name']}" ) # GraphDB builtin queries cannot be deleted
             gdb.graphdb_call({
                 'url'    : '/rest/sparql/saved-queries',
-                'method' : 'DELETE', 
-                'params' : { 'name': item['name']} 
-            }) 
+                'method' : 'DELETE',
+                'params' : { 'name': item['name']}
+            })
         for filename in config["queries"] :
             with open( replace_env_var( filename )) as f: sparql = f.read()
             name = re.sub( '(.*\/|)([^\/]+)\.\w+$', r'\2', filename )
-            print( "TEST:   " + name) 
+            print( "TEST:   " + name)
             gdb.validate_sparql_query( sparql, echo=False)
-            print( "LOAD:   " + name) 
+            print( "LOAD:   " + name)
             gdb.graphdb_call({
                 'url'    : '/rest/sparql/saved-queries',
-                'method'  : 'POST', 
+                'method'  : 'POST',
                 'headers' : { 'Content-Type': 'application/json' },
                 'json'    : { 'name': name, 'body': sparql, "shared": "true" }
             }, [ 201 ] )
@@ -435,7 +435,7 @@ def main():
     PREFIX ex:   <http://example.org/>
     SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
     WHERE{{
-        ?g a void:Dataset ; void:triples ?x 
+        ?g a void:Dataset ; void:triples ?x
         OPTIONAL{{ ?g dct:modified ?y }}
         OPTIONAL{{ ?g ex:has_sha256 ?sha256 }}
     }}
