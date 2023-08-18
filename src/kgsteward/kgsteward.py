@@ -41,10 +41,8 @@ import re
 import hashlib
 
 import yaml
-import requests # https://docs.python-requests.org/en/master/user/quickstart/
-from dumper import dump
-from SPARQLWrapper import SPARQLWrapper2
-from array import *
+import requests         # https://docs.python-requests.org/en/master/user/quickstart/
+from dumper import dump # just in case to debug
 
 from .graphdb import GraphDBclient
 
@@ -137,7 +135,8 @@ def get_user_input():
 
 RE_CATCH_ENV_VAR = re.compile( "\\$\\{([^\\}]+)\\}" )
 
-def replace_env_var(txt):
+def replace_env_var( txt ):
+    """ A helper sub with no magic """
     m = RE_CATCH_ENV_VAR.match( txt )
     if m:
         val = os.getenv( m.group( 1 ) )
@@ -149,15 +148,139 @@ def replace_env_var(txt):
     else:
         return txt
 
+def get_target( config, name ) :
+    """ A stupid helper function """
+    for rec in config["graphs"] :
+        if rec["dataset"] == name :
+            return rec
+    raise RuntimeError( "Target dataset not found: " + name )
+
+def get_sha256( config, name ) :
+    sha256 = hashlib.sha256()
+    target = get_target( config, name )
+    context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
+    if "url" in target :
+        for urlx in target["url"] :
+            path = "<" + replace_env_var( urlx ) + ">"
+            sha256.update( path.encode('utf-8') )
+    if "file" in target :
+        for filename in target["file"] :
+            with open( replace_env_var( filename ), "rb") as f :
+                for chunk in iter(lambda: f.read(4096), b"") :
+                    sha256.update(chunk)
+    if "zenodo" in target :
+        for id in target["zenodo"]:
+            r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
+            info = r.json()
+            for record in info["files"] :
+                sha256.update( record["checksum"].encode('utf-8'))
+    if "update" in target :
+        for filename in target["update"] :
+            with open( replace_env_var( filename )) as f: sparql = f.read()
+            sha256.update( sparql.encode('utf-8'))
+    return sha256.hexdigest()
+
+def update_config( gdb, config ) :
+    """ Add information about the currrent repository status """
+    name2dataset = {}
+    for dataset in config["graphs"] :
+        name = dataset["dataset"]
+        name2dataset[name]    = dataset
+        dataset["count"]      = ""
+        dataset["date"]       = ""
+        dataset["sha256_old"] = ""
+        dataset["status"]     = "EMPTY"
+    r = gdb.sparql_query( """
+PREFIX void: <http://rdfs.org/ns/void#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+PREFIX ex:   <http://example.org/>
+SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
+WHERE{{
+    ?g a void:Dataset   ; 
+        void:triples  ?x      ;
+        dct:modified  ?y      ;
+        ex:has_sha256 ?sha256 ;
+}}
+""" )
+    re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
+    for rec in r.json()["results"]["bindings"] :
+        name = re_catch_name.search( rec["g"]["value"] ).group( 1 )
+        if not name in name2dataset :
+            continue
+        dataset = name2dataset[name]
+        dataset["count"]      = rec["x"]["value"]
+        dataset["date"]       = rec["t"]["value"]
+        dataset["sha256_old"] = str( rec["sha256"]["value"] )
+        dataset["sha256_new"] = get_sha256( config, name )
+        if dataset["sha256_old"] == dataset["sha256_new"] :
+            dataset["status"] = "ok"
+        else :
+            dataset["status"] = "UPDATE"
+    buf = set()
+    for dataset in config["graphs"] :
+        if dataset["status"] != "ok" :
+            buf.add( dataset["dataset"] )
+            continue
+        if "parent" in dataset :
+            if dataset["parent"] == "*" and buf :
+                if any( name2dataset[name]["status"] != "ok" for name in buf ) :
+                    dataset["status"] = "PROPAGATE"
+                    buf.add( dataset["dataset"])
+            else:
+                for parent in target["parent"].split( "," ) :
+                    if name2dataset[name]["status"] != "ok" :
+                        dataset["status"] = "PROPAGATE"
+                        buf.add( dataset["dataset"] )
+                        break
+    return config
+
+def update_dataset_info( gdb, config, name ) :
+    context = "<" + config["setup_base_IRI"] + name + ">"
+    sha256 = get_sha256( config, name )
+    gdb.sparql_update( f"""DELETE
+WHERE{{
+    GRAPH {context} {{
+        {context} ?p ?o
+    }}
+}}""" )
+    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+PREFIX dct:  <http://purl.org/dc/terms/>
+PREFIX ex:   <http://example.org/>
+;
+INSERT {{
+    GRAPH {context} {{
+        {context} a void:Dataset ;
+            void:triples               ?c   ;
+            void:distinctSubjects      ?cs  ;
+            void:properties            ?cp  ;
+            void:distinctObjects       ?co  ;
+            dct:modified               ?now ;
+            ex:has_sha256              "{sha256}" .
+    }}
+}}
+USING {context}
+WHERE {{
+    SELECT
+        ( COUNT( * ) AS ?c )
+        ( COUNT( DISTINCT( ?s )) AS ?cs )
+        ( COUNT( DISTINCT( ?p )) AS ?cp )
+        ( COUNT( DISTINCT( ?o )) AS ?co )
+        ( NOW() AS ?now )
+    WHERE {{
+        ?s ?p ?o
+    }}
+}}
+""")
 
 def main():
     """Main function of the kgsteward workflow."""
+
     args = get_user_input()
 
     # ---------------------------------------------------------#
     # Read environment variables
-    # FIXME: remove SINERGIA
     # ---------------------------------------------------------#
+
     GRAPHDB_URL = os.getenv("GRAPHDB_URL")
     if not GRAPHDB_URL:
         sys.exit("Environment variable GRAPHDB_URL is not set!")
@@ -168,26 +291,18 @@ def main():
     if not GRAPHDB_PASSWORD:
         sys.exit("Environment variable GRAPHDB_PASSWORD is not set!")
 
-
     # --------------------------------------------------------- #
     # Load YAML config
     # --------------------------------------------------------- #
 
-
     with open( args.yamlfile[0], 'r') as f:
-        config = yaml.load( f, Loader=yaml.Loader )
-
-    REPOSITORY_ID = config['repository_id']
-
-    rdf_graph_all = set()
-    for target in config["graphs"] :
-        rdf_graph_all.add( target["dataset"] )
+        config        = yaml.load( f, Loader=yaml.Loader )
 
     # --------------------------------------------------------- #
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBclient( GRAPHDB_URL, GRAPHDB_USERNAME, GRAPHDB_PASSWORD, REPOSITORY_ID )
+    gdb = GraphDBclient( GRAPHDB_URL, GRAPHDB_USERNAME, GRAPHDB_PASSWORD, config["repository_id"] )
 
     # --------------------------------------------------------- #
     # Create a new empty repository
@@ -202,149 +317,64 @@ def main():
     # Establish the list of contexts/graphs to update
     # --------------------------------------------------------- #
 
-    rdf_graph_ok = set()
-    re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
+    if args.D or args.d or args.C or args.U :
+        config = update_config( gdb, config ) # takes a while
+
+    rdf_graph_all = set()
+    rdf_graph_to_update = set()
+    for target in config["graphs"] :
+        rdf_graph_all.add( target["dataset"] )
 
     if args.D :
-        rdf_graph_ok = rdf_graph_all
+        rdf_graph_to_update = rdf_graph_all
     elif args.d :
         for name in args.d.split( "," ) :
             if name in rdf_graph_all :
-                rdf_graph_ok.add( name )
+                rdf_graph_to_update.add( name )
             else :
-                sys.exit( "Invalid name: " + name )
-    if args.C :
-        if not rdf_graph_ok :
-            rdf_graph_ok = rdf_graph_all.copy()
-        r = gdb.sparql_query( """PREFIX void: <http://rdfs.org/ns/void#>
-    SELECT ?g ?x
-    WHERE{
-        ?g a void:Dataset ; void:triples ?x
-    }""" )
-        for info in r.json()["results"]["bindings"] :
-            nam = re_catch_name.search( info["g"]["value"] ).group( 1 )
-            if nam in rdf_graph_ok :
-                rdf_graph_ok.remove( nam )
-
-    buf = set()
-    for target in config["graphs"] :
-        if target["dataset"] in rdf_graph_ok :
-            buf.add( target["dataset"] )
-        if "parent" in target :
-            if target["parent"] == "*" and buf :
-                rdf_graph_ok.add( target["dataset"] )
-                buf.add( target["dataset"] )
-            else:
-                for name in target["parent"].split( "," ) :
-                    if name in buf :
-                        rdf_graph_ok.add( target["dataset"] )
-                        buf.add( target["dataset"] )
+                raise RuntimeError( "Invalid dataset name: " + name )
+    elif args.C :
+        for name in rdf_graph_all :
+            target = get_target( config, name )
+            if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
+                rdf_graph_to_update.add( name )
 
     # --------------------------------------------------------- #
-    # Compute checksum of a target graph/context
-    # --------------------------------------------------------- #
-
-    def get_sha256( target ) :
-        sha256 = hashlib.sha256()
-        context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
-        if "url" in target :
-            for urlx in target["url"] :
-                path = "<" + replace_env_var( urlx ) + ">"
-                sha256.update( path.encode('utf-8') )
-        if "file" in target :
-            for filename in target["file"] :
-                with open( replace_env_var( filename ), "rb") as f :
-                    for chunk in iter(lambda: f.read(4096), b"") :
-                        sha256.update(chunk)
-        if "zenodo" in target :
-            for id in target["zenodo"]:
-                r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
-                info = r.json()
-                for record in info["files"] :
-                    sha256.update( record["checksum"].encode('utf-8'))
-        if "update" in target :
-            for filename in target["update"] :
-                with open( replace_env_var( filename )) as f: sparql = f.read()
-                sha256.update( sparql.encode('utf-8') )
-        return sha256.hexdigest()
-
-    def update_dataset_info( target ) :
-        context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
-        sha256 = get_sha256( target )
-        gdb.sparql_update( f"""DELETE
-    WHERE{{
-        GRAPH {context} {{
-            {context} ?p ?o
-        }}
-    }}""" )
-        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    PREFIX dct:  <http://purl.org/dc/terms/>
-    PREFIX ex:   <http://example.org/>
-    ;
-    INSERT {{
-        GRAPH {context} {{
-            {context} a void:Dataset ;
-                void:triples               ?c   ;
-                void:distinctSubjects      ?cs  ;
-                void:properties            ?cp  ;
-                void:distinctObjects       ?co  ;
-                dct:modified               ?now ;
-                ex:has_sha256              "{sha256}" .
-        }}
-    }}
-    USING {context}
-    WHERE {{
-        SELECT
-            ( COUNT( * ) AS ?c )
-            ( COUNT( DISTINCT( ?s )) AS ?cs )
-            ( COUNT( DISTINCT( ?p )) AS ?cp )
-            ( COUNT( DISTINCT( ?o )) AS ?co )
-            ( NOW() AS ?now )
-        WHERE {{
-            ?s ?p ?o
-        }}
-    }}
-    """)
-
-    # --------------------------------------------------------- #
-    # Drop target graphs
+    # Drop previous data, upload new data in their respective 
+    # graphs, update void stats. 
     # --------------------------------------------------------- #
 
     for target in config["graphs"] :
-        if target["dataset"] in rdf_graph_ok :
-            graph_IRI = config["setup_base_IRI"] + target["dataset"]
-            gdb.sparql_update( f"DROP GRAPH <{graph_IRI}>", [ 204, 404 ] )
 
-    # --------------------------------------------------------- #
-    # Upload data in their respective graphs, update void stats
-    # --------------------------------------------------------- #
-
-    for target in config["graphs"] :
-        if not target["dataset"] in rdf_graph_ok :
-            continue
-        context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
+        name = target["dataset"]
+        if not name in rdf_graph_to_update :
+            continue 
+            
+        graph_IRI = config["setup_base_IRI"] + name
+        gdb.sparql_update( f"DROP GRAPH <{graph_IRI}>", [ 204, 404 ] )
+        context = "<" + config["setup_base_IRI"] + name + ">"
 
         if "url" in target :
             for urlx in target["url"] :
                 path = "<" + replace_env_var( urlx ) + ">"
                 gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{
-        GRAPH {context} {{
-            {context} void:dataDump {path}
-        }}
-    }}""" )
+INSERT DATA {{
+    GRAPH {context} {{
+        {context} void:dataDump {path}
+    }}
+}}""" )
 
         if "file" in target :
             for filename in target["file"] :
                 path = "<file://" + replace_env_var( filename ) + ">"
                 gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{
-        GRAPH {context} {{
-            {context} void:dataDump {path}
-        }}
-    }}""" )
+INSERT DATA {{
+    GRAPH {context} {{
+        {context} void:dataDump {path}
+    }}
+}}""" )
 
         if "zenodo" in target :
             for id in target["zenodo"]:
@@ -354,18 +384,18 @@ def main():
                     path = "<https://zenodo.org/record/" + str( id ) + "/files/" + record["key"] + ">"
                     gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-    INSERT DATA {{
-        GRAPH {context} {{
-            {context} void:dataDump {path}
-        }}
-    }}""" )
+INSERT DATA {{
+    GRAPH {context} {{
+        {context} void:dataDump {path}
+    }}
+}}""" )
 
         if "update" in target :
             for filename in target["update"] :
                 with open( replace_env_var( filename )) as f: sparql = f.read()
                 gdb.sparql_update( sparql )
 
-        update_dataset_info( target )
+        update_dataset_info( gdb, config, name )
 
     # --------------------------------------------------------- #
     # Force update dataset info
@@ -426,51 +456,31 @@ def main():
         gdb.free_access()
 
     # --------------------------------------------------------- #
-    # Print current DB status
+    # Print final repository status
     # --------------------------------------------------------- #
-
-    r = gdb.sparql_query( """
-    PREFIX void: <http://rdfs.org/ns/void#>
-    PREFIX dct:  <http://purl.org/dc/terms/>
-    PREFIX ex:   <http://example.org/>
-    SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
-    WHERE{{
-        ?g a void:Dataset ; void:triples ?x
-        OPTIONAL{{ ?g dct:modified ?y }}
-        OPTIONAL{{ ?g ex:has_sha256 ?sha256 }}
-    }}
-    """ ) # FIXME: remove OPTIONAL sooner or later
+    
+    config = update_config( gdb, config )
+    r = gdb.get_context_list()
+    context = set()
     re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
-    count  = {}
-    date   = {}
-    sha256 = {}
-    for info in r.json()["results"]["bindings"] :
-        nam = re_catch_name.search( info["g"]["value"] ).group( 1 )
-        count[nam] = info["x"]["value"]
-        if "t" in info :
-            date[nam] = info["t"]["value"]
-        else :
-            date[nam] = ""
-        if "sha256" in info :
-            sha256[nam] = str( info["sha256"]["value"] )
-        else :
-            sha256[nam] = ""
+    for rec in r.json()["results"]["bindings"] :
+        name = re_catch_name.search( rec["contextID"]["value"] ).group( 1 )
+        context.add( name ) # FIXME
 
-    print( '----------------------------------------------------------')
-    print( '       graph/context        #triple    last modified  ')
-    print( '----------------------------------------------------------')
-    for target in config["graphs"] :
-        sha256current = get_sha256( target )
-        if target["dataset"] in count :
-            status = "update available" if sha256current != sha256[target["dataset"]] else ''
-            print('{:>20} : {:>12}    {} {}'.format( target["dataset"], count[target["dataset"]], date[target["dataset"]], status ))
-            del count[target["dataset"]]
-        else :
-            print( '{:>20} : {:>12}'.format( target["dataset"], "na" ))
-    for name in sorted( count ) :
-        print( '{:>20} : {:>12}'.format( name, "???" ))
+    print( '---------------------------------------------------------- -----------')
+    print( '       graph/context        #triple    last modified       status')
+    print( '---------------------------------------------------------- -----------')
+    for dataset in config["graphs"] :
+        print('{:>20} : {:>12}    {:>20} {}'.format( dataset["dataset"], dataset["count"], dataset["date"], dataset["status"] ))
+        if dataset["dataset"] in context :
+            context.remove( dataset["dataset"] )
+    for name in context:
+        print('{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ))
     print( '----------------------------------------------------------')
 
+# --------------------------------------------------------- #
+# Main
+# --------------------------------------------------------- #
 
 if __name__ == "__main__":
     main()

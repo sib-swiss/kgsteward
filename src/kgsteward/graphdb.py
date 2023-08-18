@@ -133,6 +133,15 @@ class GraphDBclient():
             status_code_ok=status_code_ok,
             echo=echo,
         )
+    def get_context_list( self, echo = True ) :
+        return http_call({
+            'method'  : 'GET',
+            'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/contexts",
+            'headers' : {
+                'Accept'        : 'application/json',
+                'Authorization' : self.authorization
+            }
+        }, [ 200 ], echo )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )
