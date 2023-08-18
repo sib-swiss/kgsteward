@@ -227,7 +227,7 @@ WHERE{{
                     dataset["status"] = "PROPAGATE"
                     buf.add( dataset["dataset"])
             else:
-                for parent in target["parent"].split( "," ) :
+                for parent in dataset["parent"].split( "," ) :
                     if name2dataset[name]["status"] != "ok" :
                         dataset["status"] = "PROPAGATE"
                         buf.add( dataset["dataset"] )
