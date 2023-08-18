@@ -10,7 +10,7 @@ classifiers = [
   "License :: OSI Approved :: GPL3v3 License",
   "Operating System :: OS Independent",
 ]
-dependencies = ["dumper", "requests", "pathlib", "PyYAML", "SPARQLWrapper"]
+dependencies = ["dumper", "requests", "pathlib", "PyYAML" ]
 
 [project.urls]
 "Homepage" = "https://github.com/sib-swiss/kgsteward"
