@@ -171,6 +171,8 @@ def get_sha256( config, name ) :
     if "zenodo" in target :
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
+            if not r.status_code == 200 :
+                raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
             info = r.json()
             for record in info["files"] :
                 sha256.update( record["checksum"].encode('utf-8'))
@@ -317,9 +319,6 @@ def main():
     # Establish the list of contexts/graphs to update
     # --------------------------------------------------------- #
 
-    if args.D or args.d or args.C or args.U :
-        config = update_config( gdb, config ) # takes a while
-
     rdf_graph_all = set()
     rdf_graph_to_update = set()
     for target in config["graphs"] :
@@ -334,6 +333,7 @@ def main():
             else :
                 raise RuntimeError( "Invalid dataset name: " + name )
     elif args.C :
+        config = update_config( gdb, config ) # takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -379,6 +379,8 @@ INSERT DATA {{
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
+                if not r.status_code == 200 :
+                    raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
                 for record in info["files"] :
                     path = "<https://zenodo.org/record/" + str( id ) + "/files/" + record["key"] + ">"
