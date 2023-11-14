@@ -39,7 +39,7 @@ import os
 import sys
 import re
 import hashlib
-
+import glob
 import yaml
 import requests         # https://docs.python-requests.org/en/master/user/quickstart/
 from dumper import dump # just in case to debug
@@ -134,6 +134,7 @@ def get_user_input():
 
 
 RE_CATCH_ENV_VAR = re.compile( "\\$\\{([^\\}]+)\\}" )
+RE_CATCH_FILENAME = re.compile( "([^\\/]+)\\$" )
 
 def replace_env_var( txt ):
     """ A helper sub with no magic """
@@ -412,15 +413,17 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.V :
-        for filename in config["validations"] :
-            print( '----------------------------------------------------------')
-            print( filename )
-            with open( replace_env_var( filename )) as f: sparql = f.read()
-            r = gdb.sparql_query_to_tsv( sparql, echo = False )
-            if r.text.count( "\n" ) == 1 :
-                print( "---- Pass ;-) ----")
-            else:
-                print( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )))
+        for path in config["validations"] :
+            filenames = glob.glob( replace_env_var( path ))
+            for filename in filenames :
+                print( '----------------------------------------------------------')
+                print( filename )
+                with open( filename ) as f: sparql = f.read()
+                r = gdb.sparql_query_to_tsv( sparql, echo = False )
+                if r.text.count( "\n" ) == 1 :
+                    print( "---- Pass ;-) ----")
+                else:
+                    print( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )))
         print( '----------------------------------------------------------')
         sys.exit( 0 )
 
@@ -437,18 +440,23 @@ INSERT DATA {{
                 'method' : 'DELETE',
                 'params' : { 'name': item['name']}
             })
-        for filename in config["queries"] :
-            with open( replace_env_var( filename )) as f: sparql = f.read()
-            name = re.sub( '(.*\/|)([^\/]+)\.\w+$', r'\2', filename )
-            print( "TEST:   " + name)
-            gdb.validate_sparql_query( sparql, echo=False)
-            print( "LOAD:   " + name)
-            gdb.graphdb_call({
-                'url'    : '/rest/sparql/saved-queries',
-                'method'  : 'POST',
-                'headers' : { 'Content-Type': 'application/json' },
-                'json'    : { 'name': name, 'body': sparql, "shared": "true" }
-            }, [ 201 ] )
+        for path in config["queries"] :
+            filenames = glob.glob( replace_env_var( path ))
+            for filename in filenames :
+                with open( filename ) as f: sparql = f.read()
+                name = re.sub( '(.*\/|)([^\/]+)\.\w+$', r'\2', filename )
+                print( "TEST:   " + name)
+                gdb.validate_sparql_query( sparql, echo=False)
+                print( "LOAD:   " + name)
+                gdb.graphdb_call({
+                    'url'    : '/rest/sparql/saved-queries',
+                    'method'  : 'POST',
+                    'headers' : { 
+                        'Content-Type': 'application/json',
+                        'Accept-Encoding': 'identity'
+                    },
+                    'json'    : { 'name': name, 'body': sparql, "shared": "true" }
+                }, [ 201 ] )
 
     # --------------------------------------------------------- #
     # Turn free access ON
