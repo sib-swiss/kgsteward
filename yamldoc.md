@@ -3,7 +3,7 @@
 
 ## Supported YAML syntax
 
-Within the YAM config files, UNIX environment variable can by referred to using `$(...)`syntax. This is meant to faciliate sharing of config files, as local variable values can be stored in the local environment. 
+Within the YAM config file(s), UNIX environment variable can by referred to using `$(...)`syntax. This is meant to faciliate sharing of config files, as local variable values can be stored in the local environment. 
 
 * __`endpoint`__ - The SPARQL endpoint url.
 
