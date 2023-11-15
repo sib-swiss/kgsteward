@@ -49,7 +49,6 @@ graphs:
   update:  ${PATH_TO_RDF_DATA}/fix_schema.sparql
 ```
 
-
 * __`queries`__ - A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query reusult is not iteself checked. Wild card can be supplied in the path. Example
 
 ```{yaml}
