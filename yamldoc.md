@@ -3,6 +3,7 @@
 
 ## Supported YAML syntax
 
+Environmental variable are reffered to using `$(...)`syntax
 
 * __`repository_id`__ - the name of the repository in the triplestore (the SPARQL endpoint is )
 
