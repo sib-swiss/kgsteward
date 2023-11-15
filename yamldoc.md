@@ -3,11 +3,18 @@
 
 ## Supported YAML syntax
 
-Within the YAM config file(s), UNIX environment variable can by referred to using `$(...)`syntax. This is meant to faciliate sharing of config files, as local variable values can be stored in the local environment. 
+Within the YAM config file(s), UNIX environment variables can by referred to using `$(...)`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment. 
 
 * __`endpoint`__ - The SPARQL endpoint url.
 
+```{yaml}
+    endpoint: http://localhost:7200
+```
 * __`username`__ - The name of a user with write access-rights in the triplestore.
+
+```{yaml}
+    username: admin
+```
 
 * __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file!  
 
@@ -17,9 +24,21 @@ Within the YAM config file(s), UNIX environment variable can by referred to usin
 
 * __`repository_id`__ - the name of the repository in the triplestore.
 
+```{yaml}
+    repository_id: TEST
+```
+
 * __`setup_base_IRI`__ - base IRI to name the RDF graphs   
 
-* __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle fil
+```{yaml}
+    repository_id: https://www.example.com/
+```
+
+* __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle file
+
+```{yaml}
+    graphdb_config: config.ttl
+```
 
 * __`graphs`__ - Mandatory data graphs configuration, see details below.
 
