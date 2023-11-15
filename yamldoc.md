@@ -1,7 +1,7 @@
 
 # Kgsteward config file
 
-## >Expected YAML syntax
+## Supported YAML syntax
 
 
 * `repository_id` - the name of the repository in the triplestore (the SPARQL endpoint is )
