@@ -3,7 +3,15 @@
 
 ## Supported YAML syntax
 
-Environmental variable are reffered to using `$(...)`syntax
+UNIX environment variable can by referred to using the `$(...)`syntax which is interpreted by `kgsteaward`. 
+
+* __`endpoint_url`__ - The SPARQL endpoint url.
+
+* __`username`__ - The name of a user with write access-rights on the triplestore
+
+* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored in the config file!  
+
+<div align="center">`password: ${GRAPHDB_SECRET_PASSWORD}`</div>
 
 * __`repository_id`__ - the name of the repository in the triplestore (the SPARQL endpoint is )
 
