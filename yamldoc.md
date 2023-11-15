@@ -40,7 +40,15 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
     graphdb_config: config.ttl
 ```
 
-* __`graphs`__ - Mandatory data graphs configuration, see details below.
+* __`graphs`__ - Mandatory data graphs configuration, see details below. For example
+
+  ```{yaml}
+graphs:
+  dataset: schema
+  file:    ${PATH_TO_RDF_DATA}/schema.ttl
+  update:  ${PATH_TO_RDF_DATA}/fix_schema.sparql
+```
+
 
 * __`queries`__ - A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query reusult is not iteself checked. Wild card can be supplied in the path. Example
 
@@ -54,5 +62,9 @@ queries:
 By convention a valid result return nothing, while the first five returned lines
 represent an excerpt of the problems
 
-
+```{yaml}
+queries:
+  - ${SOME_PATH}/query.sparql
+  - ${PATH_TO_SPARQL_QUERIES}/*.rq
+```
 
