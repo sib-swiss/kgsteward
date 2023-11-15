@@ -42,7 +42,7 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
 
 * __`graphs`__ - Mandatory data graphs configuration, see details below. For example
 
-  ```{yaml}
+```{yaml}
 graphs:
   dataset: schema
   file:    ${PATH_TO_RDF_DATA}/schema.ttl
