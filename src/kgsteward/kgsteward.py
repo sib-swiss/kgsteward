@@ -136,7 +136,7 @@ def get_user_input():
 RE_CATCH_ENV_VAR = re.compile( "\\$\\{([^\\}]+)\\}" )
 RE_CATCH_FILENAME = re.compile( "([^\\/]+)\\$" )
 
-def replace_env_var( txt ):
+def replace_env_var( txt ) :
     """ A helper sub with no magic """
     m = RE_CATCH_ENV_VAR.match( txt )
     if m:
@@ -148,6 +148,33 @@ def replace_env_var( txt ):
             sys.exit(f"Environment variable not set: {m.group(1)}")
     else:
         return txt
+
+def parse_yaml_config( filename ) :
+    """ Recursive parser of config file(s)"""
+    print( "Parse yaml file: " + filename )
+    with open( filename, 'r') as f:
+        config = yaml.load( f, Loader = yaml.Loader )
+    for key in list( config ) :
+        if key not in [ "repository_id", "setup_base_IRI", "graphdb_config", "graphs", "queries", "validations" ] :
+            print( "Ignored config key in file (" + filename + "): " + key )
+            del config[key]
+    graphs      = list()
+    for item in config["graphs"] :
+        if( "source" in item ) :
+            c = parse_yaml_config( replace_env_var( item["source"] )) # recursion
+            for key in list( c ) :
+                if key not in [ "graphs" ] :
+                    print( "Ignored config key from file (" + filename + "): " + key )
+            for graph in c["graphs"] :
+                if graph["dataset"] in config["graphs"] :
+                    raise RuntimeError( "Duplicated dataset name: " + item["dataset"] )
+                graphs.append( graph )
+        else:
+            if not "dataset" in item :
+                raise RuntimeError( "Dataset name is mandatory: " + str( item ))
+            graphs.append( item )
+    config["graphs"] = graphs
+    return config
 
 def get_target( config, name ) :
     """ A stupid helper function """
@@ -298,8 +325,7 @@ def main():
     # Load YAML config
     # --------------------------------------------------------- #
 
-    with open( args.yamlfile[0], 'r') as f:
-        config        = yaml.load( f, Loader=yaml.Loader )
+    config = parse_yaml_config( replace_env_var( args.yamlfile[0] ))
 
     # --------------------------------------------------------- #
     # Test if GraphDB is running and set it in write mode

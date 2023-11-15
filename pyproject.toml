@@ -1,6 +1,6 @@
 [project]
 name = "kgsteward"
-version = "1.0.5"
+version = "1.0.6"
 authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
 description = "Knwowledge Graph Steward - Command line tool to help manage RDF store"
 readme = "README.md"
