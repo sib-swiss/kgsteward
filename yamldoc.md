@@ -44,9 +44,11 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
 
 ```{yaml}
 graphs:
-  dataset: schema
-  file:    ${PATH_TO_RDF_DATA}/schema.ttl
-  update:  ${PATH_TO_RDF_DATA}/fix_schema.sparql
+  - dataset: schema
+    file:    ${PATH_TO_RDF_DATA}/schema.ttl
+    update:  ${PATH_TO_RDF_DATA}/fix_schema.sparql
+  - dataset: pizza
+    url: https://raw.githubusercontent.com/apache/jena/main/jena-examples/src/main/resources/data/pizza.owl.rdf
 ```
 
 * __`queries`__ - A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query reusult is not iteself checked. Wild card can be supplied in the path. Example
