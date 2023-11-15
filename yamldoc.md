@@ -11,9 +11,7 @@ UNIX environment variable can by referred to using the `$(...)`syntax which is i
 
 * __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored in the config file!  
 
-<div align="center">
-  `password: ${GRAPHDB_SECRET_PASSWORD}`
-</div>
+    password: ${GRAPHDB_SECRET_PASSWORD}
 
 * __`repository_id`__ - the name of the repository in the triplestore (the SPARQL endpoint is )
 
