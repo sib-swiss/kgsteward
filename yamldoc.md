@@ -3,7 +3,7 @@
 
 ## Supported YAML syntax
 
-UNIX environment variable can by referred to using the `$(...)`syntax which is interpreted by `kgsteaward`. 
+Within the YAM config files, UNIX environment variable can by referred to using `$(...)`syntax. This is meant to faciliate sharing of config files, as local variable values can be stored in the local environment. 
 
 * __`endpoint`__ - The SPARQL endpoint url.
 
@@ -11,7 +11,9 @@ UNIX environment variable can by referred to using the `$(...)`syntax which is i
 
 * __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file!  
 
+```{yaml}
     password: ${SECRET_PASSWORD}
+```
 
 * __`repository_id`__ - the name of the repository in the triplestore.
 
@@ -19,7 +21,7 @@ UNIX environment variable can by referred to using the `$(...)`syntax which is i
 
 * __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle fil
 
-* __`graphs`__ - dataset configuration, see details below
+* __`graphs`__ - Mandatory data graphs configuration, see details below.
 
 * __`queries`__ - A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query reusult is not iteself checked. Wild card can be supplied in the path. Example
 
