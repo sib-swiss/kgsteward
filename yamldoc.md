@@ -16,7 +16,7 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
     username: admin
 ```
 
-* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! This key is optional and the user is prompted for it if not defined in the config. 
+* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! If this key is absent and the user will be prompted for a password. 
 
 ```{yaml}
     password: ${SECRET_PASSWORD}
