@@ -5,18 +5,18 @@
 
 Within the YAM config file(s), UNIX environment variables can by referred to using `$(...)`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment. 
 
-* __`endpoint`__ - The SPARQL endpoint url.
+* __`endpoint`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined 
 
 ```{yaml}
     endpoint: http://localhost:7200
 ```
-* __`username`__ - The name of a user with write access-rights in the triplestore.
+* __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and the user is prompted for it if it is not defined 
 
 ```{yaml}
     username: admin
 ```
 
-* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file!  
+* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! This key is optional and the user is prompted for it if not defined in the config. 
 
 ```{yaml}
     password: ${SECRET_PASSWORD}
