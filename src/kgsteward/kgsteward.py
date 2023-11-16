@@ -42,6 +42,7 @@ import hashlib
 import glob
 import yaml
 import requests         # https://docs.python-requests.org/en/master/user/quickstart/
+import getpass
 from dumper import dump # just in case to debug
 
 from .graphdb import GraphDBclient
@@ -155,7 +156,7 @@ def parse_yaml_config( filename ) :
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     for key in list( config ) :
-        if key not in [ "repository_id", "setup_base_IRI", "graphdb_config", "graphs", "queries", "validations" ] :
+        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
     graphs      = list()
@@ -307,32 +308,31 @@ def main():
 
     args = get_user_input()
 
-    # ---------------------------------------------------------#
-    # Read environment variables
-    # ---------------------------------------------------------#
-
-    GRAPHDB_URL = os.getenv("GRAPHDB_URL")
-    if not GRAPHDB_URL:
-        sys.exit("Environment variable GRAPHDB_URL is not set!")
-    GRAPHDB_USERNAME = os.getenv("GRAPHDB_USERNAME")
-    if not GRAPHDB_USERNAME:
-        sys.exit("Environment variable GRAPHDB_USERNAME is not set!")
-    GRAPHDB_PASSWORD = os.getenv("GRAPHDB_PASSWORD")
-    if not GRAPHDB_PASSWORD:
-        sys.exit("Environment variable GRAPHDB_PASSWORD is not set!")
 
     # --------------------------------------------------------- #
-    # Load YAML config
+    # Load YAML config and complete it
     # --------------------------------------------------------- #
 
     config = parse_yaml_config( replace_env_var( args.yamlfile[0] ))
+    print()
+    if not "endpoint" in config :
+        config["endpoint"] = input( "Enter endpoint : " )
+    if not "username" in config :
+        config["username"] = input( "Enter username : " )
+    if not "password" in config :
+        config["password"] = getpass.getpass( prompt = "Enter password : " )
 
     # --------------------------------------------------------- #
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBclient( GRAPHDB_URL, GRAPHDB_USERNAME, GRAPHDB_PASSWORD, config["repository_id"] )
-
+    gdb = GraphDBclient( 
+        replace_env_var( config["endpoint"] ), 
+        replace_env_var( config["username"] ),
+        replace_env_var( config["password"] ), 
+        replace_env_var( config["repository_id"] )
+    )
+    
     # --------------------------------------------------------- #
     # Create a new empty repository
     # turn autocomplete ON
