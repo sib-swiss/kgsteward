@@ -410,7 +410,7 @@ INSERT DATA {{
                     raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
                 for record in info["files"] :
-                    path = "<https://zenodo.org/record/" + str( id ) + "/files/" + record["key"] + ">"
+                    path = "<https://zenodo.org/records/" + str( id ) + "/files/" + record["key"] + ">"
                     gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
