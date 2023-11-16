@@ -69,3 +69,22 @@ queries:
   - ${PATH_TO_SPARQL_QUERIES}/*.rq
 ```
 
+### `graphs` syntax
+
+It consist in an ordered list of records that will be considered in the supplied order. The following key is manadtory in every record
+
+* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <setup_base_IRI><dataset>
+
+At least one of the following keys should be supplied. Note that the execution order will be the same as listed below
+
+* __`file`__ - Optional list of files containing RDF data. Nota Bene: there is a maximal file size that is allowed. It is 200 MB for GraphDB.
+
+* __`url`__ - Optional list of url from which to load RDF data
+
+* __`zenodo`__
+
+In addition, the following two keys permits
+
+* __`source`__
+
+* __`parent`__
