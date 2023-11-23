@@ -227,7 +227,7 @@ PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
 WHERE{{
-    ?g a void:Dataset   ; 
+    ?g a void:Dataset   ;
         void:triples  ?x      ;
         dct:modified  ?y      ;
         ex:has_sha256 ?sha256 ;
@@ -326,13 +326,13 @@ def main():
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBclient( 
-        replace_env_var( config["endpoint"] ), 
+    gdb = GraphDBclient(
+        replace_env_var( config["endpoint"] ),
         replace_env_var( config["username"] ),
-        replace_env_var( config["password"] ), 
+        replace_env_var( config["password"] ),
         replace_env_var( config["repository_id"] )
     )
-    
+
     # --------------------------------------------------------- #
     # Create a new empty repository
     # turn autocomplete ON
@@ -367,16 +367,16 @@ def main():
                 rdf_graph_to_update.add( name )
 
     # --------------------------------------------------------- #
-    # Drop previous data, upload new data in their respective 
-    # graphs, update void stats. 
+    # Drop previous data, upload new data in their respective
+    # graphs, update void stats.
     # --------------------------------------------------------- #
 
     for target in config["graphs"] :
 
         name = target["dataset"]
         if not name in rdf_graph_to_update :
-            continue 
-            
+            continue
+
         graph_IRI = config["setup_base_IRI"] + name
         gdb.sparql_update( f"DROP GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["setup_base_IRI"] + name + ">"
@@ -477,7 +477,7 @@ INSERT DATA {{
                 gdb.graphdb_call({
                     'url'    : '/rest/sparql/saved-queries',
                     'method'  : 'POST',
-                    'headers' : { 
+                    'headers' : {
                         'Content-Type': 'application/json',
                         'Accept-Encoding': 'identity'
                     },
@@ -494,7 +494,7 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     # Print final repository status
     # --------------------------------------------------------- #
-    
+
     config = update_config( gdb, config )
     r = gdb.get_context_list()
     context = set()

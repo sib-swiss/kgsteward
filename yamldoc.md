@@ -3,20 +3,20 @@
 
 ## Supported YAML syntax
 
-Within the YAM config file(s), UNIX environment variables can by referred to using `$(...)`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment. 
+Within the YAM config file(s), UNIX environment variables can by referred to using `$(...)`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment.
 
-* __`endpoint`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined 
+* __`endpoint`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined
 
 ```{yaml}
     endpoint: http://localhost:7200
 ```
-* __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and the user is prompted for it if it is not defined 
+* __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and the user is prompted for it if it is not defined
 
 ```{yaml}
     username: admin
 ```
 
-* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! If this key is absent and the user will be prompted for a password. 
+* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! If this key is absent and the user will be prompted for a password.
 
 ```{yaml}
     password: ${SECRET_PASSWORD}
@@ -28,7 +28,7 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
     repository_id: TEST
 ```
 
-* __`setup_base_IRI`__ - base IRI to name the RDF graphs   
+* __`setup_base_IRI`__ - base IRI to name the RDF graphs
 
 ```{yaml}
     repository_id: https://www.example.com/
@@ -59,7 +59,7 @@ queries:
   - ${PATH_TO_SPARQL_QUERIES}/*.rq
 ```
 
-* __`validations`__ - path(s) to sparql queries used to validate the repsository. 
+* __`validations`__ - path(s) to sparql queries used to validate the repsository.
 By convention a valid result return nothing, while the first five returned lines
 represent an excerpt of the problems
 
