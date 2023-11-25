@@ -34,7 +34,7 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
     repository_id: https://www.example.com/
 ```
 
-* __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle file
+* __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section qbout how to create such a file. 
 
 ```{yaml}
     graphdb_config: config.ttl
@@ -73,15 +73,15 @@ queries:
 
 It consist in an ordered list of records that will be considered in the supplied order. The following key is manadtory in every record
 
-* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <setup_base_IRI><dataset>
+* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <setup_base_IRI><dataset> FIXME: rename this as `name`
 
 At least one of the following keys should be supplied. Note that the execution order will be the same as listed below
 
-* __`file`__ - Optional list of files containing RDF data. Nota Bene: there is a maximal file size that is allowed. It is 200 MB for GraphDB.
+* __`file`__ - Optional list of files containing RDF data. Nota Bene: there might be a maximal file size that is allowed - it is 200 MB by default for GraphDB and compressed file format may not be supported 
 
 * __`url`__ - Optional list of url from which to load RDF data
 
-* __`zenodo`__
+* __`zenodo`__ - Fetch 
 
 In addition, the following two keys permits
 
