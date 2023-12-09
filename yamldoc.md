@@ -46,7 +46,8 @@ Note that the server endpoint is expected to be found at `${server_url}/reposito
 ```
 
 
-* __`RDF4J.config_file`__ __`GraphDB.config_file`__ - filename with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section about how to create such a file. 
+* __`RDF4J.config_file`__
+* __`GraphDB.config_file`__ - filename with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section about how to create such a file. 
 
 ```{yaml}
     graphdb_config: config.ttl
