@@ -5,11 +5,28 @@
 
 Within the YAM config file(s), UNIX environment variables can by referred to using `${...}`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment.
 
-* __`endpoint`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined
+
+*__`server_type`__
+
+Only two values are currently supported `RDF4J`or `GraphDB`
 
 ```{yaml}
-    endpoint: http://localhost:7200
+    server_type: GraphDB
 ```
+
+* __`server_url`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined
+
+```{yaml}
+    server_url: http://localhost:7200
+```
+Note that the server endpoint is expected to be found at `${server_url}/repositories/${repository_id}` for RDF4J and GraphDB servers.
+
+* __`repository_id`__ - the name of the repository in the triplestore.
+
+```{yaml}
+    repository_id: TEST
+```
+
 * __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and the user is prompted for it if it is not defined
 
 ```{yaml}
@@ -22,19 +39,14 @@ Within the YAM config file(s), UNIX environment variables can by referred to usi
     password: ${SECRET_PASSWORD}
 ```
 
-* __`repository_id`__ - the name of the repository in the triplestore.
+* __`setup_base_IRI`__ - base IRI to name the RDF graphs 
 
 ```{yaml}
-    repository_id: TEST
+    repository_id: http://www.example.com/
 ```
 
-* __`setup_base_IRI`__ - base IRI to name the RDF graphs
 
-```{yaml}
-    repository_id: https://www.example.com/
-```
-
-* __`graphdb_config`__ - filname with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section qbout how to create such a file. 
+* __`RDF4J.config_file`__ __`GraphDB.config_file`__ - filename with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section about how to create such a file. 
 
 ```{yaml}
     graphdb_config: config.ttl
