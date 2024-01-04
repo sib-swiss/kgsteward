@@ -43,9 +43,12 @@ import glob
 import yaml
 import requests         # https://docs.python-requests.org/en/master/user/quickstart/
 import getpass
-from dumper import dump # just in case to debug
+from   dumper    import dump # just in case to debug
 
-from .graphdb import GraphDBclient
+from .graphdb    import GraphDBclient
+from .fuseki     import FusekiClient
+from .fileserver import LocalFileServer 
+from .common     import *
 
 # ---------------------------------------------------------#
 # The RDF source graphs configuration
@@ -152,14 +155,15 @@ def replace_env_var( txt ) :
 
 def parse_yaml_config( filename ) :
     """ Recursive parser of config file(s)"""
-    print( "Parse yaml file: " + filename )
+    print_break()
+    print( "# Parse yaml file: " + filename )
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     for key in list( config ) :
         if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
-    graphs      = list()
+    graphs = list()
     for item in config["graphs"] :
         if( "source" in item ) :
             c = parse_yaml_config( replace_env_var( item["source"] )) # recursion
@@ -213,6 +217,7 @@ def get_sha256( config, name ) :
 
 def update_config( gdb, config ) :
     """ Add information about the currrent repository status """
+    print_break()
     name2dataset = {}
     for dataset in config["graphs"] :
         name = dataset["dataset"]
@@ -266,6 +271,7 @@ WHERE{{
     return config
 
 def update_dataset_info( gdb, config, name ) :
+    print_break()
     context = "<" + config["setup_base_IRI"] + name + ">"
     sha256 = get_sha256( config, name )
     gdb.sparql_update( f"""DELETE
@@ -326,7 +332,8 @@ def main():
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBclient(
+    gdb = GraphDBclient( 
+        # FusekiClient(
         replace_env_var( config["endpoint"] ),
         replace_env_var( config["username"] ),
         replace_env_var( config["password"] ),
@@ -377,12 +384,14 @@ def main():
         if not name in rdf_graph_to_update :
             continue
 
+        print_break()
         graph_IRI = config["setup_base_IRI"] + name
         gdb.sparql_update( f"DROP GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["setup_base_IRI"] + name + ">"
 
         if "url" in target :
             for urlx in target["url"] :
+                print_break()
                 path = "<" + replace_env_var( urlx ) + ">"
                 gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -393,16 +402,34 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            for filename in target["file"] :
-                path = "<file://" + replace_env_var( filename ) + ">"
-                gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
-                gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+            use_file_server = True
+            if use_file_server :
+                fs = LocalFileServer()
+                for filename in target["file"] :
+                    print_break()
+                    dir, file = os.path.split( replace_env_var( filename ) )
+                    fs.expose( dir )
+                    path = "http://localhost:8000/" + file
+                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                    path = "file://" + replace_env_var( filename )
+                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
-        {context} void:dataDump {path}
+        {context} void:dataDump <{path}>
     }}
 }}""" )
-
+                fs.terminate()
+            else:
+                for filename in target["file"] :
+                    print_break()
+                    path = "file://" + replace_env_var( filename )
+                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+INSERT DATA {{
+    GRAPH {context} {{
+        {context} void:dataDump <{path}>
+    }}
+}}""" )
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -410,6 +437,7 @@ INSERT DATA {{
                     raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
                 for record in info["files"] :
+                    print_break()
                     path = "<https://zenodo.org/records/" + str( id ) + "/files/" + record["key"] + ">"
                     gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -421,6 +449,7 @@ INSERT DATA {{
 
         if "update" in target :
             for filename in target["update"] :
+                print_break()
                 with open( replace_env_var( filename )) as f: sparql = f.read()
                 gdb.sparql_update( sparql )
 

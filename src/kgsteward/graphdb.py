@@ -2,22 +2,7 @@ import time
 
 import requests
 from dumper import dump
-
-
-def http_call(request_args, status_code=[200], echo=True):
-    """A simple wrapper which main purpose is to print out query parameters in
-    case of an unexpected returned code.
-    """
-    if echo :
-        print( '# ' + request_args['url'], flush=True )
-    r = requests.request( **request_args )
-    if r.status_code not in status_code :
-        dump( request_args )
-        print( r.status_code, flush=True )
-        print( r.text if not r.text is None else '', flush=True )
-        raise RuntimeError( "HTTP request failed!" )
-    return r
-
+from .common import *
 
 class GraphDBclient():
 
