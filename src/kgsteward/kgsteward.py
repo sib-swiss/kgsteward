@@ -532,16 +532,16 @@ INSERT DATA {{
         name = re_catch_name.search( rec["contextID"]["value"] ).group( 1 )
         context.add( name ) # FIXME
 
-    print( '---------------------------------------------------------- -----------')
-    print( '       graph/context        #triple    last modified       status')
-    print( '---------------------------------------------------------- -----------')
+    print( '-------------------------------------------------------------------')
+    print( '       graph/context        #triple     last modified       status')
+    print( '-------------------------------------------------------------------')
     for dataset in config["graphs"] :
         print('{:>20} : {:>12}    {:>20} {}'.format( dataset["dataset"], dataset["count"], dataset["date"], dataset["status"] ))
         if dataset["dataset"] in context :
             context.remove( dataset["dataset"] )
     for name in context:
         print('{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ))
-    print( '----------------------------------------------------------')
+    print( '-------------------------------------------------------------------')
 
 # --------------------------------------------------------- #
 # Main
