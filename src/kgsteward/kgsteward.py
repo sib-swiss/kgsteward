@@ -47,6 +47,7 @@ from dumper import dump # just in case to debug
 
 from .graphdb import GraphDBclient
 
+
 # ---------------------------------------------------------#
 # The RDF source graphs configuration
 #
@@ -417,7 +418,31 @@ INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump {path}
     }}
-}}""" )
+}}""" )                    
+        if "folder" in target:
+            for dir_path in target["folder"]:
+                expanded_dir_path = replace_env_var(dir_path)
+                if os.path.isdir(expanded_dir_path):
+                    # Search for all .ttl files within the 'rdf' subfolder of each directory and its subdirectories
+                    rdf_dir_paths = glob.glob(os.path.join(expanded_dir_path, '**', 'rdf'), recursive=True)
+                    print(f"RDF directories found: {rdf_dir_paths}")
+
+                    for rdf_dir_path in rdf_dir_paths:
+                        ttl_files = glob.glob(os.path.join(rdf_dir_path, '*.ttl'), recursive=True)
+                        print(f"TTL files found: {ttl_files}")
+
+                        for filename in ttl_files:
+                            file_uri = "<file://" + filename + ">"
+                            gdb.sparql_update(f"LOAD {file_uri} INTO GRAPH {context}")
+                            gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+INSERT DATA {{
+    GRAPH {context} {{
+        {context} void:dataDump {file_uri}
+    }}
+}}""" )               
+
+
+
 
         if "update" in target :
             for filename in target["update"] :
