@@ -182,7 +182,7 @@ def parse_yaml_config( filename ) :
     return config
 
 def get_target( config, name ) :
-    """ A stupid helper function """
+    """ An inefficient helper function """
     for rec in config["graphs"] :
         if rec["dataset"] == name :
             return rec
@@ -199,8 +199,8 @@ def get_sha256( config, name ) :
     if "file" in target :
         for filename in target["file"] :
             with open( replace_env_var( filename ), "rb") as f :
-                for chunk in iter(lambda: f.read(4096), b"") :
-                    sha256.update(chunk)
+                for chunk in iter( lambda: f.read(4096), b"") :
+                    sha256.update( chunk )
     if "zenodo" in target :
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -313,7 +313,6 @@ def main():
     """Main function of the kgsteward workflow."""
 
     args = get_user_input()
-
 
     # --------------------------------------------------------- #
     # Load YAML config and complete it

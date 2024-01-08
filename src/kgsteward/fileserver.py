@@ -1,14 +1,9 @@
 # The code below was strongly inspired by 
 #    https://github.com/python/cpython/blob/3.12/Lib/http/server.py
-# and I don't understand all the technical details
+# eventhough aI don't understand all the technical details
 
 import http.server
-import socket
-import threading
-import os
-import signal
 import time
-import contextlib
 import multiprocessing
 
 class MyServer( http.server.ThreadingHTTPServer ):
@@ -36,7 +31,7 @@ class LocalFileServer() :
     def expose( self, directory ) :
         if( self.thread and self.thread.is_alive() ):
             if( self.directory == directory ):
-                return # directory already exposed
+                return # directory is already exposed
             else :
                 self.terminate()
         self.directory = directory
@@ -48,7 +43,8 @@ class LocalFileServer() :
         )
         self.thread.start()
         print( f"# Directory {self.directory} is exposed on http://localhost:{self.port}" )
-        time.sleep( 0.2 ) # leaves some time for istarting the server
+        time.sleep( 0.2 ) # leaves some time for the seerver to start
+        
     def terminate( self ) :
         if( self.thread and self.thread.is_alive() ):
             self.thread.terminate();
