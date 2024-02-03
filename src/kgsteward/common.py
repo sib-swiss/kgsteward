@@ -1,6 +1,10 @@
 import requests
 import time
+import re
 import dumper
+
+RE_CATCH_BEGIN_SPACE = re.compile( "^(\\s*)" )
+RE_CATCH_END_SPACE   = re.compile( "(\\s*)$" )
 
 def http_call( request_args, status_code=[200], echo=True ):
     """A simple wrapper function arround requests.request() which 
@@ -24,4 +28,8 @@ main purpose is to
 def print_break():
 	print()
 	print( '# ------------------------------------------------------- #' )
- 
+
+def print_strip( txt ):
+    """Print after removing leading/trailing spaces"""
+    print( RE_CATCH_END_SPACE.sub( '', RE_CATCH_BEGIN_SPACE.sub( '', txt )), flush=True )
+
