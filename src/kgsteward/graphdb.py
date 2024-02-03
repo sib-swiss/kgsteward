@@ -4,7 +4,7 @@ import requests
 from dumper import dump
 from .common import *
 
-class GraphDBclient():
+class GraphDBClient():
 
     def __init__( self, graphdb_url, username, password, repository_id ):
         self.graphdb_url          = graphdb_url
@@ -86,7 +86,7 @@ class GraphDBclient():
 
     def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
         if echo :
-            print( sparql, flush=True )
+            print_strip( sparql )
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
@@ -100,7 +100,7 @@ class GraphDBclient():
 
     def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ) :
         if echo :
-            print( sparql, flush=True )
+            print_strip( sparql )
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/statements",
