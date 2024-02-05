@@ -1,4 +1,3 @@
-
 # Kgsteward config file
 
 ## Supported YAML syntax
@@ -6,7 +5,7 @@
 Within the YAM config file(s), UNIX environment variables can by referred to using `${...}`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment.
 
 
-*__`server_type`__
+* __`server_type`__ 
 
 Only two values are currently supported `RDF4J`or `GraphDB`
 
@@ -44,7 +43,7 @@ Note that the server endpoint is expected to be found at `${server_url}/reposito
 ```{yaml}
     repository_id: http://www.example.com/
 ```
-
+* __`file_server`__ - Boolean, `false` by default. If turned on, local files will be accessed through a temporary HTTP server. The benefit is the that RDF data are loaded with the same constraint as those supplied as URL, essentially file-size limits are suppressed and compressed formats are supported. The danger is that the simple python file server is insecure (see ), this should however pose no problem on a personal computer or on a server behind a firewall. 
 
 * __`RDF4J.config_file`__
 * __`GraphDB.config_file`__ - filename with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section about how to create such a file. 
