@@ -43,10 +43,9 @@ Note that the server endpoint is expected to be found at `${server_url}/reposito
 ```{yaml}
     repository_id: http://www.example.com/
 ```
-* __`file_server`__ - Boolean, `false` by default. If turned on, local files will be accessed through a temporary HTTP server. The benefit is the that RDF data are loaded with the same constraint as those supplied as URL, essentially file-size limits are suppressed and compressed formats are supported. The danger is that the simple python file server is insecure (see ), this should however pose no problem on a personal computer or on a server behind a firewall. 
+* __`use_file_server`__ - Boolean, `false` by default. When turned `true`: local files will be exposed in a temporary HTTP server and loaded from it. The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. 
 
-* __`RDF4J.config_file`__
-* __`GraphDB.config_file`__ - filename with the triplestore configutation, possibly a turtle file. This is only useful with the `-I` and `-F` options. See (...) section about how to create such a file. 
+* __`config_file`__ - filename with the triplestore configutation, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository is created interactively. This file is only used with the `-I` and `-F` options.
 
 ```{yaml}
     graphdb_config: config.ttl
