@@ -162,7 +162,7 @@ def parse_yaml_config( filename ) :
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     for key in list( config ) :
-        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "file_server", "graphs", "queries", "validations" ] :
+        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
     graphs = list()
@@ -405,7 +405,7 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            if config[ "file_server" ]:
+            if "use_file_server" in config:
                 fs = LocalFileServer()
                 for filename in target["file"] :
                     print_break()
