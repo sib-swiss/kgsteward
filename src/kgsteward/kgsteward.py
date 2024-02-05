@@ -43,10 +43,11 @@ import glob
 import yaml
 import requests         # https://docs.python-requests.org/en/master/user/quickstart/
 import getpass
-from   dumper    import dump # just in case to debug
+from   dumper    import dump # ready to help debugging
 
-from .graphdb    import GraphDBclient
-from .fuseki     import FusekiClient
+from .graphdb    import GraphDBClient
+# from .rdf4j      import RDF4JClient        # in preparation
+# from .fuseki     import FusekiClient       # in preparation
 from .fileserver import LocalFileServer 
 from .common     import *
 
@@ -153,6 +154,7 @@ def replace_env_var( txt ) :
     else:
         return txt
 
+# FIXME:validate syntax e.g. dataset name =~ /^\w+$/
 def parse_yaml_config( filename ) :
     """ Recursive parser of config file(s)"""
     print_break()
@@ -160,7 +162,7 @@ def parse_yaml_config( filename ) :
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     for key in list( config ) :
-        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "graphs", "queries", "validations" ] :
+        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "file_server", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
     graphs = list()
@@ -218,6 +220,7 @@ def get_sha256( config, name ) :
 def update_config( gdb, config ) :
     """ Add information about the currrent repository status """
     print_break()
+    print( "# Collect info about the current content of repository" )
     name2dataset = {}
     for dataset in config["graphs"] :
         name = dataset["dataset"]
@@ -231,12 +234,12 @@ PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
-WHERE{{
+WHERE{
     ?g a void:Dataset   ;
         void:triples  ?x      ;
         dct:modified  ?y      ;
-        ex:has_sha256 ?sha256 ;
-}}
+        ex:has_sha256 ?sha256 .
+}
 """ )
     re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
     for rec in r.json()["results"]["bindings"] :
@@ -283,7 +286,7 @@ WHERE{{
     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
-;
+
 INSERT {{
     GRAPH {context} {{
         {context} a void:Dataset ;
@@ -331,7 +334,8 @@ def main():
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBclient( 
+    gdb = GraphDBClient(
+        # RDF4JClient( 
         # FusekiClient(
         replace_env_var( config["endpoint"] ),
         replace_env_var( config["username"] ),
@@ -385,14 +389,14 @@ def main():
 
         print_break()
         graph_IRI = config["setup_base_IRI"] + name
-        gdb.sparql_update( f"DROP GRAPH <{graph_IRI}>", [ 204, 404 ] )
+        gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["setup_base_IRI"] + name + ">"
 
         if "url" in target :
             for urlx in target["url"] :
                 print_break()
                 path = "<" + replace_env_var( urlx ) + ">"
-                gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
+                gdb.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
@@ -401,8 +405,7 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            use_file_server = True
-            if use_file_server :
+            if config[ "file_server" ]:
                 fs = LocalFileServer()
                 for filename in target["file"] :
                     print_break()
@@ -525,11 +528,13 @@ INSERT DATA {{
 
     config = update_config( gdb, config )
     r = gdb.get_context_list()
+    j = r.json
     context = set()
     re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
-    for rec in r.json()["results"]["bindings"] :
-        name = re_catch_name.search( rec["contextID"]["value"] ).group( 1 )
-        context.add( name ) # FIXME
+    for rec in r.json()["results"]["bindings"] : 
+        name = re_catch_name.search( rec["contextID"]["value"] )
+        if name :
+            context.add( name.group( 1 ) )
 
     print( '-------------------------------------------------------------------')
     print( '       graph/context        #triple     last modified       status')
