@@ -6,7 +6,7 @@ A command line tool to help manage RDF store (GraphDB). Written in python.
 
 The code only depends on very standard Python packages. 
 Its installation should straightforward. 
-The easiest option is to install `kgsteward` with `pip`:
+The easiest option is to install `kgsteward` with `pip3`:
 
 ```shell
 pip3 install git+https://github.com/sib-swiss/kgsteward
