@@ -194,6 +194,8 @@ def get_sha256( config, name ) :
     sha256 = hashlib.sha256()
     target = get_target( config, name )
     context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
+    # FIXME: for url, verify is the server is responding, 
+    #        or better run an HTTP HEAD to get a checksum (ETag)
     if "url" in target :
         for urlx in target["url"] :
             path = "<" + replace_env_var( urlx ) + ">"

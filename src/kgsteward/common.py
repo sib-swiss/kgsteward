@@ -3,8 +3,11 @@ import time
 import re
 import dumper
 
+from termcolor import colored
+
 RE_CATCH_BEGIN_SPACE = re.compile( "^(\\s*)" )
 RE_CATCH_END_SPACE   = re.compile( "(\\s*)$" )
+RE_CATCH_TAB         = re.compile( "(\\t)" )
 
 def http_call( request_args, status_code=[200], echo=True ):
     """A simple wrapper function arround requests.request() which 
@@ -29,7 +32,11 @@ def print_break():
 	print()
 	print( '# ------------------------------------------------------- #' )
 
-def print_strip( txt ):
+def print_strip( txt, color = None ):
     """Print after removing leading/trailing spaces"""
-    print( RE_CATCH_END_SPACE.sub( '', RE_CATCH_BEGIN_SPACE.sub( '', txt )), flush=True )
+    txt = RE_CATCH_TAB.sub( '    ', RE_CATCH_END_SPACE.sub( '', RE_CATCH_BEGIN_SPACE.sub( '', txt )))
+    if color :
+        print( colored( txt, color ), flush = True )
+    else :
+        print( txt , flush = True )
 

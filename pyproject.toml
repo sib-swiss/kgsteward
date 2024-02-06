@@ -1,6 +1,6 @@
 [project]
 name = "kgsteward"
-version = "1.0.13"
+version = "1.0.14"
 authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
 description = "Knwowledge Graph Steward - Command line tool to help manage RDF store"
 readme = "README.md"
@@ -10,7 +10,7 @@ classifiers = [
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Operating System :: OS Independent",
 ]
-dependencies = [ "dumper", "requests", "pathlib", "PyYAML" ]
+dependencies = [ "dumper", "requests", "pathlib", "PyYAML", "termcolor" ]
 
 [project.urls]
 "Homepage" = "https://github.com/sib-swiss/kgsteward"
