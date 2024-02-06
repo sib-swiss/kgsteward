@@ -196,6 +196,9 @@ def get_sha256( config, name ) :
     context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
     # FIXME: for url, verify is the server is responding, 
     #        or better run an HTTP HEAD to get a checksum (ETag)
+    if "system" in target :
+        for cmd in target["system"] :
+            sha256.update( cmd.encode( 'utf-8' ))
     if "url" in target :
         for urlx in target["url"] :
             path = "<" + replace_env_var( urlx ) + ">"
@@ -393,6 +396,14 @@ def main():
         graph_IRI = config["setup_base_IRI"] + name
         gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["setup_base_IRI"] + name + ">"
+        
+        if "system" in target :
+            for cmd in target["system"] :
+                print_break()
+                print( "#System cmd: " + cmd )
+                exit_code = os.system( cmd )
+                if not exit_code == 0 :
+                    raise RuntimeError( 'System cmd failed: ' + "cmd" )
 
         if "url" in target :
             for urlx in target["url"] :
