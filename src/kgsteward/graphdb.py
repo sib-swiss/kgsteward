@@ -100,7 +100,7 @@ class GraphDBClient():
 
     def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ) :
         if echo :
-            print_strip( sparql, "blue")
+            print_strip( sparql, "green")
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/statements",
