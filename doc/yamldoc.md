@@ -1,6 +1,6 @@
-# Kgsteward config file
+# Kgsteward config file: YAML syntax
 
-## Supported YAML syntax
+## Server config parameters
 
 Within the YAM config file(s), UNIX environment variables can by referred to using `${...}`syntax. This is meant to faciliate the sharing of config files, as variable values remain stored in the local environment.
 
@@ -81,15 +81,15 @@ queries:
   - ${PATH_TO_SPARQL_QUERIES}/*.rq
 ```
 
-### `graphs` syntax
+## Datasets / RDF graphs /contexts syntax
 
-It consist in an ordered list of records that are processed in the supplied order. The following key is mandatory in every record
+ Values of the __`graphs`__ key consists in an ordered list of records that are processed in the supplied order. The following key is mandatory in every record:
 
 * __`dataset`__ - Mandatory name for this record. If `file`, `url`, `zenodo` or `update` are supplied, `target_context` will be created  as a RDF named graph/context by concataining `<dataset_base_IRI>` and `<dataset>`. A list datasets to update can be supplied to kgsteard with the `-d` option.
 
-At least one of the following keys should be supplied. Note that they will be executed in order `target_context`, `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a `parent` dependency. 
+At least one of the following keys should be supplied in every record. Note that they will always be executed in order `target_context`, `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a `parent` dependency. 
 
-* __`target_context`__ An optional RDF named graph/context that will overwrite the default one produced by concataining `<dataset_base_IRI>` and `<dataset>`. For example
+* __`target_context`__ An optional RDF named graph/context that will overwrite the default one produced by concataining `<dataset_base_IRI>` and `<dataset>`. __not yet implemented__
 
 ```{yaml}
 target_context: http://www.example.com/context/mytestcontext
