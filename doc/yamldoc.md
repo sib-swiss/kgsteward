@@ -83,7 +83,7 @@ queries:
 
 It consist in an ordered list of records that will be considered in the supplied order. The following key is manadtory in every record
 
-* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <setup_base_IRI><dataset> FIXME: rename this as `name`
+* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <dataset_base_IRI><dataset> FIXME: rename this as `name`
 
 At least one of the following keys should be supplied. Note that they will be executed in order `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a dependency. 
 
