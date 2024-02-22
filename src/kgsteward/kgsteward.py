@@ -154,15 +154,9 @@ def replace_env_var( txt ) :
     else:
         return txt
 
-# FIXME:validate syntax e.g. dataset name =~ /^\w+$/
-def parse_yaml_config( filename ) :
-    """ Recursive parser of config file(s)"""
-    print_break()
-    print( "# Parse yaml file: " + filename )
-    with open( filename, 'r') as f:
-        config = yaml.load( f, Loader = yaml.Loader )
+def verify_config( config ):
     for key in list( config ) :
-        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
+        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "server_config", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
         if "endpoint" in config and "server_url" not in config :
@@ -173,8 +167,22 @@ def parse_yaml_config( filename ) :
             config[ "dataset_base_IRI" ] = config[ "setup_base_IRI" ]
             del config[ "setup_base_IRI" ]
             print( "'setup_base_IRI' key is deprecated, use 'dataset_base_IRI' instead" )
+        if "graphdb_config" in config and "server_config" not in config :
+            config[ "server_config" ] = config[ "graphdb_config" ]
+            del config[ "graphdb_config" ]
+            print( "'graphdb_config' key is deprecated, use 'server_config' instead" )
+    return config
+
+# FIXME:validate syntax e.g. dataset name =~ /^\w+$/
+def parse_yaml_config( filename ) :
+    """ Recursive parser of config file(s)"""
+    print_break()
+    print( "# Parse yaml file: " + filename )
+    with open( filename, 'r') as f:
+        config = yaml.load( f, Loader = yaml.Loader )
+    config = verify_config( config )
     for key in list( config ) :
-        if key in [ "server_url", "repository_id", "username", "password", "dataset_base_IRI", "graphdb_config" ]:
+        if key in [ "server_url", "repository_id", "username", "password", "dataset_base_IRI", "server_config" ]:
             os.environ[ key ] = config[ key ]
     graphs = list()
     for item in config["graphs"] :
@@ -375,7 +383,7 @@ def main():
     # --------------------------------------------------------- #
 
     if args.I :
-        gdb.rewrite_repository( replace_env_var( config['graphdb_config'] ))
+        gdb.rewrite_repository( replace_env_var( config['server_config'] ))
 
     # --------------------------------------------------------- #
     # Establish the list of contexts/graphs to update
