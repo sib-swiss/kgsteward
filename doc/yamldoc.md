@@ -42,7 +42,9 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
 ```{yaml}
     setup_base_IRI: http://www.example.com/context/
 ```
-* __`use_file_server`__ - Boolean, `false` by default. When turned `true`: local files will be exposed in a temporary HTTP server and loaded from it. The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. 
+* __`use_file_server`__ - Boolean, `false` by default. When turned `true`: local files will be exposed in a temporary HTTP server and loaded from it. The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.
+
+* __`file_server_port`__  - Optional integer, default to 8000.
 
 * __`server_config`__ - filename with the triplestore configuration, possibly a turtle file. `graphdb_config` is a deprecated synonym. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository_id`. 
 
