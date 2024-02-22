@@ -31,7 +31,7 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
     username: admin
 ```
 
-* __`password`__ - The password of the abover user. It is highly recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! If this key is absent and the user will be prompted for a password, which might more secure.
+* __`password`__ - The password of a user with write-access rights to the triplestore. It is recommended that the value of this variable is passed trough an environment variable, such as the password is not stored directly in the config file! Alternatively if this key is absent and `username` is defined, a password will be prompted for interactively, which is more secure. 
 
 ```{yaml}
     password: ${SECRET_PASSWORD}
