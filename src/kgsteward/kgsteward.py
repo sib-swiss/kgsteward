@@ -169,6 +169,13 @@ def parse_yaml_config( filename ) :
             config[ "server_url" ] = config[ "endpoint" ]
             del config[ "endpoint" ]
             print( "'endpoint' key is deprecated, use 'server_url' instead" )
+        if "setup_base_IRI" in config and "dataset_base_IRI"  not in config :
+            config[ "dataset_base_IRI" ] = config[ "setup_base_IRI" ]
+            del config[ "setup_base_IRI" ]
+            print( "'setup_base_IRI' key is deprecated, use 'dataset_base_IRI' instead" )
+    for key in list( config ) :
+        if key in [ "server_url", "repository_id", "username", "password", "dataset_base_IRI", "graphdb_config" ]:
+            os.environ[ key ] = config[ key ]
     graphs = list()
     for item in config["graphs"] :
         if( "source" in item ) :
@@ -197,7 +204,7 @@ def get_target( config, name ) :
 def get_sha256( config, name ) :
     sha256 = hashlib.sha256()
     target = get_target( config, name )
-    context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
+    context = "<" + config["dataset_base_IRI"] + target["dataset"] + ">"
     os.environ["TARGET_GRAPH_CONTEXT"] = context
     # FIXME: for url, verify is the server is responding, 
     #        or better run an HTTP HEAD to get a checksum (ETag)
@@ -267,7 +274,7 @@ WHERE{
         ex:has_sha256 ?sha256 .
 }
 """ )
-    re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
+    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" )
     for rec in r.json()["results"]["bindings"] :
         name = re_catch_name.search( rec["g"]["value"] ).group( 1 )
         if not name in name2dataset :
@@ -301,7 +308,7 @@ WHERE{
 
 def update_dataset_info( gdb, config, name ) :
     print_break()
-    context = "<" + config["setup_base_IRI"] + name + ">"
+    context = "<" + config["dataset_base_IRI"] + name + ">"
     sha256 = get_sha256( config, name )
     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
@@ -345,9 +352,7 @@ def main():
     print()
     if not "server_url" in config :
         config["server_url"] = input( "Enter server_url : " )
-    if not "username" in config :
-        config["username"] = input( "Enter username : " )
-    if not "password" in config :
+    if "username" in config and not "password" in config :
         config["password"] = getpass.getpass( prompt = "Enter password : " )
 
     # --------------------------------------------------------- #
@@ -408,9 +413,9 @@ def main():
             continue
 
         print_break()
-        graph_IRI = config["setup_base_IRI"] + name
+        graph_IRI = config["dataset_base_IRI"] + name
         gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
-        context = "<" + config["setup_base_IRI"] + name + ">"
+        context = "<" + config["dataset_base_IRI"] + name + ">"
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -575,7 +580,7 @@ INSERT DATA {{
     r = gdb.get_context_list()
     j = r.json
     context = set()
-    re_catch_name = re.compile( config['setup_base_IRI'] + "(\\w+)" )
+    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" )
     for rec in r.json()["results"]["bindings"] : 
         name = re_catch_name.search( rec["contextID"]["value"] )
         if name :
