@@ -226,10 +226,12 @@ def get_sha256( config, name ) :
             path = "<" + replace_env_var( urlx ) + ">"
             sha256.update( path.encode('utf-8') )
     if "file" in target :
-        for filename in target["file"] :
-            with open( replace_env_var( filename ), "rb") as f :
-                for chunk in iter( lambda: f.read(4096), b"") :
-                    sha256.update( chunk )
+        for path in target["file"] :
+            filenames = sorted( glob.glob( replace_env_var( path )))
+            for filename in filenames :
+                with open( replace_env_var( filename ), "rb") as f :
+                    for chunk in iter( lambda: f.read(4096), b"") :
+                        sha256.update( chunk )
     if "zenodo" in target :
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -450,26 +452,30 @@ INSERT DATA {{
         if "file" in target :
             if "use_file_server" in config:
                 fs = LocalFileServer( port = config[ "file_server_port" ] )
-                for filename in target["file"] :
-                    print_break()
-                    dir, file = os.path.split( replace_env_var( filename ) )
-                    fs.expose( dir  )
-                    path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
-                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
-                    path = "file://" + replace_env_var( filename )
-                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                for path in target["file"] :
+                    filenames = sorted( glob.glob( replace_env_var( path )))
+                    for filename in filenames :
+                        print_break()
+                        dir, file = os.path.split( replace_env_var( filename ) )
+                        fs.expose( dir  )
+                        path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
+                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        path = "file://" + replace_env_var( filename )
+                        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump <{path}>
     }}
 }}""" )
                 fs.terminate()
-            else:
-                for filename in target["file"] :
-                    print_break()
-                    path = "file://" + replace_env_var( filename )
-                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
-                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+            else: # use_file_server is false
+                for path in target["file"] :
+                    filenames = sorted( glob.glob( replace_env_var( path )))
+                    for filename in filenames :
+                        print_break()
+                        path = "file://" + replace_env_var( filename )
+                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump <{path}>
@@ -531,7 +537,7 @@ INSERT DATA {{
 
     if args.V :
         for path in config["validations"] :
-            filenames = glob.glob( replace_env_var( path ))
+            filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
                 print( '----------------------------------------------------------')
                 print( filename )
@@ -558,7 +564,7 @@ INSERT DATA {{
                 'params' : { 'name': item['name']}
             })
         for path in config["queries"] :
-            filenames = glob.glob( replace_env_var( path ))
+            filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( '(.*\/|)([^\/]+)\.\w+$', r'\2', filename )
