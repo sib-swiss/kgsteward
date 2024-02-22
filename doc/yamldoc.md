@@ -102,16 +102,14 @@ system:
   - rapper -c -i turtle input.ttl
 ```
 
-* __`file`__ - Optional list of files containing RDF data. Wildcard "*" is supported in file names. The manner files are loaded depnds on the `use_file_server` are loaded. With GraphDB, if `use_file_server` is `false` there might be a maximal file size (200 MB by default) and compressed file format may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see above security warning. 
+* __`file`__ - Optional list of files containing RDF data. Wild card "*" can be used. The strategy to load the files depends on the `use_file_server` Boolean value. With GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above. 
 
 * __`url`__ - Optional list of url from which to load RDF data
 
-* __`zenodo`__ - Fetch turtle files from zenodo. This is a completely ad hoc command developped for ENPKG ().
+* __`zenodo`__ - Fetch turtle files from zenodo. This is a completely ad hoc command developped for ENPKG (), that would deserve to be better implemented/documented.
 
-* __`update`__ - Optional list of SPARQL updates command. Each list item is either a filename, or a record with the keys `file` (that expect a list of files) and `replace` that expect a list of string substitions to be executed on every SPARQL updates before being executed.  
+* __`update`__ - Optional list of SPARQL updates command. Each list item is either a filename, or a record with two keys `file` and `replace`.
 
-In addition, the following two keys are supported
+* __`source`__ A YAML file with the syntax described here. This has only been tested with the `graphs` key. This proved useful to sepparate server-specfic parameters in the outer YAML file, and datasets content in in the inner YAML file. 
 
-* __`source`__ A
-
-* __`parent`__ Create a dependency graph between datasets.
+* __`parent`__ A comma-separated list of dataset to encode dependency between datasets. Updating the parent datset will provoke the update of its children.
