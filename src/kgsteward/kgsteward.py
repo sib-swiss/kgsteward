@@ -156,7 +156,7 @@ def replace_env_var( txt ) :
 
 def verify_config( config ):
     for key in list( config ) :
-        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "server_config", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
+        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "server_config", "graphdb_config", "use_file_server", "file_server_port", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
         if "endpoint" in config and "server_url" not in config :
@@ -171,6 +171,8 @@ def verify_config( config ):
             config[ "server_config" ] = config[ "graphdb_config" ]
             del config[ "graphdb_config" ]
             print( "'graphdb_config' key is deprecated, use 'server_config' instead" )
+        if "file_server_port" not in config :
+            config[ "file_server_port" ] = 8000
     return config
 
 # FIXME:validate syntax e.g. dataset name =~ /^\w+$/
@@ -447,12 +449,12 @@ INSERT DATA {{
 
         if "file" in target :
             if "use_file_server" in config:
-                fs = LocalFileServer()
+                fs = LocalFileServer( port = config[ "file_server_port" ] )
                 for filename in target["file"] :
                     print_break()
                     dir, file = os.path.split( replace_env_var( filename ) )
-                    fs.expose( dir )
-                    path = "http://localhost:8000/" + file
+                    fs.expose( dir  )
+                    path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
                     gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
                     path = "file://" + replace_env_var( filename )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
