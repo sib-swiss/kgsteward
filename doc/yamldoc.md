@@ -19,7 +19,7 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
     server_url: http://localhost:7200
 ```
 
-* __`repository_id`__ - the name of the repository in the triplestore.
+* __`repository_id`__ - the name of the repository in the triplestore. This key is stored in the execution environment and can be accessed through ${repository_id}. 
 
 ```{yaml}
     repository_id: TEST
