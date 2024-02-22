@@ -83,22 +83,33 @@ queries:
 
 It consist in an ordered list of records that are processed in the supplied order. The following key is mandatory in every record
 
-* __`dataset`__ - Mandatory name for this record. It will be used to create the RDF named graph/context `<dataset_base_IRI><dataset>`. A list datasets to update can be supplied to kgsteard with the `-d` option.
+* __`dataset`__ - Mandatory name for this record. If `file`, `url`, `zenodo` or `update` are supplied, `target_context` will be created  as a RDF named graph/context by concataining `<dataset_base_IRI>` and `<dataset>`. A list datasets to update can be supplied to kgsteard with the `-d` option.
 
 At least one of the following keys should be supplied. Note that they will be executed in order `target_context`, `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a `parent` dependency. 
 
-* __`system`__ - A system command.  
+* __`target_context`__ An optional RDF named graph/context that will overwrite the default one produced by concataining `<dataset_base_IRI>` and `<dataset>`. For example
 
-* __`file`__ - Optional list of files containing RDF data. Nota Bene: there might be a maximal file size that is allowed - it is 200 MB by default for GraphDB and compressed file format may not be supported 
+```{yaml}
+target_context: http://www.example.com/context/mytestcontext
+```
+
+* __`system`__ - A list of system command. This is a simple convenience provided by kgsteward which is not meant to be a replacement for serious make-like system (as git/dvc).
+
+```{yaml}
+system:
+  - rapper -c -i turtle input.ttl
+```
+
+* __`file`__ - Optional list of files containing RDF data. Wildcard "*" is supported in file names. The manner files are loaded depnds on the `use_file_server` are loaded. With GraphDB, if `use_file_server` is `false` there might be a maximal file size (200 MB by default) and compressed file format may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see above security warning. 
 
 * __`url`__ - Optional list of url from which to load RDF data
 
-* __`zenodo`__ - Fetch turtle from zenodo. This is an ad hoc command developped for ENPKG.
+* __`zenodo`__ - Fetch turtle files from zenodo. This is a completely ad hoc command developped for ENPKG ().
 
-* __`update`__ 
+* __`update`__ - Optional list of SPARQL updates command. Each list item is either a filename, or a record with the keys `file` (that expect a list of files) and `replace` that expect a list of string substitions to be executed on every SPARQL updates before being executed.  
 
 In addition, the following two keys are supported
 
 * __`source`__ A
 
-* __`parent`__ Create a dependency graph between resource
+* __`parent`__ Create a dependency graph between datasets.
