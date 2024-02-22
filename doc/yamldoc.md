@@ -81,11 +81,11 @@ queries:
 
 ### `graphs` syntax
 
-It consist in an ordered list of records that will be considered in the supplied order. The following key is manadtory in every record
+It consist in an ordered list of records that are processed in the supplied order. The following key is mandatory in every record
 
-* __`dataset`__ - Mandatory name for this record. It will permit to create the RDF named graph <dataset_base_IRI><dataset> FIXME: rename this as `name`
+* __`dataset`__ - Mandatory name for this record. It will be used to create the RDF named graph/context `<dataset_base_IRI><dataset>`. A list datasets to update can be supplied to kgsteard with the `-d` option.
 
-At least one of the following keys should be supplied. Note that they will be executed in order `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a dependency. 
+At least one of the following keys should be supplied. Note that they will be executed in order `target_context`, `system`, `url`, `file`, `zenodo`, `update`. For a different order, use two datasets and a `parent` dependency. 
 
 * __`system`__ - A system command.  
 
