@@ -47,7 +47,7 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
 * __`server_config`__ - filename with the triplestore configutation, possibly a turtle file. `graphdb_config` is a deprecated synonym. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository is created interactively, thus permitting to reproduce the repository configuration elswhere. This file is only used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in this config file and should be maintained in sync with `repository_id`. 
 
 ```{yaml}
-    graphdb_config: config.ttl
+    server_config: config.ttl
 ```
 
 * __`graphs`__ - Mandatory data graphs configuration, see details below. For example
