@@ -13,12 +13,11 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
     server_type: GraphDB
 ```
 
-* __`server_url`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined
+* __`server_url`__ - The SPARQL endpoint url. This key is optional and the user is prompted for it if it is not defined. __`endpoint`__ is a deprecated synonym for `server_url`. It is actually misleading as the real SPARQL endpoint is located at `${server_url}/repositories/${repository_id}` in RDF4J and GraphDB servers. For example 
 
 ```{yaml}
     server_url: http://localhost:7200
 ```
-`endpoint`is synonym for `server_url`. In addition of being deprecated, it is misleading as the SPARQL endpoint is actually located at `${server_url}/repositories/${repository_id}` for RDF4J and GraphDB servers. 
 
 * __`repository_id`__ - the name of the repository in the triplestore.
 
