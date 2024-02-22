@@ -5,7 +5,7 @@ A command line tool to help manage RDF store (GraphDB). Written in python.
 ## Installation
 
 The code only depends on very standard Python packages.
-Its installation should straightforward.
+Its installation should be straightforward.
 The easiest option is to install `kgsteward` with `pip3`:
 
 ```shell
@@ -32,3 +32,11 @@ pip install --upgrade setuptools
 ```shell
 kgsteward -h
 ```
+
+## Documentation
+
+## References
+
+__`kgsteward`__ was developped to manage experimental chemical data (LC-MS2) and experimental biological data (bio-activity) data together with reference chemical structures derived from public database (LOTUS, wikidata) as reported in [A Sample-Centric and Knowledge-Driven Computational Framework for Natural Products Drug Discovery](https://doi.org/10.1021/acscentsci.3c00800)
+
+
