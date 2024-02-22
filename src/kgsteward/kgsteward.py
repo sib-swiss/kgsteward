@@ -162,9 +162,13 @@ def parse_yaml_config( filename ) :
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     for key in list( config ) :
-        if key not in [ "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
+        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "graphdb_config", "use_file_server", "graphs", "queries", "validations" ] :
             print( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
+        if "endpoint" in config and "server_url" not in config :
+            config[ "server_url" ] = config[ "endpoint" ]
+            del config[ "endpoint" ]
+            print( "'endpoint' key is deprecated, use 'server_url' instead" )
     graphs = list()
     for item in config["graphs"] :
         if( "source" in item ) :
@@ -194,6 +198,7 @@ def get_sha256( config, name ) :
     sha256 = hashlib.sha256()
     target = get_target( config, name )
     context = "<" + config["setup_base_IRI"] + target["dataset"] + ">"
+    os.environ["TARGET_GRAPH_CONTEXT"] = context
     # FIXME: for url, verify is the server is responding, 
     #        or better run an HTTP HEAD to get a checksum (ETag)
     if "system" in target :
@@ -217,8 +222,24 @@ def get_sha256( config, name ) :
             for record in info["files"] :
                 sha256.update( record["checksum"].encode('utf-8'))
     if "update" in target :
-        for filename in target["update"] :
+        for token in target["update"] :
+            replace = []
+            if isinstance( token , dict ):
+                for key, value in token.items():
+                    if not value: # None
+                        filename = key
+                    elif key == "replace":
+                        for d in value:
+                            for k, v in d.items():
+                                replace.append(( replace_env_var( k ), replace_env_var( v )))
+                    else:
+                        raise RuntimeError("Unsupported key: " + key )
+            else:
+                filename = token
             with open( replace_env_var( filename )) as f: sparql = f.read()
+            if replace :
+                for old, new in replace:
+                    sparql = sparql.replace( old, new )
             sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
@@ -282,12 +303,6 @@ def update_dataset_info( gdb, config, name ) :
     print_break()
     context = "<" + config["setup_base_IRI"] + name + ">"
     sha256 = get_sha256( config, name )
-    gdb.sparql_update( f"""DELETE
-WHERE{{
-    GRAPH {context} {{
-        {context} ?p ?o
-    }}
-}}""" )
     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
@@ -328,8 +343,8 @@ def main():
 
     config = parse_yaml_config( replace_env_var( args.yamlfile[0] ))
     print()
-    if not "endpoint" in config :
-        config["endpoint"] = input( "Enter endpoint : " )
+    if not "server_url" in config :
+        config["server_url"] = input( "Enter server_url : " )
     if not "username" in config :
         config["username"] = input( "Enter username : " )
     if not "password" in config :
@@ -342,7 +357,7 @@ def main():
     gdb = GraphDBClient(
         # RDF4JClient( 
         # FusekiClient(
-        replace_env_var( config["endpoint"] ),
+        replace_env_var( config["server_url"] ),
         replace_env_var( config["username"] ),
         replace_env_var( config["password"] ),
         replace_env_var( config["repository_id"] )
@@ -396,7 +411,7 @@ def main():
         graph_IRI = config["setup_base_IRI"] + name
         gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["setup_base_IRI"] + name + ">"
-        
+        os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
                 print_break()
@@ -463,9 +478,26 @@ INSERT DATA {{
 }}""" )
 
         if "update" in target :
-            for filename in target["update"] :
+            for token in target["update"] :
+                replace = []
+                if isinstance( token , dict ):
+                    for key, value in token.items():
+                        if not value: # None
+                            filename = key
+                        elif key == "replace":
+                            for d in value:
+                                for k, v in d.items():
+                                    replace.append(( replace_env_var( k ), replace_env_var( v )))
+                        else:
+                            raise RuntimeError("Unsupported key: " + key )
+                else:
+                    filename = token
                 print_break()
                 with open( replace_env_var( filename )) as f: sparql = f.read()
+                if replace :
+                    for old, new in replace:
+                        sparql = sparql.replace( old, new )
+                
                 gdb.sparql_update( sparql )
 
         update_dataset_info( gdb, config, name )
