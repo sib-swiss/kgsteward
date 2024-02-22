@@ -25,7 +25,7 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
     repository_id: TEST
 ```
 
-* __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and the user is prompted for it if it is not defined
+* __`username`__ - The name of a user with write access-rights in the triplestore. This key is optional and it if it absent the serve is expected to be accessed in write more without authentication. For example:
 
 ```{yaml}
     username: admin
