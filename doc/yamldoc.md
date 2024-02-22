@@ -37,7 +37,7 @@ Only one values is currently supported: `GraphDB` and it is the defaults. This k
     password: ${SECRET_PASSWORD}
 ```
 
-* __`dataset_base_IRI`__ - base IRI to construct the name the RDF graphs/context. `setup_base_IRI` is a deprecated synonyme. See `graphs` below for how it is used. For example 
+* __`dataset_base_IRI`__ - base IRI to construct the name the RDF graphs/context. `setup_base_IRI` is a deprecated synonym. See `graphs` below for how it is used. For example 
 
 ```{yaml}
     setup_base_IRI: http://www.example.com/context/
