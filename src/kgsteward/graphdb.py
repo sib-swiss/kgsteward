@@ -12,6 +12,8 @@ class GraphDBClient():
         self.password             = password
         self.repository_id        = repository_id
         self.authorization        = '' # to be set below
+        print_break()
+        print_task( "try contacting server" ) 
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/login/" + self.username,
@@ -152,15 +154,15 @@ class GraphDBClient():
         }, [ 503, 500, 400, 200 ], echo )
         if r.status_code == 503 :
             time.sleep( 1 )
-            print( "\t" + "query timed out" )
+            report( "status", "query timed out" )
         elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
             time.sleep( 1 )
-            print( "\t" + "unknown error, maybe timeout" )
+            report( "status", "unknown error, maybe timeout" )
         elif r.status_code == 400 :
             raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
         else : #  r.status_code == 200 :
             n = r.text.count( "\n" )
             if n == 0 :
-                print( "\t" + "!!! empty results !!!" )
+                report( "status" + "!!! empty results !!!" )
             else :
-                print( "\t" + str( n ) + " lines returned" )
+                report( "status", str( n ) + " lines returned" )

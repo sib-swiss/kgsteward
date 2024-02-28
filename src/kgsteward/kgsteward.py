@@ -157,20 +157,20 @@ def replace_env_var( txt ) :
 def verify_config( config ):
     for key in list( config ) :
         if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "server_config", "graphdb_config", "use_file_server", "file_server_port", "graphs", "queries", "validations" ] :
-            print( "Ignored config key in file (" + filename + "): " + key )
+            print_warn( "Ignored config key in file (" + filename + "): " + key )
             del config[key]
         if "endpoint" in config and "server_url" not in config :
             config[ "server_url" ] = config[ "endpoint" ]
             del config[ "endpoint" ]
-            print( "'endpoint' key is deprecated, use 'server_url' instead" )
+            print_warn( '"endpoint" is deprecated, use "server_url" instead' )
         if "setup_base_IRI" in config and "dataset_base_IRI"  not in config :
             config[ "dataset_base_IRI" ] = config[ "setup_base_IRI" ]
             del config[ "setup_base_IRI" ]
-            print( "'setup_base_IRI' key is deprecated, use 'dataset_base_IRI' instead" )
+            print_warn( '"setup_base_IRI" is deprecated, use "dataset_base_IRI" instead' )
         if "graphdb_config" in config and "server_config" not in config :
             config[ "server_config" ] = config[ "graphdb_config" ]
             del config[ "graphdb_config" ]
-            print( "'graphdb_config' key is deprecated, use 'server_config' instead" )
+            print_warn( '"graphdb_config" is deprecated, use "server_config" instead' )
         if "file_server_port" not in config :
             config[ "file_server_port" ] = 8000
     return config
@@ -178,8 +178,7 @@ def verify_config( config ):
 # FIXME:validate syntax e.g. dataset name =~ /^\w+$/
 def parse_yaml_config( filename ) :
     """ Recursive parser of config file(s)"""
-    print_break()
-    print( "# Parse yaml file: " + filename )
+    report( "parse file", filename )
     with open( filename, 'r') as f:
         config = yaml.load( f, Loader = yaml.Loader )
     config = verify_config( config )
@@ -192,7 +191,7 @@ def parse_yaml_config( filename ) :
             c = parse_yaml_config( replace_env_var( item["source"] )) # recursion
             for key in list( c ) :
                 if key not in [ "graphs" ] :
-                    print( "Ignored config key from file (" + filename + "): " + key )
+                    print_warn( "Ignored config key: " + key )
             for graph in c["graphs"] :
                 if graph["dataset"] in config["graphs"] :
                     raise RuntimeError( "Duplicated dataset name: " + item["dataset"] )
@@ -265,7 +264,7 @@ def get_sha256( config, name ) :
 def update_config( gdb, config ) :
     """ Add information about the currrent repository status """
     print_break()
-    print( "# Collect info about the current content of repository" )
+    print_task( "retrieve current status" )
     name2dataset = {}
     for dataset in config["graphs"] :
         name = dataset["dataset"]
@@ -360,8 +359,10 @@ def main():
     # Load YAML config and complete it
     # --------------------------------------------------------- #
 
+    print_break()
+    print_task( "read YAML config" );
     config = parse_yaml_config( replace_env_var( args.yamlfile[0] ))
-    print()
+    # print()
     if not "server_url" in config :
         config["server_url"] = input( "Enter server_url : " )
     if "username" in config and not "password" in config :
@@ -425,13 +426,13 @@ def main():
             continue
 
         print_break()
+        print_task( "update dataset " + name )
         graph_IRI = config["dataset_base_IRI"] + name
         gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
         context = "<" + config["dataset_base_IRI"] + name + ">"
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
-                print_break()
                 print( "#System cmd: " + cmd )
                 exit_code = os.system( cmd )
                 if not exit_code == 0 :
@@ -439,7 +440,6 @@ def main():
 
         if "url" in target :
             for urlx in target["url"] :
-                print_break()
                 path = "<" + replace_env_var( urlx ) + ">"
                 gdb.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -455,7 +455,6 @@ INSERT DATA {{
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
-                        print_break()
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
                         path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
@@ -472,7 +471,6 @@ INSERT DATA {{
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
-                        print_break()
                         path = "file://" + replace_env_var( filename )
                         gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
                         gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -488,7 +486,6 @@ INSERT DATA {{
                     raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
                 for record in info["files"] :
-                    print_break()
                     path = "<https://zenodo.org/records/" + str( id ) + "/files/" + record["key"] + ">"
                     gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -513,7 +510,6 @@ INSERT DATA {{
                             raise RuntimeError("Unsupported key: " + key )
                 else:
                     filename = token
-                print_break()
                 with open( replace_env_var( filename )) as f: sparql = f.read()
                 if replace :
                     for old, new in replace:
@@ -591,7 +587,7 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     # Print final repository status
     # --------------------------------------------------------- #
-
+    
     config = update_config( gdb, config )
     r = gdb.get_context_list()
     j = r.json
@@ -602,16 +598,22 @@ INSERT DATA {{
         if name :
             context.add( name.group( 1 ) )
 
-    print( '-------------------------------------------------------------------')
-    print( '       graph/context        #triple     last modified       status')
-    print( '-------------------------------------------------------------------')
+    print_break()
+    print_task( "show current status" )
+    print( '#         dataset           #triple        last modified    status')
+    print( '#      =============        =======     =================== ======' )
     for dataset in config["graphs"] :
-        print('{:>20} : {:>12}    {:>20} {}'.format( dataset["dataset"], dataset["count"], dataset["date"], dataset["status"] ))
+        print('{:>20}   {:>12}    {:>20} {}'.format( 
+            dataset["dataset"], 
+            dataset["count"], 
+            dataset["date"], 
+            dataset["status"]
+        ))
         if dataset["dataset"] in context :
             context.remove( dataset["dataset"] )
     for name in context:
         print('{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ))
-    print( '-------------------------------------------------------------------')
+    print_break()
 
 # --------------------------------------------------------- #
 # Main

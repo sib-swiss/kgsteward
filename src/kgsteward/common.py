@@ -16,7 +16,7 @@ main purpose is to
 	(1) print elapsed time
     (2) print query parameters in case of an unexpected status code."""     
     if echo :   
-        print( '#', request_args['method'], request_args['url'], flush=True )
+        report( request_args['method'], request_args['url'] )
     start_time = time.time()
     r = requests.request( **request_args )
     end_time = time.time() 
@@ -25,12 +25,14 @@ main purpose is to
         print( r.status_code, flush=True )
         print( r.text if not r.text is None else '', flush=True )
         raise RuntimeError( "HTTP request failed!" )
-    print( "# Elapsed time:", end_time - start_time, flush=True ) 
+    report( "elapsed time", end_time - start_time ) 
     return r
 
 def print_break():
-	print()
-	print( '# ------------------------------------------------------- #' )
+    # print()
+# print( '# ------------------------------------------------------- #' )
+    print( '# -----------------------------------------------------------------')
+
 
 def print_strip( txt, color = None ):
     """Print after removing leading/trailing spaces"""
@@ -39,4 +41,14 @@ def print_strip( txt, color = None ):
         print( colored( txt, color ), flush = True )
     else :
         print( txt , flush = True )
+
+def report( key, value, color = "black" ) :
+    print( '# ' + colored( f"{key:>12} : {value}" , color ), flush = True )
+
+def print_task( txt ):
+    report( 'TASK', txt, color = "black" )
+
+def print_warn( txt ):
+    report( 'warning', txt, color = "red" )
+
 
