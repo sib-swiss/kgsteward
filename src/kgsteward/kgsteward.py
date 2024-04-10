@@ -44,6 +44,7 @@ import yaml
 import requests         # https://docs.python-requests.org/en/master/user/quickstart/
 import getpass
 from   dumper    import dump # ready to help debugging
+from termcolor   import colored
 
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient        # in preparation
@@ -127,6 +128,11 @@ def get_user_input():
                  "site, i.e. they are not attached to a specific repository. "
                  "It may fail on SPARQL syntax error!"
     )
+    parser.add_argument(
+        '-P',
+        action = 'store_true',
+        help   = "Reset all prefixes"
+    )
     args = parser.parse_args()
 
     # Further processing of command line arguments
@@ -156,8 +162,8 @@ def replace_env_var( txt ) :
 
 def verify_config( config ):
     for key in list( config ) :
-        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "server_config", "graphdb_config", "use_file_server", "file_server_port", "graphs", "queries", "validations" ] :
-            print_warn( "Ignored config key in file (" + filename + "): " + key )
+        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "dataset_base_IRI", "server_config", "graphdb_config", "use_file_server", "file_server_port", "graphs", "queries", "validations", "prefixes" ] :
+            print_warn( "Ignored config key in YAML: " + key )
             del config[key]
         if "endpoint" in config and "server_url" not in config :
             config[ "server_url" ] = config[ "endpoint" ]
@@ -241,24 +247,28 @@ def get_sha256( config, name ) :
                 sha256.update( record["checksum"].encode('utf-8'))
     if "update" in target :
         for token in target["update"] :
-            replace = []
+            sparql_update = []
+            replace       = []
             if isinstance( token , dict ):
-                for key, value in token.items():
-                    if not value: # None
-                        filename = key
-                    elif key == "replace":
-                        for d in value:
-                            for k, v in d.items():
-                                replace.append(( replace_env_var( k ), replace_env_var( v )))
-                    else:
+                for key, value in token.items(): # first pass
+                    if key == "sparql_update_file" :
+                        for filename in value:
+                            with open( replace_env_var( filename )) as f: sparql = f.read()
+                            sparql_update.append( sparql )
+                    elif key != "replace":
                         raise RuntimeError("Unsupported key: " + key )
+                    for key, value in token.items(): # second pass
+                        if key == "replace":
+                            for d in value:
+                                for k, v in d.items():
+                                    for i in range( len( sparql_update )):
+                                        sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
+                    for sparql in sparql_update:
+                        sha256.update( sparql.encode('utf-8'))
             else:
                 filename = token
-            with open( replace_env_var( filename )) as f: sparql = f.read()
-            if replace :
-                for old, new in replace:
-                    sparql = sparql.replace( old, new )
-            sha256.update( sparql.encode('utf-8'))
+                with open( replace_env_var( filename )) as f: sparql = f.read()
+                sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
 def update_config( gdb, config ) :
@@ -497,27 +507,47 @@ INSERT DATA {{
 
         if "update" in target :
             for token in target["update"] :
-                replace = []
+                sparql_update = []
+                replace       = []
                 if isinstance( token , dict ):
-                    for key, value in token.items():
-                        if not value: # None
-                            filename = key
-                        elif key == "replace":
+                    for key, value in token.items(): # first pass
+                        if key == "sparql_update_file" :
+                            for filename in value:
+                                with open( replace_env_var( filename )) as f: sparql = f.read()
+                                sparql_update.append( sparql )
+                        elif key != "replace":
+                            raise RuntimeError("Unsupported key: " + key )
+                    for key, value in token.items(): # second pass
+                        if key == "replace":
                             for d in value:
                                 for k, v in d.items():
-                                    replace.append(( replace_env_var( k ), replace_env_var( v )))
-                        else:
-                            raise RuntimeError("Unsupported key: " + key )
+                                    for i in range( len( sparql_update )):
+                                        sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
+                    for sparql in sparql_update:
+                        gdb.sparql_update( sparql )
                 else:
                     filename = token
-                with open( replace_env_var( filename )) as f: sparql = f.read()
-                if replace :
-                    for old, new in replace:
-                        sparql = sparql.replace( old, new )
-                
-                gdb.sparql_update( sparql )
+                    with open( replace_env_var( filename )) as f: sparql = f.read()
+                    gdb.sparql_update( sparql )
 
         update_dataset_info( gdb, config, name )
+
+
+    # --------------------------------------------------------- #
+    # Force update namespace declarations
+    # --------------------------------------------------------- #
+
+    if args.P and "prefixes" in config:
+        print_task( "rewrite prefixes" )
+        gdb.rewrite_prefixes()
+        catch_key_value = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>" )
+        for filename in config["prefixes"] :
+            report( "parse file", filename )
+            file = open( replace_env_var( filename ))
+            for line in file:
+                match = catch_key_value.search( line )
+                if match:
+                    gdb.set_prefix( match.group( 1 ), match.group( 2 ))
 
     # --------------------------------------------------------- #
     # Force update dataset info
@@ -563,7 +593,7 @@ INSERT DATA {{
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
                 with open( filename ) as f: sparql = f.read()
-                name = re.sub( '(.*\/|)([^\/]+)\.\w+$', r'\2', filename )
+                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 print( "TEST:   " + name)
                 gdb.validate_sparql_query( sparql, echo=False)
                 print( "LOAD:   " + name)
@@ -600,19 +630,19 @@ INSERT DATA {{
 
     print_break()
     print_task( "show current status" )
-    print( '#         dataset           #triple        last modified    status')
-    print( '#      =============        =======     =================== ======' )
+    print( colored("         dataset           #triple        last modified    status", "blue" ))
+    print( colored("      =============        =======     =================== ======", "blue" ))
     for dataset in config["graphs"] :
-        print('{:>20}   {:>12}    {:>20} {}'.format( 
+        print( colored( '{:>20}   {:>12}    {:>20} {}'.format( 
             dataset["dataset"], 
             dataset["count"], 
             dataset["date"], 
             dataset["status"]
-        ))
+        ), "blue" ))
         if dataset["dataset"] in context :
             context.remove( dataset["dataset"] )
     for name in context:
-        print('{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ))
+        print( colored( '{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
 # --------------------------------------------------------- #

@@ -166,3 +166,25 @@ class GraphDBClient():
                 report( "status" + "!!! empty results !!!" )
             else :
                 report( "status", str( n ) + " lines returned" )
+
+    def rewrite_prefixes( self, echo = True ):
+        r = http_call({
+            'method'  : 'DELETE',
+            'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/namespaces",
+            'headers' : {
+                'Authorization' : self.authorization
+            }
+        }, [204], echo )
+
+    def set_prefix( self, short, long, echo = True ):
+        r = http_call({
+            'method'  : 'PUT',
+            'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/namespaces/" + short,
+            'headers' : {
+                'Accept'        : "text/plain",
+                'Authorization' : self.authorization
+            },
+            'data'    : long
+        }, [204], echo )
+
+
