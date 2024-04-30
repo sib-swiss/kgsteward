@@ -443,10 +443,11 @@ def main():
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
-                print( "#System cmd: " + cmd )
-                exit_code = os.system( cmd )
+                cmd2 = replace_env_var( cmd )
+                print( colored( cmd2, "cyan" ))
+                exit_code = os.system( cmd2 )
                 if not exit_code == 0 :
-                    raise RuntimeError( 'System cmd failed: ' + "cmd" )
+                    raise RuntimeError( 'System cmd failed: ' + cmd2 )
 
         if "url" in target :
             for urlx in target["url"] :
@@ -572,7 +573,8 @@ INSERT DATA {{
                 if r.text.count( "\n" ) == 1 :
                     print( "---- Pass ;-) ----")
                 else:
-                    print( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )))
+                    print( colored( sparql, "green" ))
+                    print( colored( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )), "red" ))
         print( '----------------------------------------------------------')
         sys.exit( 0 )
 
