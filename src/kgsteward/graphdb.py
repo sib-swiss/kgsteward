@@ -13,7 +13,7 @@ class GraphDBClient():
         self.repository_id        = repository_id
         self.authorization        = '' # to be set below
         print_break()
-        print_task( "try contacting server" ) 
+        print_task( "contacting server" ) 
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/login/" + self.username,
