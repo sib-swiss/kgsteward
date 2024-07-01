@@ -1,6 +1,5 @@
 import time
 
-import requests
 from dumper import dump
 from .common import *
 
@@ -140,7 +139,7 @@ class GraphDBClient():
 
     def validate_sparql_query( self, sparql, echo = False ) :
         r = http_call({
-            'method'  : 'GET',
+            'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
             'headers' : {
                 'Accept'        : 'text/tab-separated-values',
