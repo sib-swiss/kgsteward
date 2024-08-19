@@ -1,3 +1,24 @@
+# --------------------------------------------------------- #
+# Some REST services were not documented in the help pages
+# of GraphDB. The syntax of these services can be deduced
+# from the JS code of the graphdb-workbench at GitHub
+#
+#    https://github.com/Ontotext-AD/graphdb-workbench
+#
+# in directory /src/js/angular/rest, or better in
+#
+# https://rdf4j.org/documentation/reference/rest-api/
+#
+# If one mess up with user/password, GraphDB may end up in
+# a state where connection become impossible. The only
+# way out is to erase the graphdb.home directory
+# (Mac in ~/Library/Application\ Support/GraphDB)
+# and restart GraphDB. All data will be lost!
+#
+# Given the frequent updates of GraphDB, some of the 
+# above comments might already be deprecated.
+# --------------------------------------------------------- #
+
 import time
 
 from dumper import dump
@@ -119,8 +140,9 @@ class GraphDBClient():
             status_code_ok=status_code_ok,
             echo=echo,
         )
-    def get_context_list( self, echo = True ) :
-        return http_call({
+    
+    def get_contexts( self, echo = True ) :
+        r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/contexts",
             'headers' : {
@@ -128,6 +150,10 @@ class GraphDBClient():
                 'Authorization' : self.authorization
             }
         }, [ 200 ], echo )
+        contexts = set()
+        for rec in r.json()["results"]["bindings"] : 
+            contexts.add( "<" + rec["contextID"]["value"] + ">" )
+        return contexts
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )
