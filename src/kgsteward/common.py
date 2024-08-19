@@ -28,6 +28,14 @@ main purpose is to
     report( "elapsed time", end_time - start_time ) 
     return r
 
+def get_head_info( url ):
+    r = http_call({ 'method': 'HEAD', 'url': url })
+    str = ""
+    for key in sorted( r.headers ):
+         if key.lower() in [ "last-modified",  "content-length" ]:
+            str += key + " " + r.headers[ key ] + " "
+    return str
+
 def print_break():
     # print()
 # print( '# ------------------------------------------------------- #' )
