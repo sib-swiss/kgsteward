@@ -1,39 +1,5 @@
 """Main kgsteward module."""
 
-# https://confluence.csiro.au/public/VOCAB/vocabulary-services/publishing-vocabularies/best-practice-in-formalizing-a-skos-vocabulary
-
-# https://rdf4j.org/documentation/reference/rest-api/
-
-# About relationship of dcat:Dataset and void:Dataset
-# https://lists.w3.org/Archives/Public/public-lod/2017Mar/0014.html
-
-# https://www.w3.org/TR/dwbp/
-
-# https://wimmics.github.io/voidmatic/
-
-# Very useful list of recommendations including vocabulary suggestion and SPARQL example
-# https://www.w3.org/TR/hcls-dataset/
-# https://eudat.eu/sites/default/files/MichelDumontier.pdf
-# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4991880/
-
-# --------------------------------------------------------- #
-# Some REST services are not documented in the help pages
-# of GraphDB. The syntax of these services can be deduced
-# from the JS code of the graphdb-workbench at GitHub
-#
-#    https://github.com/Ontotext-AD/graphdb-workbench
-#
-# in directory /src/js/angular/rest, or better in
-#
-# https://rdf4j.org/documentation/reference/rest-api/
-#
-# If one mess up with user/password, GraphDB may end up in
-# a state where connection become impossible. The only
-# way out is to erase the graphdb.home directory
-# (Mac in ~/Library/Application\ Support/GraphDB)
-# and restart GraphDB. All data will be lost!
-# --------------------------------------------------------- #
-
 import argparse
 import os
 import sys
@@ -41,10 +7,10 @@ import re
 import hashlib
 import glob
 import yaml
-import requests         # https://docs.python-requests.org/en/master/user/quickstart/
+import requests  # https://docs.python-requests.org/en/master/user/quickstart/
 import getpass
-from   dumper    import dump # ready to help debugging
-from termcolor   import colored
+from   dumper    import dump # get ready to help debugging
+from   termcolor import colored
 
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient        # in preparation
@@ -162,7 +128,10 @@ def replace_env_var( txt ) :
 
 def verify_config( config ):
     for key in list( config ) :
-        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", "setup_base_IRI", "dataset_base_IRI", "server_config", "graphdb_config", "use_file_server", "file_server_port", "graphs", "queries", "validations", "prefixes" ] :
+        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", 
+                        "setup_base_IRI", "dataset_base_IRI", "server_config", "graphdb_config", 
+                        "use_file_server", "file_server_port", "graphs", "queries", "validations", 
+                        "prefixes" ] :
             print_warn( "Ignored config key in YAML: " + key )
             del config[key]
         if "endpoint" in config and "server_url" not in config :
@@ -209,27 +178,48 @@ def parse_yaml_config( filename ) :
     config["graphs"] = graphs
     return config
 
-def get_target( config, name ) :
+def get_target( config, name ):
     """ An inefficient helper function """
     for rec in config["graphs"] :
         if rec["dataset"] == name :
             return rec
     raise RuntimeError( "Target dataset not found: " + name )
 
+def get_context( config, name ):
+    target = get_target( config, name )
+    if "target_graph_context" in target :
+        context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
+    else:
+        context = "<" + config["dataset_base_IRI"] + name + ">"
+    return context
+
 def get_sha256( config, name ) :
     sha256 = hashlib.sha256()
     target = get_target( config, name )
-    context = "<" + config["dataset_base_IRI"] + target["dataset"] + ">"
+    context = get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
-    # FIXME: for url, verify is the server is responding, 
-    #        or better run an HTTP HEAD to get a checksum (ETag)
     if "system" in target :
         for cmd in target["system"] :
             sha256.update( cmd.encode( 'utf-8' ))
     if "url" in target :
-        for urlx in target["url"] :
-            path = "<" + replace_env_var( urlx ) + ">"
+        for url in target["url"] :
+            path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
+            info = get_head_info( path ) # as a side effect: verify is the server is responding
+            sha256.update( info.encode('utf-8') )
+    if "stamp" in target :
+        for link in target["stamp"] :
+            path = replace_env_var( link )
+            sha256.update( path.encode('utf-8') )
+            if( path.startswith( "http:" )):
+                info = get_head_info( path ) # as a side effect: verify is the server is responding
+                sha256.update( info.encode('utf-8') )
+            else:  # assume local file
+                filenames = sorted( glob.glob( replace_env_var( path )))
+                for filename in filenames :
+                    with open( replace_env_var( filename ), "rb") as f :
+                        for chunk in iter( lambda: f.read(4096), b"") :
+                            sha256.update( chunk )
     if "file" in target :
         for path in target["file"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
@@ -295,7 +285,7 @@ WHERE{
         ex:has_sha256 ?sha256 .
 }
 """ )
-    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" )
+    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" ) # FIXME: this does not catch .well-known
     for rec in r.json()["results"]["bindings"] :
         name = re_catch_name.search( rec["g"]["value"] ).group( 1 )
         if not name in name2dataset :
@@ -329,7 +319,7 @@ WHERE{
 
 def update_dataset_info( gdb, config, name ) :
     print_break()
-    context = "<" + config["dataset_base_IRI"] + name + ">"
+    context = get_context( config, name )
     sha256 = get_sha256( config, name )
     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
@@ -437,9 +427,8 @@ def main():
 
         print_break()
         print_task( "update dataset " + name )
-        graph_IRI = config["dataset_base_IRI"] + name
-        gdb.sparql_update( f"DROP SILENT GRAPH <{graph_IRI}>", [ 204, 404 ] )
-        context = "<" + config["dataset_base_IRI"] + name + ">"
+        context = get_context( config, name )
+        gdb.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -497,12 +486,12 @@ INSERT DATA {{
                     raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
                 for record in info["files"] :
-                    path = "<https://zenodo.org/records/" + str( id ) + "/files/" + record["key"] + ">"
-                    gdb.sparql_update( f"LOAD {path} INTO GRAPH {context}" )
+                    path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
+                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
-        {context} void:dataDump {path}
+        {context} void:dataDump <{path}>
     }}
 }}""" )
 
@@ -618,18 +607,11 @@ INSERT DATA {{
 
     # --------------------------------------------------------- #
     # Print final repository status
+    # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
     
     config = update_config( gdb, config )
-    r = gdb.get_context_list()
-    j = r.json
-    context = set()
-    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" )
-    for rec in r.json()["results"]["bindings"] : 
-        name = re_catch_name.search( rec["contextID"]["value"] )
-        if name :
-            context.add( name.group( 1 ) )
-
+    contexts = gdb.get_contexts()
     print_break()
     print_task( "show current status" )
     print( colored("         dataset           #triple        last modified    status", "blue" ))
@@ -641,9 +623,10 @@ INSERT DATA {{
             dataset["date"], 
             dataset["status"]
         ), "blue" ))
-        if dataset["dataset"] in context :
-            context.remove( dataset["dataset"] )
-    for name in context:
+        context = get_context( config, dataset["dataset"])
+        if context  in contexts :
+            contexts.remove( context )
+    for name in contexts:
         print( colored( '{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
