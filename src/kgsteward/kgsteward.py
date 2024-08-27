@@ -13,8 +13,8 @@ from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
 
 from .graphdb    import GraphDBClient
-# from .rdf4j      import RDF4JClient        # in preparation
-# from .fuseki     import FusekiClient       # in preparation
+# from .rdf4j      import RDF4JClient      # in preparation
+from .fuseki     import FusekiClient       # in preparation
 from .fileserver import LocalFileServer 
 from .common     import *
 
@@ -372,13 +372,19 @@ def main():
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBClient(
-        # RDF4JClient( 
-        # FusekiClient(
-        replace_env_var( config["server_url"] ),
+#    gdb = GraphDBClient(
+#        replace_env_var( config["server_url"] ),
+#        replace_env_var( config["username"] ),
+#        replace_env_var( config["password"] ),
+#        replace_env_var( config["repository_id"] )
+#    )
+
+    # fuseki-server  --tdb2 --loc=/Users/mpagni/scratch/fuseki-server --update /ReconXKG 
+    gdb = FusekiClient(
+        replace_env_var( "http://localhost:3030"),
         replace_env_var( config["username"] ),
         replace_env_var( config["password"] ),
-        replace_env_var( config["repository_id"] )
+        replace_env_var( "ReconXKG" )
     )
 
     # --------------------------------------------------------- #
