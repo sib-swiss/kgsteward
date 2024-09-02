@@ -115,14 +115,16 @@ RE_CATCH_FILENAME = re.compile( "([^\\/]+)\\$" )
 
 def replace_env_var( txt ) :
     """ A helper sub with no magic """
-    m = RE_CATCH_ENV_VAR.match( txt )
+    # report( "input", txt )
+    m = RE_CATCH_ENV_VAR.search( txt )
     if m:
         val = os.getenv( m.group( 1 ) )
         if val:
+            # report( "catch", txt )
             txt = RE_CATCH_ENV_VAR.sub( val, txt )
             return replace_env_var( txt ) # recursion
         else:
-            sys.exit(f"Environment variable not set: {m.group(1)}")
+            stop_error( f"Environment variable not set: {m.group(1)}" )
     else:
         return txt
 
@@ -188,9 +190,9 @@ def get_target( config, name ):
 def get_context( config, name ):
     target = get_target( config, name )
     if "target_graph_context" in target :
-        context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
+        context = replace_env_var( target["target_graph_context"] )
     else:
-        context = "<" + config["dataset_base_IRI"] + name + ">"
+        context = config["dataset_base_IRI"] + name
     return context
 
 def get_sha256( config, name ) :
@@ -321,13 +323,14 @@ def update_dataset_info( gdb, config, name ) :
     print_break()
     context = get_context( config, name )
     sha256 = get_sha256( config, name )
-    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+    gdb.sparql_update( f"""
+PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 
 INSERT {{
-    GRAPH {context} {{
-        {context} a void:Dataset ;
+    GRAPH <{context}> {{
+        <{context}> a void:Dataset ;
             void:triples               ?c   ;
             void:distinctSubjects      ?cs  ;
             void:properties            ?cp  ;
@@ -336,16 +339,17 @@ INSERT {{
             ex:has_sha256              "{sha256}" .
     }}
 }}
-USING {context}
 WHERE {{
-    SELECT
-        ( COUNT( * ) AS ?c )
-        ( COUNT( DISTINCT( ?s )) AS ?cs )
-        ( COUNT( DISTINCT( ?p )) AS ?cp )
-        ( COUNT( DISTINCT( ?o )) AS ?co )
-        ( NOW() AS ?now )
-    WHERE {{
-        ?s ?p ?o
+    GRAPH <{context}> {{
+        SELECT
+            ( COUNT( * ) AS ?c )
+            ( COUNT( DISTINCT( ?s )) AS ?cs )
+            ( COUNT( DISTINCT( ?p )) AS ?cp )
+            ( COUNT( DISTINCT( ?o )) AS ?co )
+            ( NOW() AS ?now )
+        WHERE {{
+            ?s ?p ?o
+        }}
     }}
 }}
 """)
@@ -382,10 +386,11 @@ def main():
     # fuseki-server  --tdb2 --loc=/Users/mpagni/scratch/fuseki-server --update /ReconXKG 
     gdb = FusekiClient(
         replace_env_var( "http://localhost:3030"),
-        replace_env_var( config["username"] ),
-        replace_env_var( config["password"] ),
-        replace_env_var( "ReconXKG" )
+        replace_env_var( config["repository_id"] )
     )
+    print_break()
+    print_task( "ping server" )
+    gdb.ping()
 
     # --------------------------------------------------------- #
     # Create a new empty repository
@@ -434,7 +439,7 @@ def main():
         print_break()
         print_task( "update dataset " + name )
         context = get_context( config, name )
-        gdb.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
+        gdb.sparql_update( f"DROP SILENT GRAPH <{context}>" ) 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -446,17 +451,18 @@ def main():
 
         if "url" in target :
             for urlx in target["url"] :
-                path = "<" + replace_env_var( urlx ) + ">"
-                gdb.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
+                path = replace_env_var( urlx )
+                gdb.load_from_url( path, context )
+                # gdb.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
                 gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump {path}
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
 
         if "file" in target :
-            if "use_file_server" in config:
+            if "use_file_server" in config and config["use_file_server"]:
                 fs = LocalFileServer( port = config[ "file_server_port" ] )
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
@@ -464,25 +470,27 @@ INSERT DATA {{
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
                         path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
-                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         path = "file://" + replace_env_var( filename )
                         gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
                 fs.terminate()
             else: # use_file_server is false
                 for path in target["file"] :
-                    filenames = sorted( glob.glob( replace_env_var( path )))
+                    path = replace_env_var( path )
+                    filenames = sorted( glob.glob( path ))
                     for filename in filenames :
-                        path = "file://" + replace_env_var( filename )
-                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
-                        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                        gdb.load_from_file( filename, context )
+                        # path = "file://" + replace_env_var( filename )
+                        # gdb.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
         if "zenodo" in target :
@@ -493,11 +501,11 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"] :
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                     gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
 
@@ -517,6 +525,9 @@ INSERT DATA {{
                         if key == "replace":
                             for d in value:
                                 for k, v in d.items():
+                                    print( "k: " + k  )
+                                    print( "v: " + v  )
+                                    print( " :" + replace_env_var( v ) )
                                     for i in range( len( sparql_update )):
                                         sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
                     for sparql in sparql_update:
@@ -620,8 +631,8 @@ INSERT DATA {{
     contexts = gdb.get_contexts()
     print_break()
     print_task( "show current status" )
-    print( colored("         dataset           #triple        last modified    status", "blue" ))
-    print( colored("      =============        =======     =================== ======", "blue" ))
+    print( colored("          dataset           #triple        last modified    status", "blue" ))
+    print( colored("       =============        =======     =================== ======", "blue" ))
     for dataset in config["graphs"] :
         print( colored( '{:>20}   {:>12}    {:>20} {}'.format( 
             dataset["dataset"], 

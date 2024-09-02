@@ -1,21 +1,28 @@
-import time
-
 from dumper import dump
+import re
 from .common import *
+from .generic import GenericClient
 
-class FusekiClient():
+# FIXME: implement curl -XPOST http://localhost:3030/$/compact/TEST?deleteOld=true
+# FIXME: test env variable JVM_ARGS
+class FusekiClient( GenericClient ):
 
-    def __init__( self, fuseki_url, username, password, repository_id ):
-        self.fuseki_url           = fuseki_url
-        self.username             = username
-        self.password             = password
-        self.repository_id        = repository_id
-        print_break()
-        print_task( "contacting server" ) 
+    def __init__( self, fuseki_url, repository_id ):
+        self.fuseki_url = fuseki_url
+        self.repository_id = repository_id
+        super().__init__(  
+            fuseki_url + "/" + repository_id + "/sparql", 
+            fuseki_url + "/" + repository_id + "/update",
+            fuseki_url + "/" + repository_id + "/data"
+        )
+
+    def ping( self ):
         r = http_call({
             'method'  : 'GET',
             'url'     : self.fuseki_url + "/#/"
-        },[ 200 ] )        
+        },[ 200 ] )
+        #ignore = super().ping()
+        #print( "OK" )
 
     def rewrite_repository( self, graphdb_config_filename ) :
         print_warn( "Not yet implemented: FusekiClient.rewrite_repository()" )
@@ -23,47 +30,27 @@ class FusekiClient():
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );
 
-    def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
-        if echo :
-            print( sparql, flush=True )
-        r = http_call({
-            'method'  : 'GET',
-            'url'     : self.fuseki_url + "/" + self.repository_id + "/sparql",
-            'params'  : { 'query': sparql }
-        }, status_code_ok, echo )
-        return r
+#    def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
+#        if echo :
+#            print( sparql, flush=True )
+#        r = http_call({
+#            'method'  : 'GET',
+#            'url'     : self.fuseki_url + "/" + self.repository_id + "/sparql",
+#            'params'  : { 'query': sparql }
+#        }, status_code_ok, echo )
+#        return r
+    
+    # on success fuseki return 200, not 204 !!!
+    def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
+        super().sparql_update( sparql, status_code_ok = [ 200 ], echo = echo )
 
-    def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ) :
-        if echo :
-            print( sparql, flush=True )
-        r = http_call({
-            'method'  : 'POST',
-            'url'     : self.fuseki_url + "/" + self.repository_id + "/update",
-            'params'  : { 'update': sparql }
-        }, status_code_ok, echo )
-
-    def sparql_query_to_tsv( self, sparql, status_code_ok=[200], echo=True) :
+    def sparql_query_to_tsv( self, sparql, status_code_ok = [200], echo=True) :
         return self.sparql_query(
             sparql,
             accept='text/tab-separated-values',
             status_code_ok=status_code_ok,
             echo=echo,
         )
-
-    def get_contexts( self, echo = True ) :
-        return set() # FIXME: remove
-        r = http_call({
-            'method'  : 'GET',
-            'url'     : self.fuseki_url + "/#/dataset/" + self.repository_id + "/get",
-            'headers' : {
-                'Accept'        : 'application/json',
-                # 'Authorization' : self.authorization
-            }
-        }, [ 200 ], echo )
-        contexts = set()
-        for rec in r.json()["results"]["bindings"] : 
-            contexts.add( "<" + rec["contextID"]["value"] + ">" )
-        return contexts
         
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         print_warn( "Not yet implemented: FusekiClient.graphdb_call()" )
@@ -97,3 +84,15 @@ class FusekiClient():
                 print( "\t" + "!!! empty results !!!" )
             else :
                 print( "\t" + str( n ) + " lines returned" )
+
+    def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ):
+        if re.search( r"\.ttl$", url ):
+            self.sparql_update( f"LOAD SILENT <{url}> INTO GRAPH <{context}>", echo = echo )
+        elif re.search( r"\.(gz|bz2|xz)$", url  ):
+            filename = tmpdir + "/" + url.split('/')[-1]
+            if echo:
+                report( 'write file', filename )
+            download_file( url, filename )
+            self.load_from_file( filename, context, echo = echo )
+        else:
+            stop_error( "Cannot handle this type of link with Fuseki: " + url )
