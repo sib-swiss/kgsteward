@@ -76,7 +76,7 @@ class GenericClient():
                     },
                     'data'    : f
                 },
-                [ 200, 201 ]
+                [ 200, 201 ] # fuseki 200, GraphDB 201
             )
 
         
