@@ -205,8 +205,9 @@ def get_sha256( config, name ) :
         for url in target["url"] :
             path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
-            info = get_head_info( path ) # as a side effect: verify is the server is responding
-            sha256.update( info.encode('utf-8') )
+            if re.search( r"https?:", path ) : # do not run HEAD on ftp server FIXME: implement something better
+               info = get_head_info( path ) # as a side effect: verify is the server is responding
+               sha256.update( info.encode('utf-8') )
     if "stamp" in target :
         for link in target["stamp"] :
             path = replace_env_var( link )
