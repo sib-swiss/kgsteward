@@ -16,16 +16,16 @@ class GenericClient():
         sparql = "SELECT ?hello WHERE{ BIND( 'Hello' AS ?hello )}"
         if echo :
             print( sparql, flush = True )
-        r = self.sparql_query( self, sparql, echo = echo )
+        r = self.sparql_query( sparql, echo = echo )
 
-    def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True ) :
         if echo :
             print( colored( sparql, "green" ), flush = True )
         r = http_call(
             {
-                'method'  : 'GET',
+                'method'  : 'POST', 
                 'url'     : self.endpoint_query,
-                'headers' : { 'Accept' : accept },
+                'headers' : { 'Accept' : 'application/json' },
                 'params'  : { 'query' : sparql }
             },
             status_code_ok,
@@ -33,7 +33,7 @@ class GenericClient():
         )
         return r
 
-    def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ):
+    def sparql_update( self, sparql, status_code_ok = [ 200, 204 ], echo = True ):
         if echo :
             print( colored( sparql, "green" ), flush=True )
         r = http_call(
@@ -78,5 +78,4 @@ class GenericClient():
                 },
                 [ 200, 201 ] # fuseki 200, GraphDB 201
             )
-
         
