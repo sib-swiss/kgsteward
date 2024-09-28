@@ -26,7 +26,7 @@ Install (the Free version of) of GraphDB from [Ontotext website](https://www.ont
 
 By default, the user interface of GraphDB becomes available at http://localhost:7200
 
-## First step with Fuseki (alternative
+## First step with Fuseki (alternative)
 
 As an alternative to GraphDB, you can install [Fuseki](https://jena.apache.org/documentation/fuseki2). If you are using homebrew on OSX, just type
 
