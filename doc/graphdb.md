@@ -1,6 +1,5 @@
 # First steps
 
-
 ## Install examples
 
 Clone this git repository and define an environment variable poinitng to its root dir 
@@ -14,7 +13,13 @@ This environment variable will be used through all the examples.
 ## Install kgsteward
 
 You can follow the instructions [here](https://github.com/sib-swiss/kgsteward) or
-invoke it using `GITHUB_KGSTEWARD_ROOT_DIR/kgsteward`. 
+create an alias 
+
+```{bash}
+alias kgsteward=GITHUB_KGSTEWARD_ROOT_DIR/kgsteward`. 
+```
+
+In the latter case some python packages might need to be installed. 
 
 ## First step with GraphDb
 
