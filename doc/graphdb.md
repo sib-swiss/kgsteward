@@ -6,11 +6,10 @@
 Clone this git repository and define an environment variable poinitng to its root dir 
 
 ```{bash}
-
 export GITHUB_KGSTEWARD_ROOT_DIR=<absolute-path-to-dir>
 git clone $GITHUB_KGSTEWARD_ROOT_DIR
-
 ```
+This environment variable will be used through all the examples.
 
 ## Install kgsteward
 
