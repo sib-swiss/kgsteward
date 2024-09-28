@@ -16,9 +16,8 @@ You can follow the instructions [here](https://github.com/sib-swiss/kgsteward) o
 create an alias 
 
 ```{bash}
-alias kgsteward=GITHUB_KGSTEWARD_ROOT_DIR/kgsteward`. 
+alias kgsteward=GITHUB_KGSTEWARD_ROOT_DIR/kgsteward
 ```
-
 In the latter case some python packages might need to be installed. 
 
 ## First step with GraphDb
