@@ -22,17 +22,11 @@ In the latter case some python packages might need to be installed.
 
 ## First step with GraphDB
 
-You can install (the Free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu). 
-Launch it. 
+Install (the Free version of) of GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions, and launch it. 
 
-By default, the user interface of  GraphDB is available at http://localhost:7200
+By default, the user interface of GraphDB becomes available at http://localhost:7200
 
-```{bash}
-cd <github-kgsteward-root>/example/example_1
-kgstward graphdb.yaml
-```
-
-## First step with Fuseki
+## First step with Fuseki (alternative
 
 As an alternative to GraphDB, you can install [Fuseki](https://jena.apache.org/documentation/fuseki2). If you are using homebrew on OSX, just type
 
@@ -44,8 +38,8 @@ and launch it with
 ```{bash}
 fuseki-server ..
 ```
+By default, the user interface of Fuseki becomes available at http://localhost:xxxx
 
-By default, the user interface of Fuseki is available at http://localhost:xxxx
 
 ## Run first example
 
