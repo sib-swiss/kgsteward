@@ -24,7 +24,8 @@ In the latter case some python packages might need to be installed.
 
 You can install (the Free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu). 
 Launch it. 
-By default, the GraphDB user interface is available at http://localhost:7200
+
+By default, the user interface of  GraphDB is available at http://localhost:7200
 
 ```{bash}
 cd <github-kgsteward-root>/example/example_1
@@ -38,7 +39,35 @@ As an alternative to GraphDB, you can install [Fuseki](https://jena.apache.org/d
 ```{bash}
 brew install fuseki
 ```
+and launch it with
 
-Install the latest Fuseki distribution, for example pn OSX `brew install fuskeki`
+```{bash}
+fuseki-server ..
+...
+
+By default, the user interface of Fuseki is available at http://localhost:xxxx
+
+## Run first example
+
+Here below are the three commands to run. If you are using fuseki, just replace graphdb.example_1.yaml with fuseki.example_1.yaml in the code below
+
+```{bash}
+cd $GITHUB_KGSTEWARD_ROOT_DIR/examples/example_1
+kgsteward graphdb.example_1.yaml -I # create a new repository named EXAMPLE_1 and erase its content
+kgsteward graphdb.example_1.yaml -C # populate the EXAMPLE_1 repository
+```
+
+If everything went well, you shoud see something like this.
+
+Congratulation you have populated your first triplestore.
+
+
+
+
+
+
+
+
+
 
 
