@@ -43,7 +43,7 @@ and launch it with
 
 ```{bash}
 fuseki-server ..
-...
+```
 
 By default, the user interface of Fuseki is available at http://localhost:xxxx
 
