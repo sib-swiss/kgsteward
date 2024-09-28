@@ -1,7 +1,9 @@
 ## First step with GraphDb
 
-If you are new to GraphDB, install the Free version from Ontotext website then launch it. 
-By default GraphDB UI becones avaliable on localhost:7200. 
+Install (the Free version of) GraphDB from (Ontotext website)[https://www.ontotext.com], then launch it.  
+By default the GraphDB user interface becomes available on http://localhost:7200
+
+
 
 ```{bash}
 cd <github-kgsteward-root>/example/example_1
