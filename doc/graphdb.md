@@ -20,7 +20,7 @@ alias kgsteward=GITHUB_KGSTEWARD_ROOT_DIR/kgsteward
 ```
 In the latter case some python packages might need to be installed. 
 
-## First step with GraphDb
+## First step with GraphDB
 
 You can install (the Free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu). 
 Launch it. 
