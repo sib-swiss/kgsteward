@@ -22,7 +22,7 @@ In the latter case some python packages might need to be installed.
 
 ## First step with GraphDB
 
-Install (the Free version of) of GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions, and launch it. 
+Install (the Free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions, and launch it. 
 
 By default, the user interface of GraphDB becomes available at http://localhost:7200
 
