@@ -1,3 +1,21 @@
+# First steps
+
+## Install kgsteward
+
+Follow instructions [here](https://github.com/sib-swiss/kgsteward)
+
+## Install examples
+
+Clone this git repository and define an environment variable poinitng to its root dir 
+
+```{bash}
+
+export GITHUB_KGSTEWARD_ROOT_DIR=<absolute-path-to-dir>
+git clone GITHUB_KGSTEWARD_ROOT_DIR
+
+```
+
+
 ## First step with GraphDb
 
 Install (the Free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu). 
