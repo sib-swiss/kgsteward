@@ -1,4 +1,4 @@
-# Untitled string in undefined Schema
+# parent Schema
 
 ```txt
 https://example.com/schema.json#/properties/graphs/items/properties/parent
@@ -12,4 +12,4 @@ A comma-separated list of previously encountered dataset names
 
 ## parent Type
 
-`string`
+`string` ([parent](kgsteward-properties-graphs-items-properties-parent.md))

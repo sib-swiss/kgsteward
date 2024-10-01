@@ -1,4 +1,4 @@
-# Untitled string in undefined Schema
+# server\_url Schema
 
 ```txt
 https://example.com/schema.json#/properties/server_url
@@ -12,7 +12,7 @@ The server URL. This key is stored in the execution environment and can be acces
 
 ## server\_url Type
 
-`string`
+`string` ([server\_url](kgsteward-properties-server_url.md))
 
 ## server\_url Constraints
 

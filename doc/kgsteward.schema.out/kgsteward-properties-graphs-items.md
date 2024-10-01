@@ -33,7 +33,7 @@ Mandatory name for this record. If `file`, `url`, `zenodo` or `update` are suppl
 
 * is required
 
-* Type: `string`
+* Type: `string` ([dataset](kgsteward-properties-graphs-items-properties-dataset.md))
 
 * cannot be null
 
@@ -41,7 +41,7 @@ Mandatory name for this record. If `file`, `url`, `zenodo` or `update` are suppl
 
 ### dataset Type
 
-`string`
+`string` ([dataset](kgsteward-properties-graphs-items-properties-dataset.md))
 
 ## parent
 
@@ -51,7 +51,7 @@ A comma-separated list of previously encountered dataset names
 
 * is optional
 
-* Type: `string`
+* Type: `string` ([parent](kgsteward-properties-graphs-items-properties-parent.md))
 
 * cannot be null
 
@@ -59,7 +59,7 @@ A comma-separated list of previously encountered dataset names
 
 ### parent Type
 
-`string`
+`string` ([parent](kgsteward-properties-graphs-items-properties-parent.md))
 
 ## target\_graph\_context
 
@@ -69,7 +69,7 @@ An optional IRI for named graph, that overloads the default concatanation of `<d
 
 * is optional
 
-* Type: `string`
+* Type: `string` ([target\_graph\_context](kgsteward-properties-graphs-items-properties-target_graph_context.md))
 
 * cannot be null
 
@@ -77,7 +77,7 @@ An optional IRI for named graph, that overloads the default concatanation of `<d
 
 ### target\_graph\_context Type
 
-`string`
+`string` ([target\_graph\_context](kgsteward-properties-graphs-items-properties-target_graph_context.md))
 
 ## system
 

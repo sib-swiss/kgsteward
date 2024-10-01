@@ -12,13 +12,13 @@
 
 ### Arrays
 
-* [Untitled array in undefined](./kgsteward-properties-graphs.md) – `https://example.com/schema.json#/properties/graphs`
+* [file](./kgsteward-properties-graphs-items-properties-file.md) – `https://example.com/schema.json#/properties/graphs/items/properties/file`
 
-* [Untitled array in undefined](./kgsteward-properties-graphs-items-properties-system.md) – `https://example.com/schema.json#/properties/graphs/items/properties/system`
+* [graphs](./kgsteward-properties-graphs.md) – `https://example.com/schema.json#/properties/graphs`
 
-* [Untitled array in undefined](./kgsteward-properties-graphs-items-properties-file.md) – `https://example.com/schema.json#/properties/graphs/items/properties/file`
+* [system](./kgsteward-properties-graphs-items-properties-system.md) – `https://example.com/schema.json#/properties/graphs/items/properties/system`
 
-* [Untitled array in undefined](./kgsteward-properties-graphs-items-properties-url.md) – `https://example.com/schema.json#/properties/graphs/items/properties/url`
+* [url](./kgsteward-properties-graphs-items-properties-url.md) – `https://example.com/schema.json#/properties/graphs/items/properties/url`
 
 ## Version Note
 

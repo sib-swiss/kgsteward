@@ -1,4 +1,4 @@
-# Untitled string in undefined Schema
+# target\_graph\_context Schema
 
 ```txt
 https://example.com/schema.json#/properties/graphs/items/properties/target_graph_context
@@ -12,4 +12,4 @@ An optional IRI for named graph, that overloads the default concatanation of `<d
 
 ## target\_graph\_context Type
 
-`string`
+`string` ([target\_graph\_context](kgsteward-properties-graphs-items-properties-target_graph_context.md))

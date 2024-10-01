@@ -30,7 +30,7 @@ The server URL. This key is stored in the execution environment and can be acces
 
 * is required
 
-* Type: `string`
+* Type: `string` ([server\_url](kgsteward-properties-server_url.md))
 
 * cannot be null
 
@@ -38,7 +38,7 @@ The server URL. This key is stored in the execution environment and can be acces
 
 ### server\_url Type
 
-`string`
+`string` ([server\_url](kgsteward-properties-server_url.md))
 
 ### server\_url Constraints
 

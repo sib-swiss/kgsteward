@@ -1,4 +1,4 @@
-# Untitled array in undefined Schema
+# url Schema
 
 ```txt
 https://example.com/schema.json#/properties/graphs/items/properties/url

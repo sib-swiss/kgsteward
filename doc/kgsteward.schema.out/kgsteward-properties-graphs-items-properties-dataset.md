@@ -1,4 +1,4 @@
-# Untitled string in undefined Schema
+# dataset Schema
 
 ```txt
 https://example.com/schema.json#/properties/graphs/items/properties/dataset
@@ -12,4 +12,4 @@ Mandatory name for this record. If `file`, `url`, `zenodo` or `update` are suppl
 
 ## dataset Type
 
-`string`
+`string` ([dataset](kgsteward-properties-graphs-items-properties-dataset.md))
