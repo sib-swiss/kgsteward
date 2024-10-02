@@ -5,13 +5,14 @@ from dumper import dump
 import re
 import hashlib
 import os
+from bs4 import BeautifulSoup
 from .common import *
 from .generic import GenericClient
 from .fileserver import LocalFileServer
 
 class VirtuosoClient( GenericClient ):
 
-    def __init__( self, virtuoso_url, username = "dba", password = "dba", file_server_port = 8000 ):
+    def __init__( self, virtuoso_url = "http://localhost:8890", username = "dba", password = "dba", file_server_port = 8000 ):
         super().__init__(  
             virtuoso_url + "/sparql", 
             virtuoso_url + "/conductor/isql.vspx",
@@ -23,21 +24,34 @@ class VirtuosoClient( GenericClient ):
         r = http_call(
             {
                 'method'  : 'GET',
-                'url'     :  virtuoso_url + "/conductor"
+                'url'     :  virtuoso_url + "/conductor/main_tabs.vspx"
             }
         )
-        dump( r )
-
-        m = re.search( r"nonce\" value=\"(\w+)", r.text, re.MULTILINE )
-        if m :
-            nonce = m.group(1 )
-            report( "nonce", nonce )
-            report( "nonce", password )
-            str = nonce + password
-            self.sid = hashlib.md5( str.encode('utf-8')).hexdigest()
-            report( "sid", self.sid )
+        soup = BeautifulSoup( r.content.decode('utf-8') , features="html.parser" )
+        field = { e['name']: e.get( 'value', '' ) for e in soup.find_all( 'input', { 'name': True})}
+        field['username'] = 'dba'
+        str = field['nonce'] + 'dba'                                      # emulate javascript effect 
+        field['password'] = hashlib.md5( str.encode('utf-8')).hexdigest() # contd.
+        print( field )
+        r = http_call(
+            {
+                'method'  : 'GET',
+                'url'     :  virtuoso_url + "/conductor/main_tabs.vspx",
+                'data'    : field
+            }
+        )
+        if re.search( "realm", r.content.decode('utf-8')):
+            print( r.content.decode('utf-8'))
         else:
-            stop_error( "Cannot obtain 'nonce' value from Virtuoso conductor!" )
+            print( "ko" )
+        #print( r.status_code )
+        #print( r.cookies )
+
+        #soup = BeautifulSoup( r.content.decode('utf-8') , features="html.parser" )
+        #field = { e['name']: e.get( 'value', '' ) for e in soup.find_all( 'input', { 'name': True})}
+        #print( field )
+        stop_error( "toto" )
+
 
     def ping( self, echo = True ):
         """ test if the server is responding """

@@ -15,6 +15,7 @@ from   termcolor import colored
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient      # in preparation
 from .fuseki     import FusekiClient       # in preparation
+from .virtuoso   import VirtuosoClient     #  
 from .fileserver import LocalFileServer 
 from .common     import *
 
@@ -385,10 +386,11 @@ def main():
 #    )
 
     # fuseki-server  --tdb2 --loc=/Users/mpagni/scratch/fuseki-server --update /ReconXKG 
-    gdb = FusekiClient(
-        replace_env_var( "http://localhost:3030"),
-        replace_env_var( config["repository_id"] )
-    )
+    #gdb = FusekiClient(
+    #    replace_env_var( "http://localhost:3030"),
+    #    replace_env_var( config["repository_id"] )
+    #)
+    gdb = VirtuosoClient()
     print_break()
     print_task( "ping server" )
     gdb.ping()
