@@ -10,7 +10,7 @@ classifiers = [
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Operating System :: OS Independent",
 ]
-dependencies = [ "dumper", "requests", "pathlib", "PyYAML", "termcolor" ]
+dependencies = [ "dumper", "requests", "pathlib", "PyYAML", "termcolor", "pydantic >=2.0.0", "pydantic-yaml" ]
 
 [project.urls]
 "Homepage" = "https://github.com/sib-swiss/kgsteward"
