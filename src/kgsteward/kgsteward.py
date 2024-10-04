@@ -6,17 +6,19 @@ import sys
 import re
 import hashlib
 import glob
-import yaml
 import requests  # https://docs.python-requests.org/en/master/user/quickstart/
 import getpass
 from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
 
+from .common     import *
+from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient        # in preparation
 # from .fuseki     import FusekiClient       # in preparation
+# from .virtuoso   import VirtuosoClient     # in preparation
 from .fileserver import LocalFileServer 
-from .common     import *
+
 
 # ---------------------------------------------------------#
 # The RDF source graphs configuration
@@ -109,75 +111,6 @@ def get_user_input():
 
     return args
 
-
-RE_CATCH_ENV_VAR = re.compile( "\\$\\{([^\\}]+)\\}" )
-RE_CATCH_FILENAME = re.compile( "([^\\/]+)\\$" )
-
-def replace_env_var( txt ) :
-    """ A helper sub with no magic """
-    m = RE_CATCH_ENV_VAR.match( txt )
-    if m:
-        val = os.getenv( m.group( 1 ) )
-        if val:
-            txt = RE_CATCH_ENV_VAR.sub( val, txt )
-            return replace_env_var( txt ) # recursion
-        else:
-            sys.exit(f"Environment variable not set: {m.group(1)}")
-    else:
-        return txt
-
-def verify_config( config ):
-    for key in list( config ) :
-        if key not in [ "server_url", "endpoint", "username", "password", "repository_id", 
-                        "setup_base_IRI", "dataset_base_IRI", "server_config", "graphdb_config", 
-                        "use_file_server", "file_server_port", "graphs", "queries", "validations", 
-                        "prefixes" ] :
-            print_warn( "Ignored config key in YAML: " + key )
-            del config[key]
-        if "endpoint" in config and "server_url" not in config :
-            config[ "server_url" ] = config[ "endpoint" ]
-            del config[ "endpoint" ]
-            print_warn( '"endpoint" is deprecated, use "server_url" instead' )
-        if "setup_base_IRI" in config and "dataset_base_IRI"  not in config :
-            config[ "dataset_base_IRI" ] = config[ "setup_base_IRI" ]
-            del config[ "setup_base_IRI" ]
-            print_warn( '"setup_base_IRI" is deprecated, use "dataset_base_IRI" instead' )
-        if "graphdb_config" in config and "server_config" not in config :
-            config[ "server_config" ] = config[ "graphdb_config" ]
-            del config[ "graphdb_config" ]
-            print_warn( '"graphdb_config" is deprecated, use "server_config" instead' )
-        if "file_server_port" not in config :
-            config[ "file_server_port" ] = 8000
-    return config
-
-# FIXME:validate syntax e.g. dataset name =~ /^\w+$/
-def parse_yaml_config( filename ) :
-    """ Recursive parser of config file(s)"""
-    report( "parse file", filename )
-    with open( filename, 'r') as f:
-        config = yaml.load( f, Loader = yaml.Loader )
-    config = verify_config( config )
-    for key in list( config ) :
-        if key in [ "server_url", "repository_id", "username", "password", "dataset_base_IRI", "server_config" ]:
-            os.environ[ key ] = config[ key ]
-    graphs = list()
-    for item in config["graphs"] :
-        if( "source" in item ) :
-            c = parse_yaml_config( replace_env_var( item["source"] )) # recursion
-            for key in list( c ) :
-                if key not in [ "graphs" ] :
-                    print_warn( "Ignored config key: " + key )
-            for graph in c["graphs"] :
-                if graph["dataset"] in config["graphs"] :
-                    raise RuntimeError( "Duplicated dataset name: " + item["dataset"] )
-                graphs.append( graph )
-        else:
-            if not "dataset" in item :
-                raise RuntimeError( "Dataset name is mandatory: " + str( item ))
-            graphs.append( item )
-    config["graphs"] = graphs
-    return config
-
 def get_target( config, name ):
     """ An inefficient helper function """
     for rec in config["graphs"] :
@@ -190,7 +123,7 @@ def get_context( config, name ):
     if "target_graph_context" in target :
         context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
     else:
-        context = "<" + config["dataset_base_IRI"] + name + ">"
+        context = "<" + config["context_base_IRI"] + name + ">"
     return context
 
 def get_sha256( config, name ) :
@@ -286,7 +219,7 @@ WHERE{
         ex:has_sha256 ?sha256 .
 }
 """ )
-    re_catch_name = re.compile( config['dataset_base_IRI'] + "(\\w+)" ) # FIXME: this does not catch .well-known
+    re_catch_name = re.compile( config['context_base_IRI'] + "(\\w+)" ) # FIXME: this does not catch .well-known
     for rec in r.json()["results"]["bindings"] :
         name = re_catch_name.search( rec["g"]["value"] ).group( 1 )
         if not name in name2dataset :
@@ -300,7 +233,7 @@ WHERE{
             dataset["status"] = "ok"
         else :
             dataset["status"] = "UPDATE"
-    buf = set()
+    buf = set() 
     for dataset in config["graphs"] :
         if dataset["status"] != "ok" :
             buf.add( dataset["dataset"] )
@@ -311,7 +244,7 @@ WHERE{
                     dataset["status"] = "PROPAGATE"
                     buf.add( dataset["dataset"])
             else:
-                for parent in dataset["parent"].split( "," ) :
+                for parent in dataset["parent"] :
                     if name2dataset[name]["status"] != "ok" :
                         dataset["status"] = "PROPAGATE"
                         buf.add( dataset["dataset"] )
@@ -362,7 +295,7 @@ def main():
 
     print_break()
     print_task( "read YAML config" );
-    config = parse_yaml_config( replace_env_var( args.yamlfile[0] ))
+    config = parse_yaml_conf( replace_env_var( args.yamlfile[0] ))
     # print()
     if not "server_url" in config :
         config["server_url"] = input( "Enter server_url : " )
@@ -373,14 +306,28 @@ def main():
     # Test if GraphDB is running and set it in write mode
     # --------------------------------------------------------- #
 
-    gdb = GraphDBClient(
-        # RDF4JClient( 
-        # FusekiClient(
-        replace_env_var( config["server_url"] ),
-        replace_env_var( config["username"] ),
-        replace_env_var( config["password"] ),
-        replace_env_var( config["repository_id"] )
-    )
+    if config["server_brand"] == "graphdb":
+        store = GraphDBClient(
+            replace_env_var( config["server_url"] ),
+            replace_env_var( config["username"] ),
+            replace_env_var( config["password"] ),
+            replace_env_var( config["repository_id"] )
+        )
+    # elif config["server_brand"] == "virtuoso":
+    #     store = VirtuosoClient(
+    #         replace_env_var( config["server_url"] ),
+    #         replace_env_var( config["username"] ),
+    #         replace_env_var( config["password"] )
+    #     )
+    # elif config["server_brand"] == "fuseki":
+    #     store = FusekiClient(
+    #         replace_env_var( config["server_url"] ),
+    #         replace_env_var( config["username"] ),
+    #         replace_env_var( config["password"] ),
+    #         replace_env_var( config["repository_id"] )
+    #     )
+    else:
+        stop_error( "Unknown server brand: " + config["server_brand"] )
 
     # --------------------------------------------------------- #
     # Create a new empty repository
@@ -389,7 +336,7 @@ def main():
     # --------------------------------------------------------- #
 
     if args.I :
-        gdb.rewrite_repository( replace_env_var( config['server_config'] ))
+        store.rewrite_repository( replace_env_var( config['server_config'] ))
 
     # --------------------------------------------------------- #
     # Establish the list of contexts/graphs to update
@@ -409,7 +356,7 @@ def main():
             else :
                 raise RuntimeError( "Invalid dataset name: " + name )
     elif args.C :
-        config = update_config( gdb, config ) # takes a while
+        config = update_config( store, config ) # takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -429,7 +376,7 @@ def main():
         print_break()
         print_task( "update dataset " + name )
         context = get_context( config, name )
-        gdb.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
+        store.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -442,8 +389,8 @@ def main():
         if "url" in target :
             for urlx in target["url"] :
                 path = "<" + replace_env_var( urlx ) + ">"
-                gdb.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
-                gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                store.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
+                store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump {path}
@@ -459,9 +406,9 @@ INSERT DATA {{
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
                         path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
-                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
                         path = "file://" + replace_env_var( filename )
-                        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                        store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump <{path}>
@@ -473,8 +420,8 @@ INSERT DATA {{
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
                         path = "file://" + replace_env_var( filename )
-                        gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
-                        gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                        store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump <{path}>
@@ -488,8 +435,8 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"] :
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    gdb.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
-                    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                    store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                    store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH {context} {{
         {context} void:dataDump <{path}>
@@ -515,13 +462,13 @@ INSERT DATA {{
                                     for i in range( len( sparql_update )):
                                         sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
                     for sparql in sparql_update:
-                        gdb.sparql_update( sparql )
+                        store.sparql_update( sparql )
                 else:
                     filename = token
                     with open( replace_env_var( filename )) as f: sparql = f.read()
-                    gdb.sparql_update( sparql )
+                    store.sparql_update( sparql )
 
-        update_dataset_info( gdb, config, name )
+        update_dataset_info( store, config, name )
 
 
     # --------------------------------------------------------- #
@@ -530,7 +477,7 @@ INSERT DATA {{
 
     if args.P and "prefixes" in config:
         print_task( "rewrite prefixes" )
-        gdb.rewrite_prefixes()
+        store.rewrite_prefixes()
         catch_key_value = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>" )
         for filename in config["prefixes"] :
             report( "parse file", filename )
@@ -538,7 +485,7 @@ INSERT DATA {{
             for line in file:
                 match = catch_key_value.search( line )
                 if match:
-                    gdb.set_prefix( match.group( 1 ), match.group( 2 ))
+                    store.set_prefix( match.group( 1 ), match.group( 2 ))
 
     # --------------------------------------------------------- #
     # Force update dataset info
@@ -559,7 +506,7 @@ INSERT DATA {{
                 print( '----------------------------------------------------------')
                 print( filename )
                 with open( filename ) as f: sparql = f.read()
-                r = gdb.sparql_query_to_tsv( sparql, echo = False )
+                r = store.sparql_query_to_tsv( sparql, echo = False )
                 if r.text.count( "\n" ) == 1 :
                     print( "---- Pass ;-) ----")
                 else:
@@ -573,10 +520,10 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.Q:
-        r = gdb.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
+        r = store.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
         for item in r.json() :
             print( f"DELETE: {item['name']}" ) # GraphDB builtin queries cannot be deleted
-            gdb.graphdb_call({
+            store.graphdb_call({
                 'url'    : '/rest/sparql/saved-queries',
                 'method' : 'DELETE',
                 'params' : { 'name': item['name']}
@@ -587,9 +534,9 @@ INSERT DATA {{
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 print( "TEST:   " + name)
-                gdb.validate_sparql_query( sparql, echo=False)
+                store.validate_sparql_query( sparql, echo=False)
                 print( "LOAD:   " + name)
-                gdb.graphdb_call({
+                store.graphdb_call({
                     'url'    : '/rest/sparql/saved-queries',
                     'method'  : 'POST',
                     'headers' : {
@@ -604,15 +551,15 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.L :
-        gdb.free_access()
+        store.free_access()
 
     # --------------------------------------------------------- #
     # Print final repository status
     # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
     
-    config = update_config( gdb, config )
-    contexts = gdb.get_contexts()
+    config = update_config( store, config )
+    contexts = store.get_contexts()
     print_break()
     print_task( "show current status" )
     print( colored("         dataset           #triple        last modified    status", "blue" ))

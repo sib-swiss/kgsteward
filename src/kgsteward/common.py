@@ -1,3 +1,4 @@
+import os
 import requests 
 import shutil
 import time
@@ -10,9 +11,23 @@ import lzma
 
 from termcolor import colored
 
+RE_CATCH_ENV_VAR     = re.compile( "\\$\\{([^\\}]+)\\}" )
 RE_CATCH_BEGIN_SPACE = re.compile( "^(\\s*)" )
 RE_CATCH_END_SPACE   = re.compile( "(\\s*)$" )
 RE_CATCH_TAB         = re.compile( "(\\t)" )
+
+def replace_env_var( txt ) :
+    """ A helper sub with no magic """
+    m = RE_CATCH_ENV_VAR.match( txt )
+    if m:
+        val = os.getenv( m.group( 1 ) )
+        if val:
+            txt = RE_CATCH_ENV_VAR.sub( val, txt )
+            return replace_env_var( txt ) # recursion
+        else:
+            sys.exit(f"Environment variable not set: {m.group(1)}")
+    else:
+        return txt
 
 def http_call( request_args, status_code=[200], echo=True ):
     """A simple wrapper arround requests.request() which main purpose is to
