@@ -9,3 +9,4 @@ kgsteward.egg-info/
 # virtualenv
 Pipfile
 Pipfile.lock
+.vscode

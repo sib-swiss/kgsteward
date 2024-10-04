@@ -49,7 +49,8 @@ class KGStewardConf( BaseModel ):
     server_url        : str = Field( 
         "http://localhost:7200",
         title = "Server URL",
-        description = description["server_url"]
+        description = description["server_url"],
+        alias = "endpoint_url"
     )
     server_config     : Optional[ str ] = None # SingleFileName()
     endpoint          : Optional[ str ] = Field(
