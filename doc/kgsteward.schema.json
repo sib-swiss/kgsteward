@@ -1,0 +1,294 @@
+{
+  "$defs": {
+    "GraphConf": {
+      "properties": {
+        "dataset": {
+          "description": "Mandatory name of a graphs record.",
+          "pattern": "[a-zA-Z]\\w{0,31}",
+          "title": "Short name of a graphs reccord",
+          "type": "string"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of name to encode dependency between datasets. \nUpdating the parent datset will provoke the update of its children.\n",
+          "title": "Parent(s) of a graphs record"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. \nIf missing, contect IRI will be built by concataining `context_base_IRI` and `dataset`\n",
+          "title": "Full IRI of a context/named graph"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of system command. \nThis is a simple convenience provided by kgsteward which is not meant to be a replacement \nfor serious Make-like system as for example git/dvc.\n",
+          "title": "UNIX system command(s)"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional list of files containing RDF data. \nWild card \"*\" can be used.\nThe strategy used to load these files will depends on the `use_file_server` Boolean value. \nWith GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above. \n",
+          "title": "Load RDF from file(s)"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional list of url from which to load RDF data",
+          "title": "Load RDF from URL(s)"
+        },
+        "stamp": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional list of paths to files which last modification dates will used.\nThe file contents are ignored.\nWild card \"*\" can be used.\n",
+          "title": "Stamp file(s)"
+        },
+        "replace": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional dictionary to perform string substitution in SPARQL queries from `update` list.\nOf uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.\n",
+          "title": "String subtitution in SPARQL update(s)"
+        },
+        "update": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional list files containing SPARQL update commands. \nWild card `*` can be supplied in the path.\n",
+          "title": "SPARQL update file(s)"
+        },
+        "zenodo": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Do not use!\nFetch turtle files from zenodo. \nThis is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later\n",
+          "title": "Ignore me"
+        }
+      },
+      "required": [
+        "dataset"
+      ],
+      "title": "GraphConf",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "server_brand": {
+      "default": "graphdb",
+      "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+      "title": "Server brand",
+      "type": "string"
+    },
+    "server_url": {
+      "default": "http://localhost:7200",
+      "description": "URL of the server. The SPARL endpoint is different and server specific.",
+      "title": "Server URL",
+      "type": "string"
+    },
+    "repository_id": {
+      "description": "The name of the repository (graphdb) or dataset (fuseki) in the triplestore.",
+      "pattern": "\\w+",
+      "title": "Repository ID",
+      "type": "string"
+    },
+    "context_base_IRI": {
+      "default": "http://example.org/context/",
+      "title": "Context Base Iri",
+      "type": "string"
+    },
+    "dataset_graph_IRI": {
+      "default": null,
+      "title": "deprecated and replaced by 'context_base_IRI'",
+      "type": "string"
+    },
+    "setup_graph_IRI": {
+      "default": null,
+      "title": "deprecated and replaced by 'context_base_IRI'",
+      "type": "string"
+    },
+    "username": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Username"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "file_server_port": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": 8000,
+      "title": "File Server Port"
+    },
+    "use_file_server": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": false,
+      "title": "Use File Server"
+    },
+    "graphs": {
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/GraphConf"
+          },
+          {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        ]
+      },
+      "title": "Graphs",
+      "type": "array"
+    },
+    "prefixes": {
+      "default": null,
+      "items": {
+        "type": "string"
+      },
+      "title": "Prefixes",
+      "type": "array"
+    },
+    "queries": {
+      "default": null,
+      "items": {
+        "type": "string"
+      },
+      "title": "Queries",
+      "type": "array"
+    },
+    "validations": {
+      "default": null,
+      "items": {
+        "type": "string"
+      },
+      "title": "Validations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "repository_id",
+    "graphs"
+  ],
+  "title": "KGStewardConf",
+  "type": "object"
+}
