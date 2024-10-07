@@ -12,7 +12,7 @@ from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
 
 from .common     import *
-from .yamlconfig import parse_yaml_conf
+from .yamlconfig import parse_yaml_conf, save_json_schema
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient        # in preparation
 from .fuseki     import FusekiClient
@@ -575,6 +575,8 @@ INSERT DATA {{
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
+    save_json_schema(  "doc/kgsteward.schema.json" )
+    
 # --------------------------------------------------------- #
 # Main
 # --------------------------------------------------------- #
