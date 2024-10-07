@@ -15,10 +15,12 @@ from .common     import *
 from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 # from .rdf4j      import RDF4JClient        # in preparation
-# from .fuseki     import FusekiClient       # in preparation
-# from .virtuoso   import VirtuosoClient     # in preparation
+from .fuseki     import FusekiClient
+# from .virtuoso   import VirtuosoClient       # in preparation
 from .fileserver import LocalFileServer 
 
+name2context = {} # global helper dict
+context2name = {} # same
 
 # ---------------------------------------------------------#
 # The RDF source graphs configuration
@@ -118,18 +120,18 @@ def get_target( config, name ):
             return rec
     raise RuntimeError( "Target dataset not found: " + name )
 
-def get_context( config, name ):
-    target = get_target( config, name )
-    if "target_graph_context" in target :
-        context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
-    else:
-        context = "<" + config["context_base_IRI"] + name + ">"
-    return context
+# def get_context( config, name ):
+#     target = get_target( config, name )
+#     if "target_graph_context" in target :
+#         context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
+#     else:
+#         context = "<" + config["context_base_IRI"] + name + ">"
+#     return context
 
 def get_sha256( config, name ) :
     sha256 = hashlib.sha256()
     target = get_target( config, name )
-    context = get_context( config, name )
+    context = name2context[ name ] # get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
     if "system" in target :
         for cmd in target["system"] :
@@ -195,67 +197,56 @@ def get_sha256( config, name ) :
                 sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
-def update_config( gdb, config ) :
+def update_config( store, config ) :
     """ Add information about the currrent repository status """
     print_break()
     print_task( "retrieve current status" )
-    name2dataset = {}
-    for dataset in config["graphs"] :
-        name = dataset["dataset"]
-        name2dataset[name]    = dataset
-        dataset["count"]      = ""
-        dataset["date"]       = ""
-        dataset["sha256_old"] = ""
-        dataset["status"]     = "EMPTY"
-    r = gdb.sparql_query( """
+    name2item = {}
+    for item in config["graphs"] :
+        name = item["dataset"]
+        name2item[name]    = item
+        item["count"]      = ""
+        item["date"]       = ""
+        item["sha256_old"] = ""
+        item["status"]     = "EMPTY"
+    r = store.sparql_query( """
 PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
-SELECT ?g ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
+SELECT ?context ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
 WHERE{
-    ?g a void:Dataset   ;
-        void:triples  ?x      ;
-        dct:modified  ?y      ;
-        ex:has_sha256 ?sha256 .
+    ?context a void:Dataset   ;
+             void:triples  ?x      ;
+             dct:modified  ?y      ;
+             ex:has_sha256 ?sha256 .
 }
-""" )
-    re_catch_name = re.compile( config['context_base_IRI'] + "(\\w+)" ) # FIXME: this does not catch .well-known
+""" )    
     for rec in r.json()["results"]["bindings"] :
-        name = re_catch_name.search( rec["g"]["value"] ).group( 1 )
-        if not name in name2dataset :
+        if rec["context"]["value"] in context2name:
+            name = context2name[rec["context"]["value"]]
+            item = name2item[ name ]
+        else:
             continue
-        dataset = name2dataset[name]
-        dataset["count"]      = rec["x"]["value"]
-        dataset["date"]       = rec["t"]["value"]
-        dataset["sha256_old"] = str( rec["sha256"]["value"] )
-        dataset["sha256_new"] = get_sha256( config, name )
-        if dataset["sha256_old"] == dataset["sha256_new"] :
-            dataset["status"] = "ok"
+        item["count"]      = rec["x"]["value"]
+        item["date"]       = rec["t"]["value"]
+        item["sha256_old"] = str( rec["sha256"]["value"] )
+        item["sha256_new"] = get_sha256( config, name )
+        if item["sha256_old"] == item["sha256_new"] :
+            item["status"] = "ok"
         else :
-            dataset["status"] = "UPDATE"
-    buf = set() 
-    for dataset in config["graphs"] :
-        if dataset["status"] != "ok" :
-            buf.add( dataset["dataset"] )
-            continue
-        if "parent" in dataset :
-            if dataset["parent"] == "*" and buf :
-                if any( name2dataset[name]["status"] != "ok" for name in buf ) :
-                    dataset["status"] = "PROPAGATE"
-                    buf.add( dataset["dataset"])
-            else:
-                for parent in dataset["parent"] :
-                    if name2dataset[name]["status"] != "ok" :
-                        dataset["status"] = "PROPAGATE"
-                        buf.add( dataset["dataset"] )
-                        break
+            item["status"] = "UPDATE"
+    for item in config["graphs"] :
+        if item["status"] == "ok" and "parent" in item :
+            for parent in item["parent"] :
+                if name2item[parent]["status"] != "ok" :
+                    item["status"] = "PROPAGATE"
     return config
 
-def update_dataset_info( gdb, config, name ) :
+def update_dataset_info( store, config, name ) :
     print_break()
-    context = get_context( config, name )
+    context = name2context[ name ]
     sha256 = get_sha256( config, name )
-    gdb.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+    store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 
@@ -296,14 +287,17 @@ def main():
     print_break()
     print_task( "read YAML config" );
     config = parse_yaml_conf( replace_env_var( args.yamlfile[0] ))
-    # print()
-    if not "server_url" in config :
-        config["server_url"] = input( "Enter server_url : " )
+    for item in config["graphs"]:
+        name2context[ item["dataset"] ] = item["context"]
+        context2name[ item["context"] ] = item["dataset"]
+
+    # if not "server_url" in config :
+    #    config["server_url"] = input( "Enter server_url : " )
     if "username" in config and not "password" in config :
         config["password"] = getpass.getpass( prompt = "Enter password : " )
 
     # --------------------------------------------------------- #
-    # Test if GraphDB is running and set it in write mode
+    # Initalise connection with the right triplestore
     # --------------------------------------------------------- #
 
     if config["server_brand"] == "graphdb":
@@ -314,18 +308,21 @@ def main():
             replace_env_var( config["repository_id"] )
         )
     # elif config["server_brand"] == "virtuoso":
+    #     print( config["server_url"] )
+    #     print( config["username"] )
+    #     print(config["password"] )
     #     store = VirtuosoClient(
     #         replace_env_var( config["server_url"] ),
     #         replace_env_var( config["username"] ),
     #         replace_env_var( config["password"] )
     #     )
-    # elif config["server_brand"] == "fuseki":
-    #     store = FusekiClient(
-    #         replace_env_var( config["server_url"] ),
-    #         replace_env_var( config["username"] ),
-    #         replace_env_var( config["password"] ),
-    #         replace_env_var( config["repository_id"] )
-    #     )
+    elif config["server_brand"] == "fuseki":
+        store = FusekiClient(
+            replace_env_var( config["server_url"] ),
+            # replace_env_var( config["username"] ),
+            # replace_env_var( config["password"] ),
+            replace_env_var( config["repository_id"] )
+        )
     else:
         stop_error( "Unknown server brand: " + config["server_brand"] )
 
@@ -375,7 +372,7 @@ def main():
 
         print_break()
         print_task( "update dataset " + name )
-        context = get_context( config, name )
+        context = name2context[ name ] # get_context( config, name )
         store.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
@@ -398,6 +395,7 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
+            dump( config )
             if "use_file_server" in config:
                 fs = LocalFileServer( port = config[ "file_server_port" ] )
                 for path in target["file"] :
@@ -469,7 +467,6 @@ INSERT DATA {{
                     store.sparql_update( sparql )
 
         update_dataset_info( store, config, name )
-
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -564,18 +561,18 @@ INSERT DATA {{
     print_task( "show current status" )
     print( colored("         dataset           #triple        last modified    status", "blue" ))
     print( colored("      =============        =======     =================== ======", "blue" ))
-    for dataset in config["graphs"] :
-        print( colored( '{:>20}   {:>12}    {:>20} {}'.format( 
-            dataset["dataset"], 
-            dataset["count"], 
-            dataset["date"], 
-            dataset["status"]
+    for item in config["graphs"] :
+        print( colored( '{:>32}   {:>12}    {:>20} {}'.format( 
+            item["dataset"], 
+            item["count"], 
+            item["date"], 
+            item["status"]
         ), "blue" ))
-        context = get_context( config, dataset["dataset"])
-        if context  in contexts :
+        context = item[ "context" ]
+        if context in contexts :
             contexts.remove( context )
     for name in contexts:
-        print( colored( '{:>20} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
+        print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
 # --------------------------------------------------------- #

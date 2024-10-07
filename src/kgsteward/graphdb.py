@@ -152,7 +152,7 @@ class GraphDBClient():
         }, [ 200 ], echo )
         contexts = set()
         for rec in r.json()["results"]["bindings"] : 
-            contexts.add( "<" + rec["contextID"]["value"] + ">" )
+            contexts.add( rec["contextID"]["value"] )
         return contexts
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :

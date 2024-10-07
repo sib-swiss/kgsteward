@@ -1,9 +1,9 @@
 #https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
 from dumper    import dump
 from enum      import Enum
-from typing    import Optional, Union
+from typing    import List, Dict, Optional, Union
 from pprintpp import pformat
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, ConfigDict
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 from .common import *
 
@@ -11,6 +11,7 @@ description = {
     "server_url" : """
     URL of the server. The SPARL endpoint is different and server specific.
 """ ,
+
 }
 
 # class SingleFileName( Field ):
@@ -28,10 +29,11 @@ description = {
 ##    title = "File name with wildcards",
 
 class GraphConf ( BaseModel ):
-    dataset  : str
-    parent   : Optional[ Union[ str, list[ str ]]] = None
+    dataset     : str = Field( pattern = r"[a-zA-Z]\w{0,31}" )
+    # dataset  : Optional[ str ]        = Field( None, id = "deprecated and replaced by 'name'" )
+    parent   : Optional[ Union[ str, List[ str ]]] = None
     context  : Optional[ str ]        = None
-    system   : Optional[ list[ str ]] = None
+    system   : Optional[ List[ str ]] = None
     file     : Optional[ list[ str ]] = None
     url      : Optional[ list[ str ]] = None
     stamp    : Optional[ list[ str ]] = None # SingleFileName()
@@ -40,32 +42,34 @@ class GraphConf ( BaseModel ):
     zenodo   : Optional[ list[ int ]] = None
 
 class ServerEnum( str, Enum ):
-    graphdb = 'graphdb'
+    graphdb  = 'graphdb'
     fuseki   = 'fuseki'
     virtuoso = 'virtuoso'
 
 class KGStewardConf( BaseModel ):
-    server_brand      : str = ServerEnum.graphdb
+    model_config = ConfigDict( extra='allow' )
+    server_brand      : str = Field( ServerEnum.graphdb, validate_default=True )
     server_url        : str = Field( 
-        "http://localhost:7200",
+        default = "http://localhost:7200",
         title = "Server URL",
         description = description["server_url"],
-        alias = "endpoint_url"
     )
+    endpoint_url      : Optional[ str ] = Field( None, id = "deprecated and replaced by 'server_url'" )
     server_config     : Optional[ str ] = None # SingleFileName()
-    endpoint          : Optional[ str ] = Field(
-        None,
-        title       = "Server URL",
-        description = "endpoint is deprecated, use server_url",
+#    endpoint          : Optional[ str ] = Field(
+#        None,
+#        title       = "Server URL",
+#        description = "endpoint is deprecated, use server_url",
+#    )
+    repository_id     : str= Field(
+        pattern = r"\w+"
     )
-    repository_id     : str = None
     context_base_IRI  : str = "http://example.org/context/"
-    dataset_graph_IRI : str = Field( None, title="Deprecated, replaced by 'context_base_IRI'" )
-    setup_graph_IRI   : str = Field( None, title="Deprecated, replaced by 'context_base_IRI'" )
-    
-    username          : str = None
-    password          : str = None
-    file_serve_port   : Optional[ int ]  = 8000
+    dataset_graph_IRI : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
+    setup_graph_IRI   : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
+    username          : Optional[ str ] = None
+    password          : Optional[ str ] = None
+    file_server_port  : Optional[ int ]  = 8000
     use_file_server   : Optional[ bool ] = False 
     graphs            : list[ Union[ GraphConf, dict [ str, str ]]] 
     prefixes          : list[str]  = None
@@ -75,13 +79,9 @@ class KGStewardConf( BaseModel ):
 def parse_yaml_conf( path : str ):
     file = open( path )
     try:
-        config = parse_yaml_raw_as( KGStewardConf, file.read()).model_dump()
+        config = parse_yaml_raw_as( KGStewardConf, file.read() ).model_dump( exclude_none = True )
     except ValidationError as e:
         stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
-    for key in list( config ):
-        if not config[key]:
-            del config[key]
-            continue
     # if key not in [ "server_url", "endpoint", "username", "password", "repository_id", 
     #                     "setup_base_IRI", "context_base_IRI", "server_config", "graphdb_config", 
     #                     "use_file_server", "file_server_port", "graphs", "queries", "validations", 
@@ -104,14 +104,17 @@ def parse_yaml_conf( path : str ):
         config[ "server_config" ] = config[ "graphdb_config" ]
         del config[ "graphdb_config" ]
         print_warn( '"graphdb_config" is deprecated, use "server_config" instead' )
+
+    if "username" in config and not "password" in config :
+        config["password"] = getpass.getpass( prompt = "Enter password : " )
+
     graphs = list()
     for item in config["graphs"] :
         if "source" in item:
             try:
                 file = open( replace_env_var( item["source"] ))
-                conf = parse_yaml_raw_as( KGStewardConf, file.read()).model_dump()
+                conf = parse_yaml_raw_as( KGStewardConf, file.read()).model_dump( exclude_none = True )
             except ValidationError as e:
-                dump( e.errors() )
                 stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
             graphs.extend( conf["graphs"] )
         else:
@@ -123,24 +126,22 @@ def parse_yaml_conf( path : str ):
     for item in config["graphs"] :
         if item["dataset"] in seen:
             stop_error( "Duplicated dataset name: " +  item["dataset"] )
-        if isinstance( item["parent"] , str ):
-            if not item["parent"] == "*":
-                stop_error( 'Only "*" is valid to designate all parents: ' + item["parent"] )
-            item["parent"] = seen
-        elif isinstance( item["parent"] , list ):
-            for parent in item["parent"]:
-                if not parent in seen:
-                    print( seen )
-                    stop_error( "Parent not previously defined: " + parent )
-        if item["context"] is None:
-            item["context"] = config["context_base_IRI"] + item["dataset"]
+        if "parent" in item:
+            if isinstance( item["parent"] , str ):
+                if not item["parent"] == "*":
+                    stop_error( 'Only "*" is valid to designate all parents: ' + item["parent"] )
+                item["parent"] = seen.copy()
+            elif isinstance( item["parent"] , list ):
+                for parent in item["parent"]:
+                    if not parent in seen:
+                        stop_error( "Parent not previously defined: " + parent )
         seen.append( item["dataset"] )
-        newitem = {}
-        for key in list( item ):
-            if not item[key]:
-                del item[key]
+        if "context" not in item:
+            item["context"] = str( config["context_base_IRI"] ) + str( item["dataset"] )
         graphs.append( item )
     config["graphs"] = graphs
+    # dump( config )
+    # stop_error( "toto" )
     return config 
 
 # c1 = parse_yaml_conf( "/Users/mpagni/gitlab.com/ReconXKG/reconxkg.yaml" )
