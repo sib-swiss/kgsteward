@@ -1,6 +1,6 @@
 # KGStewardConf
 
-JSON Schema missing a description, provide it using the `description` key in the root of the JSON document.
+This is main description
 
 ### Type: `object`
 
