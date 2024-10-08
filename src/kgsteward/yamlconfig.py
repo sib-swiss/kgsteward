@@ -9,9 +9,18 @@ from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
 from .common import *
 
 description = {
+    "schema": """
+    Configuration file follows YAML syntax. 
+    UNIX environmenent variables can be accessed anywhere in the YAML config through the `${<env-var>}` syntax. 
+    The use of UNIX environment variables permits the portability of kgsteward config file, as local path are supplied through variables. 
+    For security reason, kgsteward checks that every used variable exitsts and is not an empty string. 
+    In addition, to the environment variables available at statup of kgsteward, a certain number of variables are defined at run-time:  
+    `${}`, `${}` and `${}`.
+    Especially useful is `${graphs.name}` that can be used in be used in `graphs.replace` clause to indicate the current "active" context/named graph.
+""",
     "server_brand": """One of 'graphdb' or 'fuseki' ( 'graphdb' by default).""",
     "server_url" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
-    "repository_id": """The name of the repository (graphdb) or dataset (fuseki) in the triplestore.""",
+    "repository_id": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
 It is recommended that the value of this variable is passed trough an environment variable. 
@@ -29,7 +38,7 @@ Beware that the used python-based server is potentially insecure
 (see [here](https://docs.python.org/3/library/http.server.html) for details). 
 This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.
 """,
-    "file_server_port": "Optional integer, default to 8000.",
+    "file_server_port": "File server port.",
     "server_config":  """Filename with the triplestore configuration, possibly a turtle file. 
 `graphdb_config` is a deprecated synonym. 
 This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, 
@@ -38,17 +47,17 @@ This file is used by the `-I` and `-F` options.
 Beware that the repository ID could be hard-coded in the config file and 
 should be maintained in sync with `repository_id`.
 """,
-    "graphs": "Mandatory key to specify the overall knowledge graph content",
+    "graphs": "Mandatory key to specify the content of the knowledge graph in the triplestore",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
 Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, 
 with a short timeout.
 The query result is not iteself checked. 
-Wild card can be supplied in the path.
+Wildcard `*` can be used.
 """,
-    "validations": """A list of path(s) to SPARQL queries used to validate the repsository.
-By convention, a valid result should be empty, no row is returned. 
+    "validations": """A list of paths to files contining SPARQL queries used to validate the repsository.
+Wildcard `*` can be used.
+By convention, a valid result should be empty, i.e. no row is returned. 
 Failed results should return rows permitting to diagnose the problems.
-Wild card `*` can be supplied in the path.
 """,
     "dataset": """Mandatory name of a graphs record.""",
     "context": """IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. 
@@ -58,18 +67,18 @@ If missing, contect IRI will be built by concataining `context_base_IRI` and `da
 This is a simple convenience provided by kgsteward which is not meant to be a replacement 
 for serious Make-like system as for example git/dvc.
 """,
-"file": """Optional list of files containing RDF data. 
-Wild card "*" can be used.
+"file": """List of files containing RDF data. 
+Wildcard `*` can be used.
 The strategy used to load these files will depends on the `use_file_server` Boolean value. 
 With GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above. 
 """,
-"url": """Optional list of url from which to load RDF data""",
+"url": """List of url from which to load RDF data""",
 "zenodo": """Do not use!
 Fetch turtle files from zenodo. 
 This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
 """,
-"update": """Optional list files containing SPARQL update commands. 
-Wild card `*` can be supplied in the path.
+"update": """List of files containing SPARQL update commands. 
+Wildcard `*`can be used.
 """,
 "source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
 and inserted in the current graphs list.
@@ -77,79 +86,71 @@ and inserted in the current graphs list.
     "parent": """A list of name to encode dependency between datasets. 
 Updating the parent datset will provoke the update of its children.
 """,
-    "stamp": """Optional list of paths to files which last modification dates will used.
+    "stamp": """List of paths to files which last modification dates will used.
 The file contents are ignored.
-Wild card "*" can be used.
+Wildcard `*` can be used.
 """,
-    "replace": """Optional dictionary to perform string substitution in SPARQL queries from `update` list.
+    "replace": """Dictionary to perform string substitution in SPARQL queries from `update` list.
 Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.
 """
 }
 
-# class SingleFileName( Field ):
-#     title = "A file name",
-#     description = "A single file name, possibly using written using environment variable ${...} "
+def describe( term ):
+    if term in description:
+        return description[ term ].replace( "\n", " " ).strip()
+    else:
+        return "No description"
 
-# class MultipleFileName( Field ):
-#     title = "File name with wildcards",
-#     description = "A single file name, possibly containing with wildcards '*'"
-
-#MultipleFileName = Field(
-#    None,
-#    description = "A single file name, possibly containing with wildcards '*'"
-#)
-##    title = "File name with wildcards",
-
-class GraphConf ( BaseModel ):
+class GraphConf( BaseModel ):
     dataset     : str = Field( 
         title = "Short name of a graphs reccord",
-        description = description[ "dataset" ],
-        pattern = r"[a-zA-Z]\w{0,31}"
+        description = describe( "dataset" ),
+        pattern = r"^[a-zA-Z]\w{0,31}$"
     )
     parent   : Optional[ List[ str ]] = Field(
         None,
         title = "Parent(s) of a graphs record",
-        description = description[ "parent" ]
+        description = describe(  "parent" )
     )
     context  : Optional[ str ]        = Field( 
         None,
         title = "Full IRI of a context/named graph",
-        description = description[ "context" ]
+        description = describe(  "context" )
     )
     system   : Optional[ List[ str ]] = Field( 
         None,
         title = "UNIX system command(s)",
-        description = description[ "system" ]
+        description = describe(  "system" )
     )
     file     : Optional[ list[ str ]] = Field( 
         None,
         title = "Load RDF from file(s)",
-        description = description[ "file" ],
+        description = describe(  "file" )
     )
     url      : Optional[ list[ str ]] = Field( 
         None,
         title = "Load RDF from URL(s)",
-        description = description[ "url" ]
+        description = describe(  "url" )
     )
     stamp    : Optional[ list[ str ]] = Field( 
         None,
         title = "Stamp file(s)",
-        description = description[ "stamp" ]
+        description = describe(  "stamp" )
     )
     replace  : Optional[ list[ dict [ str, str ]]] = Field( 
         None,
         title = "String subtitution in SPARQL update(s)",
-        description = description[ "replace" ]
+        description = describe(  "replace" )
     )
     update   : Optional[ list[ str ]] = Field( 
         None,
         title = "SPARQL update file(s)",
-        description = description[ "update" ]
+        description = describe(  "update" )
     )
     zenodo   : Optional[ list[ int ]] = Field( 
         None,
         title = "Ignore me",
-        description = description[ "zenodo" ]
+        description = describe(  "zenodo" )
     )
 
 class ServerEnum( str, Enum ):
@@ -163,12 +164,12 @@ class KGStewardConf( BaseModel ):
     server_brand      : str = Field( 
         ServerEnum.graphdb, 
         title = "Server brand",
-        description = description["server_brand"]
+        description = describe( "server_brand" )
     )
     server_url        : str = Field( 
         default = "http://localhost:7200",
         title       = "Server URL",
-        description = description["server_url"],
+        description = describe( "server_url" )
     )
 #    endpoint_url      : Optional[ str ] = Field( None, id = "deprecated and replaced by 'server_url'" )
 #    server_config     : Optional[ str ] = None # SingleFileName()
@@ -178,21 +179,21 @@ class KGStewardConf( BaseModel ):
 #        description = "endpoint is deprecated, use server_url",
 #    )
     repository_id     : str= Field(
-        pattern = r"\w+",
+        pattern = r"^\w{1,32}$",
         title = "Repository ID",
-        description = description[ "repository_id" ]
+        description = describe(  "repository_id" )
     )
     context_base_IRI  : str = "http://example.org/context/"
     dataset_graph_IRI : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
     setup_graph_IRI   : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
-    username          : Optional[ str ] = None
-    password          : Optional[ str ] = None
-    file_server_port  : Optional[ int ]  = 8000
-    use_file_server   : Optional[ bool ] = False 
-    graphs            : list[ Union[ GraphConf, dict [ str, str ]]] 
-    prefixes          : list[str]  = None
-    queries           : list[str]  = None # MultipleFileName()
-    validations       : list[str]  = None # MultipleFileName()
+    username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
+    password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
+    file_server_port  : Optional[ int ]  = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
+    use_file_server   : Optional[ bool ] = Field( False, title = "Use loccal HTTP fileserver", description = describe( "use_file_server" ))
+    graphs            : list[ GraphConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+    prefixes          : list[str]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
+    queries           : list[str]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
+    validations       : list[str]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 def parse_yaml_conf( path : str ):
     file = open( path )
@@ -264,7 +265,7 @@ def parse_yaml_conf( path : str ):
 
 def save_json_schema( path ):
     schema = KGStewardConf.model_json_schema()
-    schema["description"] = "This is main description"
+    schema["description"] = describe( "schema" )
     with open( path, "w" ) as f:
         f.write( dumps( schema, indent=2 ))
 

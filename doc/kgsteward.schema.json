@@ -4,7 +4,7 @@
       "properties": {
         "dataset": {
           "description": "Mandatory name of a graphs record.",
-          "pattern": "[a-zA-Z]\\w{0,31}",
+          "pattern": "^[a-zA-Z]\\w{0,31}$",
           "title": "Short name of a graphs reccord",
           "type": "string"
         },
@@ -21,7 +21,7 @@
             }
           ],
           "default": null,
-          "description": "A list of name to encode dependency between datasets. \nUpdating the parent datset will provoke the update of its children.\n",
+          "description": "A list of name to encode dependency between datasets.  Updating the parent datset will provoke the update of its children.",
           "title": "Parent(s) of a graphs record"
         },
         "context": {
@@ -34,7 +34,7 @@
             }
           ],
           "default": null,
-          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. \nIf missing, contect IRI will be built by concataining `context_base_IRI` and `dataset`\n",
+          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology.  If missing, contect IRI will be built by concataining `context_base_IRI` and `dataset`",
           "title": "Full IRI of a context/named graph"
         },
         "system": {
@@ -50,7 +50,7 @@
             }
           ],
           "default": null,
-          "description": "A list of system command. \nThis is a simple convenience provided by kgsteward which is not meant to be a replacement \nfor serious Make-like system as for example git/dvc.\n",
+          "description": "A list of system command.  This is a simple convenience provided by kgsteward which is not meant to be a replacement  for serious Make-like system as for example git/dvc.",
           "title": "UNIX system command(s)"
         },
         "file": {
@@ -66,7 +66,7 @@
             }
           ],
           "default": null,
-          "description": "Optional list of files containing RDF data. \nWild card \"*\" can be used.\nThe strategy used to load these files will depends on the `use_file_server` Boolean value. \nWith GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above. \n",
+          "description": "List of files containing RDF data.  Wildcard `*` can be used. The strategy used to load these files will depends on the `use_file_server` Boolean value.  With GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above.",
           "title": "Load RDF from file(s)"
         },
         "url": {
@@ -82,7 +82,7 @@
             }
           ],
           "default": null,
-          "description": "Optional list of url from which to load RDF data",
+          "description": "List of url from which to load RDF data",
           "title": "Load RDF from URL(s)"
         },
         "stamp": {
@@ -98,7 +98,7 @@
             }
           ],
           "default": null,
-          "description": "Optional list of paths to files which last modification dates will used.\nThe file contents are ignored.\nWild card \"*\" can be used.\n",
+          "description": "List of paths to files which last modification dates will used. The file contents are ignored. Wildcard `*` can be used.",
           "title": "Stamp file(s)"
         },
         "replace": {
@@ -117,7 +117,7 @@
             }
           ],
           "default": null,
-          "description": "Optional dictionary to perform string substitution in SPARQL queries from `update` list.\nOf uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.\n",
+          "description": "Dictionary to perform string substitution in SPARQL queries from `update` list. Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.",
           "title": "String subtitution in SPARQL update(s)"
         },
         "update": {
@@ -133,7 +133,7 @@
             }
           ],
           "default": null,
-          "description": "Optional list files containing SPARQL update commands. \nWild card `*` can be supplied in the path.\n",
+          "description": "List of files containing SPARQL update commands.  Wildcard `*`can be used.",
           "title": "SPARQL update file(s)"
         },
         "zenodo": {
@@ -149,7 +149,7 @@
             }
           ],
           "default": null,
-          "description": "Do not use!\nFetch turtle files from zenodo. \nThis is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later\n",
+          "description": "Do not use! Fetch turtle files from zenodo.  This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later",
           "title": "Ignore me"
         }
       },
@@ -175,8 +175,8 @@
       "type": "string"
     },
     "repository_id": {
-      "description": "The name of the repository (graphdb) or dataset (fuseki) in the triplestore.",
-      "pattern": "\\w+",
+      "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+      "pattern": "^\\w{1,32}$",
       "title": "Repository ID",
       "type": "string"
     },
@@ -205,6 +205,7 @@
         }
       ],
       "default": null,
+      "description": "The name of a user with write-access rights in the triplestore.",
       "title": "Username"
     },
     "password": {
@@ -217,6 +218,7 @@
         }
       ],
       "default": null,
+      "description": "The password of a user with write-access rights to the triplestore.  It is recommended that the value of this variable is passed trough an environment variable.  By this way the password is not stored explicitely in the config file. Alternatively `?` can be used and the password will be asked interactively at run time.",
       "title": "Password"
     },
     "file_server_port": {
@@ -229,7 +231,8 @@
         }
       ],
       "default": 8000,
-      "title": "File Server Port"
+      "description": "File server port.",
+      "title": "file_server_port"
     },
     "use_file_server": {
       "anyOf": [
@@ -241,47 +244,43 @@
         }
       ],
       "default": false,
-      "title": "Use File Server"
+      "description": "Boolean, `False` by default.  When set to `True`: local files will be exposed through a temporary HTTP server and loaded from it.  Support for different RDF file types and their compressed version depend on the triplstore.  The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`.  Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+      "title": "Use loccal HTTP fileserver"
     },
     "graphs": {
+      "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
       "items": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/GraphConf"
-          },
-          {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
-          }
-        ]
+        "$ref": "#/$defs/GraphConf"
       },
-      "title": "Graphs",
+      "required": true,
+      "title": "Knowledge Graph content",
       "type": "array"
     },
     "prefixes": {
       "default": null,
+      "description": "No description",
       "items": {
         "type": "string"
       },
-      "title": "Prefixes",
+      "title": "GraphDB namespace",
       "type": "array"
     },
     "queries": {
       "default": null,
+      "description": "A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,  with a short timeout. The query result is not iteself checked.  Wildcard `*` can be used.",
       "items": {
         "type": "string"
       },
-      "title": "Queries",
+      "title": "GraphDB queries",
       "type": "array"
     },
     "validations": {
       "default": null,
+      "description": "A list of paths to files contining SPARQL queries used to validate the repsository. Wildcard `*` can be used. By convention, a valid result should be empty, i.e. no row is returned.  Failed results should return rows permitting to diagnose the problems.",
       "items": {
         "type": "string"
       },
-      "title": "Validations",
+      "title": "Validation queries",
       "type": "array"
     }
   },
@@ -291,5 +290,5 @@
   ],
   "title": "KGStewardConf",
   "type": "object",
-  "description": "This is main description"
+  "description": "Configuration file follows YAML syntax.      `${<env-var>}` in YAML config will be replaced by the value of environment variable <env-var>.      The use of UNIX environment variables is recommended to ensure the portability of a config file, local path variables must be supplied asvariable.      For secuity reason, kgsteward checks that every used environment variable exitsts and is not an empty string.      In addition, to environment variables available available at statup,      kgsteward provides access to the following list of run-time variable: `${}`, `${}` and `${}`.     `${graphs.name}`is of uttermost to be used in replace clause."
 }
