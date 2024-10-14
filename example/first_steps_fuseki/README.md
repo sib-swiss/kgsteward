@@ -20,6 +20,8 @@ brew install fuseki
 fuseki-server --localhost --port 3030 --config=$GITHUB_KGSTEWARD_DIR/example/first_steps_fuseki/config-fuseki-tdb2.ttl
 ```
 
+The fuseki UI becomes available at `http://localhost:3030`
+
 The file `config-fuseki-tdb2.ttl` contains the configuration of the repository:
 
 * it is named "BEATLES_DEMO",
@@ -30,11 +32,9 @@ The file `config-fuseki-tdb2.ttl` contains the configuration of the repository:
 
 * and importantly for kgsteward: the union of all graphs is set as default with `tdb2:unionDefaultGraph true`
 
-Please refer to the (fuseki documentation)[https://jena.apache.org/documentation/fuseki2] for more about fuseki ant its configuration.
+Please refer to the [fuseki documentation](https://jena.apache.org/documentation/fuseki2) for more about fuseki ant its configuration.
 
-4. The fuseki UI is available at `http://localhost:3030`
-
-5. In another terminal with $GITHUB_KGSTEWARD_DIR defined as above. Run the following commands to rewrite and populate the BEATLE_DEMO repository 
+5. In another terminal with $GITHUB_KGSTEWARD_DIR defined as above, and after kgsteward has been installed, run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
 
 ```
 cd $GITHUB_KGSTEWARD_DIR/example/first_steps_fuseki
@@ -42,7 +42,7 @@ kgsteward first_steps_fuseki.yaml -I # rewrite repository
 kgsteward first_steps_fuseki.yaml -C # populate repository
 ```
 
-The kgsteward config file `first_steps_fuseki.yaml` contains the following:
+The file `first_steps_fuseki.yaml` contains the following:
 
 ```
 store:
@@ -55,23 +55,26 @@ graphs:
     url:
       - https://raw.githubusercontent.com/stardog-union/stardog-tutorials/refs/heads/master/music/beatles.ttl
 ```
+
 6. Run a SPARQL query to verify that the repository contains something:
 
 ```
 curl \
 	-H "Accept: text" \
-	--data-urlencode "query=SELECT ?artist WHERE{ ?artist a <http://stardog.com/tutorial/SoloArtist> }" \
+	--data-urlencode "query=SELECT ?artist WHERE{ ?artist a <http://stardog.com/tutorial/SoloArtist> } ORDER BY ?artist" \
 	http://localhost:3030/TEST/sparql
 ```
 
 which should return something like
 
 ```
+http://stardog.com/tutorial/George_Harrison
 http://stardog.com/tutorial/John_Lennon
 http://stardog.com/tutorial/Paul_McCartney
-http://stardog.com/tutorial/George_Harrison
 http://stardog.com/tutorial/Ringo_Starr
 ```
+
+Congratulations: you populate a fuseki repository using kgsteward :-)
 
 
 
