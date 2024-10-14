@@ -1,6 +1,6 @@
-# first steps with Fuseki
+# First steps with Fuseki
 
-1. Clone kgsteward from GitHub to access a local copy of the example and create an environement variable that point to its root dir 
+1. Clone kgsteward from GitHub and create an environement variable that point to its root dir: 
 
 ```
 [change dir to where you like to clone from github]
@@ -14,25 +14,21 @@ export GITHUB_KGSTEWARD_DIR=`pwd`/kgsteward
 brew install fuseki
 ```
 
-3. Launch the Fuseki server with he configuratoin file for this example:
+3. Launch the fuseki server with the configuration file supplied for this example:
 
 ```
 fuseki-server --localhost --port 3030 --config=$GITHUB_KGSTEWARD_DIR/example/first_steps_fuseki/config-fuseki-tdb2.ttl
 ```
 
-The fuseki UI becomes available at `http://localhost:3030`
+The fuseki web interface becomes available at `http://localhost:3030`
 
-The file `config-fuseki-tdb2.ttl` contains the configuration of the repository:
+The file `config-fuseki-tdb2.ttl` contains the configuration of the repository: 
+it is named "BEATLES_DEMO", 
+it has read/write permissions,
+it saves its internal files in the TDB2 sub-directory (declared in .gitignore),
+and importantly for kgsteward, the union of all graphs is set as querying default.
 
-* it is named "BEATLES_DEMO",
-
-* it is endowed with full read/write permissions,
-
-* it saves its internal files in the TDB2 sub-directory (declared in .gitignore),
-
-* and importantly for kgsteward: the union of all graphs is set as default with `tdb2:unionDefaultGraph true`
-
-Please refer to the [fuseki documentation](https://jena.apache.org/documentation/fuseki2) for more about fuseki ant its configuration.
+Please refer to the [fuseki documentation](https://jena.apache.org/documentation/fuseki2) for more about fuseki configuration.
 
 5. In another terminal with $GITHUB_KGSTEWARD_DIR defined as above, and after kgsteward has been installed, run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
 
@@ -56,16 +52,18 @@ graphs:
       - https://raw.githubusercontent.com/stardog-union/stardog-tutorials/refs/heads/master/music/beatles.ttl
 ```
 
-6. Run a SPARQL query to verify that the repository contains something:
+which explain what is the server `store:` and how to populate it `graphs`.
+
+6. Run a SPARQL query to verify that the server is accessible and contains something:
 
 ```
 curl \
 	-H "Accept: text" \
 	--data-urlencode "query=SELECT ?artist WHERE{ ?artist a <http://stardog.com/tutorial/SoloArtist> } ORDER BY ?artist" \
-	http://localhost:3030/TEST/sparql
+	http://localhost:3030/BEATLES_DEMO/sparql
 ```
 
-which should return something like
+which should return:
 
 ```
 http://stardog.com/tutorial/George_Harrison
