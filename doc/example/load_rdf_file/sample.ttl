@@ -1,0 +1,16 @@
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX : <http://example.org/>
+
+:WallyWorld  a      :Company;
+        rdfs:label  "Wally World Amusements" .
+
+:Bill   a            :Employee;
+        :employedBy  :WallyWorld .
+
+_:b0    :fullName        "Bill Lund";
+        :employeeType    :PartTimeEmployee;
+        :employeeRating  27.2;
+        :yearsWorked     "6"^^xsd:int .
+
+:Bill   :hasEmployeeRecord  _:b0 .

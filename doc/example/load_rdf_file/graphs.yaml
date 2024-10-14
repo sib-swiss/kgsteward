@@ -1,0 +1,25 @@
+graphs:
+  - name: sample_ttl
+    file:
+    - sample.ttl
+  - name: sample_ttl_gz
+    file:
+    - sample.ttl.gz
+  - name: sample_trig
+    file:
+    - sample.trig
+  - name: sample_trig_gz
+    file:
+    - sample.trig.gz
+  - name: sample_nt
+    file:
+    - sample.nt
+  - name: sample_nt_gz
+    file:
+    - sample.nt.gz
+  - name: sample_rdfxml
+    file:
+    - sample.rdfxml
+  - name: sample_rdfxml_gz
+    file:
+    - sample.rdfxml.gz

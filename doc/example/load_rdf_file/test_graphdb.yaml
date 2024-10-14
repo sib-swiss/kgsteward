@@ -1,0 +1,4 @@
+store:
+  import: graphdb.yaml
+graphs:
+  - source: graphs.yaml
