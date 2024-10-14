@@ -1,0 +1,11 @@
+store:
+  server_brand: fuseki
+  server_url: http://localhost:3030
+  server_config: config-fuseki-tdb2.ttl 
+repository_id: TEST
+graphs:
+  - name: beatles
+    url:
+      - https://raw.githubusercontent.com/stardog-union/stardog-tutorials/refs/heads/master/music/beatles.ttl
+
+

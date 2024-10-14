@@ -1,0 +1,6 @@
+PREFIX : <http://stardog.com/tutorial/>
+
+SELECT ?artist
+WHERE{
+	?artist a :SoloArtist
+}

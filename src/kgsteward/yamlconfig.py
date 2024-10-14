@@ -112,6 +112,10 @@ class GraphDBConf( BaseModel ):
         title       = "Server URL",
         description = describe( "server_url" )
     )
+    server_config     : str = Field(
+        title       = "Server config file",
+        description = describe( "server_config" )
+    )
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     prefixes          : Optional[ list[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
@@ -127,7 +131,7 @@ class FusekiConf( BaseModel ):
         title       = "Server URL",
         description = describe( "server_url" )
     )
-
+ 
 class GraphConf( BaseModel ):
     name     : str = Field( 
         title = "Short name of a graphs reccord",
@@ -262,6 +266,7 @@ def parse_yaml_conf( path : str ):
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
         graphs.append( item )
     config["graphs"] = graphs
+    dump( config )
     return config 
 
 def save_json_schema( path ):

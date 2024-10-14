@@ -24,8 +24,8 @@ class FusekiClient( GenericClient ):
         #ignore = super().ping()
         #print( "OK" )
 
-    def rewrite_repository( self, graphdb_config_filename ) :
-        print_warn( "Not yet implemented: FusekiClient.rewrite_repository()" )
+    def rewrite_repository( self, server_config_filename ) :
+        self.sparql_update( "DROP ALL")
 
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );

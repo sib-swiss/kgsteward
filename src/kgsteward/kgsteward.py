@@ -322,7 +322,10 @@ def main():
     # --------------------------------------------------------- #
 
     if args.I :
-        store.rewrite_repository( replace_env_var( config['server_config'] ))
+        if "server_config" in config["store"]:
+            store.rewrite_repository( replace_env_var( config["store"]["server_config"] ))
+        else:
+             store.rewrite_repository()
 
     # --------------------------------------------------------- #
     # Establish the list of contexts/graphs to update
@@ -564,7 +567,7 @@ INSERT DATA {{
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
-    save_json_schema(  "doc/kgsteward.schema.json" )
+    #  save_json_schema(  "doc/kgsteward.schema.json" )
     
 # --------------------------------------------------------- #
 # Main
