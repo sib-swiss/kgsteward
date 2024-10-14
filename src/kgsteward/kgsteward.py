@@ -116,9 +116,9 @@ def get_user_input():
 def get_target( config, name ):
     """ An inefficient helper function """
     for rec in config["graphs"] :
-        if rec["dataset"] == name :
+        if rec["name"] == name :
             return rec
-    raise RuntimeError( "Target dataset not found: " + name )
+    raise RuntimeError( "Target name not found: " + name )
 
 # def get_context( config, name ):
 #     target = get_target( config, name )
@@ -203,7 +203,7 @@ def update_config( store, config ) :
     print_task( "retrieve current status" )
     name2item = {}
     for item in config["graphs"] :
-        name = item["dataset"]
+        name = item["name"]
         name2item[name]    = item
         item["count"]      = ""
         item["date"]       = ""
@@ -251,8 +251,8 @@ PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 
 INSERT {{
-    GRAPH {context} {{
-        {context} a void:Dataset ;
+    GRAPH <{context}> {{
+        <{context}> a void:Dataset ;
             void:triples               ?c   ;
             void:distinctSubjects      ?cs  ;
             void:properties            ?cp  ;
@@ -261,7 +261,7 @@ INSERT {{
             ex:has_sha256              "{sha256}" .
     }}
 }}
-USING {context}
+USING <{context}>
 WHERE {{
     SELECT
         ( COUNT( * ) AS ?c )
@@ -288,8 +288,8 @@ def main():
     print_task( "read YAML config" );
     config = parse_yaml_conf( replace_env_var( args.yamlfile[0] ))
     for item in config["graphs"]:
-        name2context[ item["dataset"] ] = item["context"]
-        context2name[ item["context"] ] = item["dataset"]
+        name2context[ item["name"] ] = item["context"]
+        context2name[ item["context"] ] = item["name"]
 
     # if not "server_url" in config :
     #    config["server_url"] = input( "Enter server_url : " )
@@ -300,31 +300,20 @@ def main():
     # Initalise connection with the right triplestore
     # --------------------------------------------------------- #
 
-    if config["server_brand"] == "graphdb":
+    if config["store"]["server_brand"] == "graphdb":
         store = GraphDBClient(
-            replace_env_var( config["server_url"] ),
-            replace_env_var( config["username"] ),
-            replace_env_var( config["password"] ),
+            replace_env_var( config["store"]["server_url"] ),
+            replace_env_var( config["store"]["username"] ),
+            replace_env_var( config["store"]["password"] ),
             replace_env_var( config["repository_id"] )
         )
-    # elif config["server_brand"] == "virtuoso":
-    #     print( config["server_url"] )
-    #     print( config["username"] )
-    #     print(config["password"] )
-    #     store = VirtuosoClient(
-    #         replace_env_var( config["server_url"] ),
-    #         replace_env_var( config["username"] ),
-    #         replace_env_var( config["password"] )
-    #     )
-    elif config["server_brand"] == "fuseki":
+    elif config["store"]["server_brand"] == "fuseki":
         store = FusekiClient(
-            replace_env_var( config["server_url"] ),
-            # replace_env_var( config["username"] ),
-            # replace_env_var( config["password"] ),
+            replace_env_var( config["store"]["server_url"] ),
             replace_env_var( config["repository_id"] )
         )
     else:
-        stop_error( "Unknown server brand: " + config["server_brand"] )
+        stop_error( "Unknown server brand: " + config["store"]["server_brand"] )
 
     # --------------------------------------------------------- #
     # Create a new empty repository
@@ -342,7 +331,7 @@ def main():
     rdf_graph_all = set()
     rdf_graph_to_update = set()
     for target in config["graphs"] :
-        rdf_graph_all.add( target["dataset"] )
+        rdf_graph_all.add( target["name"] )
 
     if args.D :
         rdf_graph_to_update = rdf_graph_all
@@ -351,7 +340,7 @@ def main():
             if name in rdf_graph_all :
                 rdf_graph_to_update.add( name )
             else :
-                raise RuntimeError( "Invalid dataset name: " + name )
+                raise RuntimeError( "Invalid name: " + name )
     elif args.C :
         config = update_config( store, config ) # takes a while
         for name in rdf_graph_all :
@@ -366,14 +355,14 @@ def main():
 
     for target in config["graphs"] :
 
-        name = target["dataset"]
+        name = target["name"]
         if not name in rdf_graph_to_update :
             continue
 
         print_break()
-        print_task( "update dataset " + name )
+        print_task( "update record " + name )
         context = name2context[ name ] # get_context( config, name )
-        store.sparql_update( f"DROP SILENT GRAPH {context}", [ 204, 404 ] )
+        store.sparql_update( f"DROP SILENT GRAPH <{context}>", [ 204, 404 ] )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -386,11 +375,11 @@ def main():
         if "url" in target :
             for urlx in target["url"] :
                 path = "<" + replace_env_var( urlx ) + ">"
-                store.sparql_update( f"LOAD SILENT {path} INTO GRAPH {context}" )
+                store.sparql_update( f"LOAD SILENT {path} INTO GRAPH <{context}>" )
                 store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump {path}
+    GRAPH <{context}> {{
+        <{context}> void:dataDump {path}
     }}
 }}""" )
 
@@ -404,12 +393,12 @@ INSERT DATA {{
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
                         path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
-                        store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         path = "file://" + replace_env_var( filename )
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
                 fs.terminate()
@@ -418,11 +407,11 @@ INSERT DATA {{
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
                         path = "file://" + replace_env_var( filename )
-                        store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                        store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
         if "zenodo" in target :
@@ -433,11 +422,11 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"] :
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    store.sparql_update( f"LOAD <{path}> INTO GRAPH {context}" )
+                    store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                     store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
-    GRAPH {context} {{
-        {context} void:dataDump <{path}>
+    GRAPH <{context}> {{
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
 
@@ -559,11 +548,11 @@ INSERT DATA {{
     contexts = store.get_contexts()
     print_break()
     print_task( "show current status" )
-    print( colored("         dataset           #triple        last modified    status", "blue" ))
-    print( colored("      =============        =======     =================== ======", "blue" ))
+    print( colored("                            name        #triple        last modified    status", "blue" ))
+    print( colored("================================        =======     =================== ======", "blue" ))
     for item in config["graphs"] :
         print( colored( '{:>32}   {:>12}    {:>20} {}'.format( 
-            item["dataset"], 
+            item["name"], 
             item["count"], 
             item["date"], 
             item["status"]

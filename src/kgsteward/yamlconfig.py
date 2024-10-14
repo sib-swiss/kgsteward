@@ -2,7 +2,7 @@
 from dumper    import dump
 from enum      import Enum
 from json      import dumps
-from typing    import List, Dict, Optional, Union
+from typing    import List, Dict, Optional, Union, Literal
 from pprintpp import pformat
 from pydantic import BaseModel, Field, ValidationError, ConfigDict
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
@@ -59,9 +59,9 @@ Wildcard `*` can be used.
 By convention, a valid result should be empty, i.e. no row is returned. 
 Failed results should return rows permitting to diagnose the problems.
 """,
-    "dataset": """Mandatory name of a graphs record.""",
+    "name": """Mandatory name of a graphs record.""",
     "context": """IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. 
-If missing, contect IRI will be built by concataining `context_base_IRI` and `dataset`
+If missing, contect IRI will be built by concataining `context_base_IRI` and `name`
 """,
 "system": """A list of system command. 
 This is a simple convenience provided by kgsteward which is not meant to be a replacement 
@@ -101,10 +101,37 @@ def describe( term ):
     else:
         return "No description"
 
+class GraphDBConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    server_brand : Literal[ "graphdb" ] = Field( 
+        title = "GraphDB brand",
+        description = describe( "server_brand" )
+    )
+    server_url        : str = Field( 
+        default = "http://localhost:7200",
+        title       = "Server URL",
+        description = describe( "server_url" )
+    )
+    username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
+    password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
+    prefixes          : Optional[ list[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
+
+class FusekiConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    server_brand : Literal[ "fuseki" ] = Field( 
+        title = "Fuseki brand",
+        description = describe( "This fixed value determines the server brand" )
+    )
+    server_url        : str = Field( 
+        default = "http://localhost:3030",
+        title       = "Server URL",
+        description = describe( "server_url" )
+    )
+
 class GraphConf( BaseModel ):
-    dataset     : str = Field( 
+    name     : str = Field( 
         title = "Short name of a graphs reccord",
-        description = describe( "dataset" ),
+        description = describe( "name" ),
         pattern = r"^[a-zA-Z]\w{0,31}$"
     )
     parent   : Optional[ List[ str ]] = Field(
@@ -153,49 +180,23 @@ class GraphConf( BaseModel ):
         description = describe(  "zenodo" )
     )
 
-class ServerEnum( str, Enum ):
-    graphdb  = 'graphdb'
-    fuseki   = 'fuseki'
-    # virtuoso = 'virtuoso'
-
 class KGStewardConf( BaseModel ):
-    # description  = "This is main description"
     model_config = ConfigDict( extra='allow' )
-    server_brand      : str = Field( 
-        ServerEnum.graphdb, 
-        title = "Server brand",
-        description = describe( "server_brand" )
-    )
-    server_url        : str = Field( 
-        default = "http://localhost:7200",
-        title       = "Server URL",
-        description = describe( "server_url" )
-    )
-#    endpoint_url      : Optional[ str ] = Field( None, id = "deprecated and replaced by 'server_url'" )
-#    server_config     : Optional[ str ] = None # SingleFileName()
-#    endpoint          : Optional[ str ] = Field(
-#        None,
-#        title       = "Server URL",
-#        description = "endpoint is deprecated, use server_url",
-#    )
+    store : Union[ GraphDBConf, FusekiConf ] 
     repository_id     : str= Field(
         pattern = r"^\w{1,32}$",
         title = "Repository ID",
         description = describe(  "repository_id" )
     )
+    graphs            : list[ GraphConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
     context_base_IRI  : str = "http://example.org/context/"
-    dataset_graph_IRI : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
-    setup_graph_IRI   : str = Field( None, title="deprecated and replaced by 'context_base_IRI'" )
-    username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
-    password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     file_server_port  : Optional[ int ]  = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
     use_file_server   : Optional[ bool ] = Field( False, title = "Use loccal HTTP fileserver", description = describe( "use_file_server" ))
-    graphs            : list[ GraphConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
-    prefixes          : list[str]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
     queries           : list[str]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : list[str]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 def parse_yaml_conf( path : str ):
+    dir_yaml, filename = os.path.split( path )
     file = open( path )
     try:
         config = parse_yaml_raw_as( KGStewardConf, file.read() ).model_dump( exclude_none = True )
@@ -231,8 +232,11 @@ def parse_yaml_conf( path : str ):
     for item in config["graphs"] :
         if "source" in item:
             try:
+                dir_old = os.getcwd()
+                os.chdir( dir_yaml )
                 file = open( replace_env_var( item["source"] ))
                 conf = parse_yaml_raw_as( KGStewardConf, file.read()).model_dump( exclude_none = True )
+                os.chdir( dir_old )
             except ValidationError as e:
                 stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
             graphs.extend( conf["graphs"] )
@@ -243,24 +247,21 @@ def parse_yaml_conf( path : str ):
     graphs = list()
     seen   = []    
     for item in config["graphs"] :
-        if item["dataset"] in seen:
-            stop_error( "Duplicated dataset name: " +  item["dataset"] )
+        if item["name"] in seen:
+            stop_error( "Duplicated name: " +  item["name"] )
         if "parent" in item:
-            if isinstance( item["parent"] , str ):
-                if not item["parent"] == "*":
-                    stop_error( 'Only "*" is valid to designate all parents: ' + item["parent"] )
-                item["parent"] = seen.copy()
-            elif isinstance( item["parent"] , list ):
-                for parent in item["parent"]:
+            for parent in item["parent"]:
+                if parent == "*":
+                    item["parent"] = seen.copy()
+                    break
+                else:
                     if not parent in seen:
                         stop_error( "Parent not previously defined: " + parent )
-        seen.append( item["dataset"] )
+        seen.append( item["name"] )
         if "context" not in item:
-            item["context"] = str( config["context_base_IRI"] ) + str( item["dataset"] )
+            item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
         graphs.append( item )
     config["graphs"] = graphs
-    # dump( config )
-    # stop_error( "toto" )
     return config 
 
 def save_json_schema( path ):
