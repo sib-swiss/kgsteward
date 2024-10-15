@@ -1,0 +1,9 @@
+store:
+  server_brand:  graphdb
+  server_url:    http://localhost:7200
+  server_config: config-graphdb-beatles.ttl 
+repository_id: BEATLES_DEMO
+graphs:
+  - name: beatles
+    url:
+      - https://raw.githubusercontent.com/sib-swiss/kgsteward/refs/heads/devel/example/data/beatles.ttl # FIXME: point to main

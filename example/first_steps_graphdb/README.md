@@ -31,7 +31,7 @@ repository_id: BEATLES_DEMO
 graphs:
   - name: beatles
     url:
-      - https://raw.githubusercontent.com/stardog-union/stardog-tutorials/refs/heads/master/music/beatles.ttl
+      - https://raw.githubusercontent.com/sib-swiss/kgsteward/refs/heads/devel/example/data/beatles.ttl # FIXME: point to main
 ```
 
 which describe what is the server `store:` and how to populate its `graphs:`.
