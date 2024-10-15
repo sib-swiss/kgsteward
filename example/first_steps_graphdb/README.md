@@ -1,61 +1,61 @@
-# First steps
+# First steps with GraphDB
 
-## Install examples
+1. Clone kgsteward from GitHub, Create an environement variable that point to its root dir: 
 
-Clone this git repository and define an environment variable pointng to its root dir 
-
-```{bash}
-export GITHUB_KGSTEWARD_ROOT_DIR=<absolute-path-to-dir>
-git clone $GITHUB_KGSTEWARD_ROOT_DIR
 ```
-This environment variable `GITHUB_KGSTEWARD_ROOT_DIR` will be used through all the examples.
-
-## Install kgsteward
-
-You can follow the instructions [here](https://github.com/sib-swiss/kgsteward) or
-create an alias 
-
-```{bash}
-alias kgsteward=GITHUB_KGSTEWARD_ROOT_DIR/kgsteward
-```
-In the latter case some python packages might need to be installed. 
-
-## First step with GraphDB
-
-Install (the free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions, and launch it. 
-
-By default, the user interface of GraphDB becomes available at http://localhost:7200
-
-## First step with Fuseki (alternative)
-
-As an alternative to GraphDB, you can install [Fuseki](https://jena.apache.org/documentation/fuseki2). If you are using homebrew on OSX, just type
-
-```{bash}
-brew install fuseki
-```
-and launch it with
-
-```{bash}
-fuseki-server ..
-```
-By default, the user interface of Fuseki becomes available at http://localhost:xxxx
-
-
-## Run first example
-
-Here below are the three commands to run. If you are using fuseki, just replace graphdb.example_1.yaml with fuseki.example_1.yaml in the code below
-
-```{bash}
-cd $GITHUB_KGSTEWARD_ROOT_DIR/examples/example_1
-kgsteward graphdb.example_1.yaml -I # create a new repository named EXAMPLE_1 and erase its content
-kgsteward graphdb.example_1.yaml -C # populate the EXAMPLE_1 repository
+[change dir to where you like to clone from github]
+git clone https://github.com/sib-swiss/kgsteward.git kgsteward
+export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
 
-If everything went well, you shoud see something like this.
+This environment variable `KGSTEWARD_ROOT_DIR` will be used through all the examples.
 
-Congratulation you have populated your first triplestore.
+2.  Install (the free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions. Launch GraphDB, using the application icons or the commend line. By default, the user interface of GraphDB becomes available at http://localhost:7200.
+
+3. In another terminal with $KGSTEWARD_ROOT_DIR defined as above, and after kgsteward has been installed ([instructions here](https://github.com/sib-swiss/kgsteward)), run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
+
+```
+cd $KGSTEWARD_ROOT_DIR/example/first_steps_graphdb
+kgsteward first_steps_graphdb.yaml -I # rewrite repository
+kgsteward first_steps_graphdb.yaml -C # populate repository
+```
+
+The file `first_steps_graphdb.yaml` contains:
+
+```
+store:
+  server_brand:  fuseki
+  server_url:    http://localhost:3030
+  server_config: config-fuseki-tdb2.ttl 
+repository_id: BEATLES_DEMO
+graphs:
+  - name: beatles
+    url:
+      - https://raw.githubusercontent.com/stardog-union/stardog-tutorials/refs/heads/master/music/beatles.ttl
+```
+
+which describe what is the server `store:` and how to populate its `graphs:`.
 
 
+4. Run a SPARQL query to verify that the server is accessible and returns the expected results:
+
+```
+curl \
+	-H "Accept: text" \
+	--data-urlencode "query=SELECT ?artist WHERE{ ?artist a <http://stardog.com/tutorial/SoloArtist> } ORDER BY ?artist" \
+	http://localhost:7200/repositories/BEATLES_DEMO
+```
+
+which should print out:
+
+```
+http://stardog.com/tutorial/George_Harrison
+http://stardog.com/tutorial/John_Lennon
+http://stardog.com/tutorial/Paul_McCartney
+http://stardog.com/tutorial/Ringo_Starr
+```
+
+Congratulations: you have populated a graphdb repository using kgsteward :-)
 
 
 

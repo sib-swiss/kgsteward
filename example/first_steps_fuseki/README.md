@@ -1,12 +1,13 @@
 # First steps with Fuseki
 
-1. Clone kgsteward from GitHub and create an environement variable that point to its root dir: 
+1. Clone kgsteward from GitHub, Create an environement variable that point to its root dir: 
 
 ```
 [change dir to where you like to clone from github]
 git clone https://github.com/sib-swiss/kgsteward.git kgsteward
 export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
+This environment variable `KGSTEWARD_ROOT_DIR` will be used through all the examples.
 
 2. Install fuseki locally. For example, with homebrew on OSX:
 
@@ -14,13 +15,12 @@ export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 brew install fuseki
 ```
 
-3. Launch the fuseki server with the configuration file supplied for this example:
+then launch the fuseki server with the configuration file supplied for this example:
 
 ```
 cd $KGSTEWARD_ROOT_DIR/example/first_steps_fuseki
 fuseki-server --localhost --port 3030 --config=config-fuseki-tdb2.ttl
 ```
-
 The fuseki web interface becomes available at [http://localhost:3030](http://localhost:3030)
 
 The file `config-fuseki-tdb2.ttl` contains the configuration of a repository named "BEATLES_DEMO". 
@@ -30,7 +30,7 @@ The union of all graphs is set as querying default using `tdb2:unionDefaultGraph
 which is critically important to ensure expected behaviour of kgsteward. 
 Please refer to the [fuseki documentation](https://jena.apache.org/documentation/fuseki2) for more about fuseki configuration files.
 
-5. In another terminal with $KGSTEWARD_ROOT_DIR defined as above, and after kgsteward has been installed, run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
+3. In another terminal with $KGSTEWARD_ROOT_DIR defined as above, and after kgsteward has been installed, run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
 
 ```
 cd $KGSTEWARD_ROOT_DIR/example/first_steps_fuseki
@@ -54,7 +54,7 @@ graphs:
 
 which describe what is the server `store:` and how to populate its `graphs:`.
 
-6. Run a SPARQL query to verify that the server is accessible and contains the expected results:
+4. Run a SPARQL query to verify that the server is accessible and returns the expected results:
 
 ```
 curl \
