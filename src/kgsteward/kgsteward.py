@@ -301,10 +301,16 @@ def main():
     # --------------------------------------------------------- #
 
     if config["store"]["server_brand"] == "graphdb":
+        if "username" in config["store"]:
+            username = config["store"]["username"]
+            password = config["store"]["password"]
+        else:
+            username = None
+            password = None
         store = GraphDBClient(
             replace_env_var( config["store"]["server_url"] ),
-            replace_env_var( config["store"]["username"] ),
-            replace_env_var( config["store"]["password"] ),
+            username,
+            password AAAAA,
             replace_env_var( config["repository_id"] )
         )
     elif config["store"]["server_brand"] == "fuseki":
