@@ -17,10 +17,11 @@ brew install fuseki
 3. Launch the fuseki server with the configuration file supplied for this example:
 
 ```
-fuseki-server --localhost --port 3030 --config=$KGSTEWARD_ROOT_DIR/example/first_steps_fuseki/config-fuseki-tdb2.ttl
+cd $KGSTEWARD_ROOT_DIR/example/first_steps_fuseki
+fuseki-server --localhost --port 3030 --config=config-fuseki-tdb2.ttl
 ```
 
-The fuseki web interface becomes available at `http://localhost:3030`
+The fuseki web interface becomes available at [http://localhost:3030](http://localhost:3030)
 
 The file `config-fuseki-tdb2.ttl` contains the configuration of a repository named "BEATLES_DEMO". 
 It is given read/write permissions,
