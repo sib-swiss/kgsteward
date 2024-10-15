@@ -10,9 +10,9 @@ export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 
 This environment variable `KGSTEWARD_ROOT_DIR` will be used through all the examples.
 
-2.  Install (the free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions. Launch GraphDB, using the application icons or the commend line. By default, the user interface of GraphDB becomes available at http://localhost:7200.
+2.  Install (the free version of) GraphDB from [Ontotext website](https://www.ontotext.com/products/graphdb/download/?ref=menu), following the vendor instructions. Launch GraphDB, using the application icon or the command line. By default, the user interface of GraphDB becomes available at http://localhost:7200.
 
-3. In another terminal with $KGSTEWARD_ROOT_DIR defined as above, and after kgsteward has been installed ([instructions here](https://github.com/sib-swiss/kgsteward)), run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_fuseki.yaml`
+3. In another terminal with $KGSTEWARD_ROOT_DIR defined as above, and after kgsteward has been installed ([instructions here](https://github.com/sib-swiss/kgsteward)), run the following commands to rewrite and populate the BEATLE_DEMO repository according to the content of `first_steps_graphdb.yaml`
 
 ```
 cd $KGSTEWARD_ROOT_DIR/example/first_steps_graphdb
@@ -24,9 +24,9 @@ The file `first_steps_graphdb.yaml` contains:
 
 ```
 store:
-  server_brand:  fuseki
-  server_url:    http://localhost:3030
-  server_config: config-fuseki-tdb2.ttl 
+  server_brand:  graphdb
+  server_url:    http://localhost:7200
+  server_config: config-graphdb-beatles.ttl 
 repository_id: BEATLES_DEMO
 graphs:
   - name: beatles
