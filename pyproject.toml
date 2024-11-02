@@ -2,7 +2,7 @@
 name = "kgsteward"
 version = "1.1.0"
 authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
-description = "Knwowledge Graph Steward - Command line tool to help manage RDF store"
+description = "Knowledge Graph Steward - Command line tool to help manage RDF store"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
