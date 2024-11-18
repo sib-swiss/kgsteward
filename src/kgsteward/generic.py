@@ -12,20 +12,25 @@ class GenericClient():
         self.endpoint_store  = endpoint_store
 
     def ping( self, echo = True ):
-        """ test if the server is responding """
+        """ ping server """
         sparql = "SELECT ?hello WHERE{ BIND( 'Hello' AS ?hello )}"
         if echo :
             print( sparql, flush = True )
         r = self.sparql_query( sparql, echo = echo )
 
-    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True ) :
+    def sparql_query( 
+        self, sparql,
+        headers = { 'Accept' : 'application/json' },
+        status_code_ok = [ 200 ], 
+        echo = True
+    ):
         if echo :
             print( colored( sparql, "green" ), flush = True )
         r = http_call(
             {
                 'method'  : 'POST', 
                 'url'     : self.endpoint_query,
-                'headers' : { 'Accept' : 'application/json' },
+                'headers' : headers,
                 'params'  : { 'query' : sparql }
             },
             status_code_ok,
@@ -33,14 +38,19 @@ class GenericClient():
         )
         return r
 
-    def sparql_update( self, sparql, status_code_ok = [ 200, 204 ], echo = True ):
+    def sparql_update( 
+        self, 
+        sparql,
+        headers        = { 'Content-Type': 'application/x-www-form-urlencoded' },
+        status_code_ok = [ 200, 204 ], 
+        echo           = True ):
         if echo :
             print( colored( sparql, "green" ), flush=True )
         r = http_call(
             {
                 'method'  : 'POST',
                 'url'     : self.endpoint_update,
-                'headers' : { 'Content-Type': 'application/x-www-form-urlencoded' },
+                'headers' : headers,
                 'params'  : { 'update': sparql }
             }, 
             status_code_ok, 
@@ -58,8 +68,9 @@ class GenericClient():
     def get_contexts( self, echo = True ) :
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {} }", echo = echo )
         contexts = set()
-        for rec in r.json()["results"]["bindings"] : 
-            contexts.add( rec["g"]["value"] )
+        for rec in r.json()["results"]["bindings"]:
+            if "g" in rec:
+                contexts.add( rec["g"]["value"] )
         return contexts
 
     def load_from_file( self, file, context, echo = True ):

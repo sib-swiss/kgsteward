@@ -2,8 +2,8 @@
 <http://example.org/WallyWorld> <http://www.w3.org/2000/01/rdf-schema#label> "Wally World Amusements" .
 <http://example.org/Bill> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://example.org/Employee> .
 <http://example.org/Bill> <http://example.org/employedBy> <http://example.org/WallyWorld> .
-_:Bec01f65786130cb74720b1d3fa9fcd50 <http://example.org/fullName> "Bill Lund" .
-_:Bec01f65786130cb74720b1d3fa9fcd50 <http://example.org/employeeType> <http://example.org/PartTimeEmployee> .
-_:Bec01f65786130cb74720b1d3fa9fcd50 <http://example.org/employeeRating> "27.2"^^<http://www.w3.org/2001/XMLSchema#decimal> .
-_:Bec01f65786130cb74720b1d3fa9fcd50 <http://example.org/yearsWorked> "6"^^<http://www.w3.org/2001/XMLSchema#int> .
-<http://example.org/Bill> <http://example.org/hasEmployeeRecord> _:Bec01f65786130cb74720b1d3fa9fcd50 .
+_:Ba57f92acef1a5f58ff7360c2ec46699b <http://example.org/fullName> "Bill Lund" .
+_:Ba57f92acef1a5f58ff7360c2ec46699b <http://example.org/employeeType> <http://example.org/PartTimeEmployee> .
+_:Ba57f92acef1a5f58ff7360c2ec46699b <http://example.org/employeeRating> "27.2"^^<http://www.w3.org/2001/XMLSchema#decimal> .
+_:Ba57f92acef1a5f58ff7360c2ec46699b <http://example.org/yearsWorked> "6"^^<http://www.w3.org/2001/XMLSchema#int> .
+<http://example.org/Bill> <http://example.org/hasEmployeeRecord> _:Ba57f92acef1a5f58ff7360c2ec46699b .

@@ -14,9 +14,10 @@ from   termcolor import colored
 from .common     import *
 from .yamlconfig import parse_yaml_conf, save_json_schema
 from .graphdb    import GraphDBClient
-# from .rdf4j      import RDF4JClient        # in preparation
 from .fuseki     import FusekiClient
-# from .virtuoso   import VirtuosoClient       # in preparation
+# from .rdf4j      import RDF4JClient     # in preparation
+# from .oxigraph   import OxigraphClient  # in preparation     
+# from .virtuoso   import VirtuosoClient  # in preparation
 from .fileserver import LocalFileServer 
 
 name2context = {} # global helper dict
@@ -220,21 +221,24 @@ WHERE{
              dct:modified  ?y      ;
              ex:has_sha256 ?sha256 .
 }
-""" )    
-    for rec in r.json()["results"]["bindings"] :
-        if rec["context"]["value"] in context2name:
-            name = context2name[rec["context"]["value"]]
-            item = name2item[ name ]
-        else:
-            continue
-        item["count"]      = rec["x"]["value"]
-        item["date"]       = rec["t"]["value"]
-        item["sha256_old"] = str( rec["sha256"]["value"] )
-        item["sha256_new"] = get_sha256( config, name )
-        if item["sha256_old"] == item["sha256_new"] :
-            item["status"] = "ok"
-        else :
-            item["status"] = "UPDATE"
+""" )
+    try: 
+        for rec in r.json()["results"]["bindings"] :
+            if rec["context"]["value"] in context2name:
+                name = context2name[rec["context"]["value"]]
+                item = name2item[ name ]
+            else:
+                continue
+            item["count"]      = rec["x"]["value"]
+            item["date"]       = rec["t"]["value"]
+            item["sha256_old"] = str( rec["sha256"]["value"] )
+            item["sha256_new"] = get_sha256( config, name )
+            if item["sha256_old"] == item["sha256_new"] :
+                item["status"] = "ok"
+            else :
+                item["status"] = "UPDATE"
+    except RequestsJSONDecodeError:
+        pass
     for item in config["graphs"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
@@ -261,16 +265,17 @@ INSERT {{
             ex:has_sha256              "{sha256}" .
     }}
 }}
-USING <{context}>
 WHERE {{
-    SELECT
-        ( COUNT( * ) AS ?c )
-        ( COUNT( DISTINCT( ?s )) AS ?cs )
-        ( COUNT( DISTINCT( ?p )) AS ?cp )
-        ( COUNT( DISTINCT( ?o )) AS ?co )
-        ( NOW() AS ?now )
-    WHERE {{
-        ?s ?p ?o
+    GRAPH <{context}> {{
+        SELECT
+            ( COUNT( * ) AS ?c )
+            ( COUNT( DISTINCT( ?s )) AS ?cs )
+            ( COUNT( DISTINCT( ?p )) AS ?cp )
+            ( COUNT( DISTINCT( ?o )) AS ?co )
+            ( NOW() AS ?now )
+        WHERE {{
+            ?s ?p ?o
+        }}
     }}
 }}
 """)
@@ -302,15 +307,15 @@ def main():
 
     if config["store"]["server_brand"] == "graphdb":
         if "username" in config["store"]:
-            username = config["store"]["username"]
-            password = config["store"]["password"]
+            username = replace_env_var( config["store"]["username"] )
+            password = replace_env_var( config["store"]["password"] )
         else:
             username = None
             password = None
         store = GraphDBClient(
             replace_env_var( config["store"]["server_url"] ),
             username,
-            password AAAAA,
+            password,
             replace_env_var( config["repository_id"] )
         )
     elif config["store"]["server_brand"] == "fuseki":
@@ -318,6 +323,10 @@ def main():
             replace_env_var( config["store"]["server_url"] ),
             replace_env_var( config["repository_id"] )
         )
+#    elif config["store"]["server_brand"] == "oxigraph":
+#        store = OxigraphClient(
+#            replace_env_var( config["store"]["server_url"] )
+#        )
     else:
         stop_error( "Unknown server brand: " + config["store"]["server_brand"] )
 
@@ -371,7 +380,7 @@ def main():
         print_break()
         print_task( "update record " + name )
         context = name2context[ name ] # get_context( config, name )
-        store.sparql_update( f"DROP SILENT GRAPH <{context}>", [ 204, 404 ] )
+        store.sparql_update( f"DROP SILENT GRAPH <{context}>" )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         if "system" in target :
             for cmd in target["system"] :
@@ -415,8 +424,9 @@ INSERT DATA {{
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
-                        path = "file://" + replace_env_var( filename )
-                        store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                        store.load_from_file( filename, context )
+                        # path = "file://" + replace_env_var( filename )
+                        # store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{

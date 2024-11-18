@@ -4,7 +4,7 @@
 
 ```
 [change dir to where you like to clone from github]
-git clone https://github.com/sib-swiss/kgsteward.git kgsteward
+kgsteward first_steps_graphdb.yaml -Igit clone https://github.com/sib-swiss/kgsteward.git kgsteward
 export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
 
@@ -35,7 +35,6 @@ graphs:
 ```
 
 which describe what is the server `store:` and how to populate its `graphs:`.
-
 
 4. Run a SPARQL query to verify that the server is accessible and returns the expected results:
 

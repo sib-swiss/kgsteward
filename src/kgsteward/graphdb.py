@@ -31,52 +31,47 @@ class GraphDBClient():
         self.username             = username
         self.password             = password
         self.repository_id        = repository_id
-        self.authorization        = '' # to be set below
+        self.headers              = {} # to be set below
         print_break()
-        print_task( "contacting server" ) 
-        r = http_call({
-            'method'  : 'POST',
-            'url'     : self.graphdb_url + "/rest/login/" + self.username,
-            'headers' : {
-                "X-GraphDB-Repository" : self.repository_id,
-                "X-GraphDB-Password"   : self.password
-            }
-        })
-        if 'Authorization' in r.headers:
-            self.authorization = r.headers[ 'Authorization' ]
-        else:
-            raise RuntimeError(
-                f"Authentication to GraphDB server failed: {self.graphdb_url}"
-            )
-
+        print_task( "contacting server" )
+        if self.username is not None :
+            r = http_call({
+                'method'  : 'POST',
+                'url'     : self.graphdb_url + "/rest/login/" + self.username,
+                'headers' : {
+                    "X-GraphDB-Repository" : self.repository_id,
+                    "X-GraphDB-Password"   : self.password
+                }
+            })
+            if 'Authorization' in r.headers:
+                self.headers = { 'Authorization': r.headers[ 'Authorization' ] }
+            else:
+                raise RuntimeError(
+                    f"Authentication to GraphDB server failed: {self.graphdb_url}"
+                )
+            
     def rewrite_repository( self, graphdb_config_filename ) :
         http_call({
             'method' : 'DELETE',
             'url'    : self.graphdb_url + '/rest/repositories/' + self.repository_id,
-            'headers' : { 'Authorization' : self.authorization }
+            'headers' : self.headers
         })
         http_call({
             'method'  : 'POST',
-            'url'     :  self.graphdb_url + '/rest/repositories',
-            'headers' : { 'Authorization' : self.authorization },
+            'url'     : self.graphdb_url + '/rest/repositories',
+            'headers' : self.headers,
             'files'   : { 'config' : open( graphdb_config_filename , 'rb' )}
         }, [ 201 ] )
         http_call({
             'method'  : 'POST',
-            'url'     :  self.graphdb_url + '/rest/autocomplete/enabled',
-            'headers' : {
-                "X-GraphDB-Repository" : self.repository_id,
-                'Authorization'        : self.authorization
-            },
+            'url'     : self.graphdb_url + '/rest/autocomplete/enabled',
+            'headers' : { **self.headers, "X-GraphDB-Repository": self.repository_id },
             'params'  : { 'enabled' : 'true' }
         })
         http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/security",
-            'headers' : {
-                "X-GraphDB-Repository": self.repository_id,
-                "Authorization":        self.authorization,
-            },
+            'headers' : { **self.headers, "X-GraphDB-Repository": self.repository_id },
             'json'    : "true"
         })
 
@@ -84,15 +79,12 @@ class GraphDBClient():
         http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/rest/class-hierarchy?doReload=true&graphURI=",
-            'headers' : {
-                "X-GraphDB-Repository" : self.repository_id,
-                "Authorization"        : self.authorization,
-             },
+            'headers' : { **self.headers, "X-GraphDB-Repository": self.repository_id },
         })
         http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/security/free-access",
-            'headers' : { "Authorization" : self.authorization },
+            'headers' : self.headers,
             "json"    : {
                 "enabled" : "true",
                 "authorities" : [ "READ_REPO_" + self.repository_id ],
@@ -106,32 +98,29 @@ class GraphDBClient():
             }
         })
 
-    def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
+    def sparql_query( self, sparql, headers = { 'Accept': 'application/json' }, status_code_ok = [ 200 ], echo = True ) :
         if echo :
             print_strip( sparql, "green" )
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : {
-                'Accept'        : accept,
-                'Authorization' : self.authorization
-            },
+            'headers' : { **self.headers, **headers },
             'params'  : { 'query': sparql }
         }, status_code_ok, echo )
         return r
 
-    def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ) :
+    def sparql_update( self, sparql, headers = { 'Content-Type': 'application/x-www-form-urlencoded'}, status_code_ok = [ 204 ], echo = True ) :
         if echo :
             print_strip( sparql, "green")
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/statements",
-            'headers' : {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization' : self.authorization
-            },
+            'headers' : { **self.headers, **headers },
             'params'  : { 'update': sparql }
         }, status_code_ok, echo )
+
+    def load_from_file( self, file, context, headers = {}, echo = True ):
+        super().load_from_file( file, context, { **self.headers, **headers }, echo = echo )
 
     def sparql_query_to_tsv( self, sparql, status_code_ok=[200], echo=True) :
         return self.sparql_query(
@@ -145,10 +134,7 @@ class GraphDBClient():
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/contexts",
-            'headers' : {
-                'Accept'        : 'application/json',
-                'Authorization' : self.authorization
-            }
+            'headers' : { **self.headers, 'Accept': 'application/json' },
         }, [ 200 ], echo )
         contexts = set()
         for rec in r.json()["results"]["bindings"] : 
@@ -196,19 +182,14 @@ class GraphDBClient():
         r = http_call({
             'method'  : 'DELETE',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/namespaces",
-            'headers' : {
-                'Authorization' : self.authorization
-            }
+            'headers' : self.headers,
         }, [204], echo )
 
     def set_prefix( self, short, long, echo = True ):
         r = http_call({
             'method'  : 'PUT',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/namespaces/" + short,
-            'headers' : {
-                'Accept'        : "text/plain",
-                'Authorization' : self.authorization
-            },
+            'headers' : self.headers.copy().update({ 'Accept', 'text/plain' }),
             'data'    : long
         }, [204], echo )
 

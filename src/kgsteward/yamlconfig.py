@@ -184,23 +184,34 @@ class GraphConf( BaseModel ):
         description = describe(  "zenodo" )
     )
 
+class GraphSource( BaseModel ):
+    source : str = Field( 
+        title = "Path to a yaml file",
+        # description = describe( 
+        # "source" ),
+    )
+
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    store : Union[ GraphDBConf, FusekiConf ] 
+    store : Union[ GraphDBConf, FusekiConf ]
     repository_id     : str= Field(
         pattern = r"^\w{1,32}$",
         title = "Repository ID",
         description = describe(  "repository_id" )
     )
-    graphs            : list[ GraphConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+    graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
     context_base_IRI  : str = "http://example.org/context/"
     file_server_port  : Optional[ int ]  = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
     use_file_server   : Optional[ bool ] = Field( False, title = "Use loccal HTTP fileserver", description = describe( "use_file_server" ))
     queries           : list[str]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : list[str]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
+class SourceGraphConf( BaseModel ):
+    graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+
+
 def parse_yaml_conf( path : str ):
-    dir_yaml, filename = os.path.split( path )
+    dir_yaml, filename = os.path.split( os.path.abspath( path ))
     file = open( path )
     try:
         config = parse_yaml_raw_as( KGStewardConf, file.read() ).model_dump( exclude_none = True )
@@ -239,7 +250,7 @@ def parse_yaml_conf( path : str ):
                 dir_old = os.getcwd()
                 os.chdir( dir_yaml )
                 file = open( replace_env_var( item["source"] ))
-                conf = parse_yaml_raw_as( KGStewardConf, file.read()).model_dump( exclude_none = True )
+                conf = parse_yaml_raw_as( SourceGraphConf, file.read()).model_dump( exclude_none = True )
                 os.chdir( dir_old )
             except ValidationError as e:
                 stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
