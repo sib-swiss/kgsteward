@@ -24,14 +24,21 @@ import time
 from dumper import dump
 from .common import *
 
-class GraphDBClient():
+from .generic import GenericClient
+
+class GraphDBClient( GenericClient ):
 
     def __init__( self, graphdb_url, username, password, repository_id ):
+        super().__init__(  
+            graphdb_url + "/repositories/" + repository_id, 
+            graphdb_url + "/repositories/" + repository_id + "/statements",
+            graphdb_url + "/repositories/" + repository_id + "/rdf-graphs/service"
+        )
         self.graphdb_url          = graphdb_url
         self.username             = username
         self.password             = password
         self.repository_id        = repository_id
-        self.headers              = {} # to be set below
+        self.headers              = {} # to be updated below
         print_break()
         print_task( "contacting server" )
         if self.username is not None :
@@ -49,7 +56,7 @@ class GraphDBClient():
                 raise RuntimeError(
                     f"Authentication to GraphDB server failed: {self.graphdb_url}"
                 )
-            
+
     def rewrite_repository( self, graphdb_config_filename ) :
         http_call({
             'method' : 'DELETE',
@@ -98,37 +105,41 @@ class GraphDBClient():
             }
         })
 
-    def sparql_query( self, sparql, headers = { 'Accept': 'application/json' }, status_code_ok = [ 200 ], echo = True ) :
-        if echo :
-            print_strip( sparql, "green" )
-        r = http_call({
-            'method'  : 'GET',
-            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : { **self.headers, **headers },
-            'params'  : { 'query': sparql }
-        }, status_code_ok, echo )
-        return r
+    def sparql_query( 
+        self, 
+        sparql, 
+        headers = { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        status_code_ok = [ 200 ], 
+        echo = True 
+    ):
+        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
 
-    def sparql_update( self, sparql, headers = { 'Content-Type': 'application/x-www-form-urlencoded'}, status_code_ok = [ 204 ], echo = True ) :
-        if echo :
-            print_strip( sparql, "green")
-        r = http_call({
-            'method'  : 'POST',
-            'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/statements",
-            'headers' : { **self.headers, **headers },
-            'params'  : { 'update': sparql }
-        }, status_code_ok, echo )
+    def sparql_update( 
+        self, 
+        sparql, 
+        headers = { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        status_code_ok = [ 204 ],
+        echo = True
+    ):
+        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
 
-    def load_from_file( self, file, context, headers = {}, echo = True ):
-        super().load_from_file( file, context, { **self.headers, **headers }, echo = echo )
+    def load_from_file( 
+        self,
+        file,
+        context, 
+        headers = {},
+        echo = True 
+    ):
+        super().load_from_file( file, context, { **self.headers, **headers }, echo )
 
-    def sparql_query_to_tsv( self, sparql, status_code_ok=[200], echo=True) :
-        return self.sparql_query(
-            sparql,
-            accept='text/tab-separated-values',
-            status_code_ok=status_code_ok,
-            echo=echo,
-        )
+    def sparql_query_to_tsv(
+        self, 
+        sparql, 
+        headers = { 'Accept': 'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        status_code_ok = [ 200 ], 
+        echo = True
+    ):
+        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
     
     def get_contexts( self, echo = True ) :
         r = http_call({

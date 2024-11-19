@@ -402,8 +402,7 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            dump( config )
-            if "use_file_server" in config:
+            if config[ "use_file_server" ]:
                 fs = LocalFileServer( port = config[ "file_server_port" ] )
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
@@ -430,7 +429,7 @@ INSERT DATA {{
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
-        <{context}> void:dataDump <{path}>
+        <{context}> void:dataDump <file://{filename}>
     }}
 }}""" )
         if "zenodo" in target :
