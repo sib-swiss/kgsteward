@@ -17,10 +17,30 @@
           "description": "URL of the server. The SPARL endpoint is different and server specific.",
           "title": "Server URL",
           "type": "string"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
+        },
+        "file_server_port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+          "title": "file_server_port"
         }
       },
       "required": [
-        "server_brand"
+        "server_brand",
+        "repository"
       ],
       "title": "FusekiConf",
       "type": "object"
@@ -91,7 +111,7 @@
             }
           ],
           "default": null,
-          "description": "List of files containing RDF data.  Wildcard `*` can be used. The strategy used to load these files will depends on the `use_file_server` Boolean value.  With GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above.",
+          "description": "List of files containing RDF data.  Wildcard `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`).  With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported.  Using a file server, these limitations are overcomed, but see the security warning described above.",
           "title": "Load RDF from file(s)"
         },
         "url": {
@@ -202,6 +222,24 @@
           "title": "Server URL",
           "type": "string"
         },
+        "server_config": {
+          "description": "Filename with the triplestore configuration, possibly a turtle file.  `graphdb_config` is a deprecated synonym.  This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,  thus permitting to reproduce the repository configuration elsewhere.  This file is used by the `-I` and `-F` options.  Beware that the repository ID could be hard-coded in the config file and  should be maintained in sync with `repository`.",
+          "title": "Server config file",
+          "type": "string"
+        },
+        "file_server_port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+          "title": "file_server_port"
+        },
         "username": {
           "anyOf": [
             {
@@ -243,12 +281,33 @@
           "default": null,
           "description": "No description",
           "title": "GraphDB namespace"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
         }
       },
       "required": [
-        "server_brand"
+        "server_brand",
+        "server_config",
+        "repository"
       ],
       "title": "GraphDBConf",
+      "type": "object"
+    },
+    "GraphSource": {
+      "properties": {
+        "source": {
+          "title": "Path to a yaml file",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "GraphSource",
       "type": "object"
     }
   },
@@ -265,16 +324,17 @@
       ],
       "title": "Store"
     },
-    "repository_id": {
-      "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
-      "pattern": "^\\w{1,32}$",
-      "title": "Repository ID",
-      "type": "string"
-    },
     "graphs": {
       "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
       "items": {
-        "$ref": "#/$defs/GraphConf"
+        "anyOf": [
+          {
+            "$ref": "#/$defs/GraphConf"
+          },
+          {
+            "$ref": "#/$defs/GraphSource"
+          }
+        ]
       },
       "required": true,
       "title": "Knowledge Graph content",
@@ -284,32 +344,6 @@
       "default": "http://example.org/context/",
       "title": "Context Base Iri",
       "type": "string"
-    },
-    "file_server_port": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": 8000,
-      "description": "File server port.",
-      "title": "file_server_port"
-    },
-    "use_file_server": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": false,
-      "description": "Boolean, `False` by default.  When set to `True`: local files will be exposed through a temporary HTTP server and loaded from it.  Support for different RDF file types and their compressed version depend on the triplstore.  The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`.  Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
-      "title": "Use loccal HTTP fileserver"
     },
     "queries": {
       "default": null,
@@ -332,10 +366,8 @@
   },
   "required": [
     "store",
-    "repository_id",
     "graphs"
   ],
   "title": "KGStewardConf",
-  "type": "object",
-  "description": "Configuration file follows YAML syntax.      UNIX environmenent variables can be accessed anywhere in the YAML config through the `${<env-var>}` syntax.      The use of UNIX environment variables permits the portability of kgsteward config file, as local path are supplied through variables.      For security reason, kgsteward checks that every used variable exitsts and is not an empty string.      In addition, to the environment variables available at statup of kgsteward, a certain number of variables are defined at run-time:       `${}`, `${}` and `${}`.     Especially useful is `${graphs.name}` that can be used in be used in `graphs.replace` clause to indicate the current \"active\" context/named graph."
+  "type": "object"
 }
