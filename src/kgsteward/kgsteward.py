@@ -316,12 +316,12 @@ def main():
             replace_env_var( config["store"]["server_url"] ),
             username,
             password,
-            replace_env_var( config["repository_id"] )
+            replace_env_var( config["store"]["repository"] )
         )
     elif config["store"]["server_brand"] == "fuseki":
         store = FusekiClient(
             replace_env_var( config["store"]["server_url"] ),
-            replace_env_var( config["repository_id"] )
+            replace_env_var( config["store"]["repository"] )
         )
 #    elif config["store"]["server_brand"] == "oxigraph":
 #        store = OxigraphClient(
