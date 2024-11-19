@@ -1,7 +1,7 @@
 import sys
-sys.path.append( "../src/kgsteward" )
-from yamlconfig import KGStewardConf
-#import jsonschema_markdown
+import json
+
+from kgsteward.yamlconfig import KGStewardConf
 
 main_model_schema = KGStewardConf.model_json_schema()
 
