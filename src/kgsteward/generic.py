@@ -1,6 +1,8 @@
 # This is a very minimalistic/generic SPARQL client
 # that might work on a real triplestore (maybe?)
 
+# How to dump a context from the command line:
+# curl -G --data-urlencode "graph=http://example.org/context/ReconX_schema" http://localhost:7200/repositories/ReconXKG2/rdf-graphs/service
 from dumper  import dump
 from .common import *
 

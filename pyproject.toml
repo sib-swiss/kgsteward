@@ -31,5 +31,11 @@ dependencies = [
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "jsonschema-markdown>=0.2.1",
+    "rdflib>=6.3.2",
+]
+
 [project.scripts]
 kgsteward = "kgsteward:run_kgsteward"

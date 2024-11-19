@@ -12,7 +12,7 @@ from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
 
 from .common     import *
-from .yamlconfig import parse_yaml_conf, save_json_schema
+from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 # from .rdf4j      import RDF4JClient     # in preparation
@@ -402,14 +402,14 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            if config[ "use_file_server" ]:
-                fs = LocalFileServer( port = config[ "file_server_port" ] )
+            if config["store"]["file_server_port"] > 0 :
+                fs = LocalFileServer( port = config["store"][ "file_server_port" ] )
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
-                        path = "http://localhost:" + str( config[ "file_server_port" ] ) + "/" + file
+                        path = "http://localhost:" + str( config["store"][ "file_server_port" ] ) + "/" + file
                         store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         path = "file://" + replace_env_var( filename )
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -419,7 +419,7 @@ INSERT DATA {{
     }}
 }}""" )
                 fs.terminate()
-            else: # use_file_server is false
+            else: # config["store"]["file_server_port"] == 0
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :

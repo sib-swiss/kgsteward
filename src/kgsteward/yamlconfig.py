@@ -1,12 +1,12 @@
 #https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
-from dumper    import dump
-from enum      import Enum
-from json      import dumps
-from typing    import List, Dict, Optional, Union, Literal
-from pprintpp import pformat
-from pydantic import BaseModel, Field, ValidationError, ConfigDict
+from dumper        import dump
+from enum          import Enum
+from typing        import List, Dict, Optional, Union, Literal
+from pprintpp      import pformat
+from pydantic      import BaseModel, Field, ValidationError, ConfigDict
 from pydantic_yaml import parse_yaml_raw_as, to_yaml_str
-from .common import *
+import json
+from .common       import *
 
 description = {
     "schema": """
@@ -20,7 +20,7 @@ description = {
 """,
     "server_brand": """One of 'graphdb' or 'fuseki' ( 'graphdb' by default).""",
     "server_url" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
-    "repository_id": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
+    "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
 It is recommended that the value of this variable is passed trough an environment variable. 
@@ -29,23 +29,23 @@ Alternatively `?` can be used and the password will be asked interactively at ru
     "context_base_IRI": """Base IRI to construct the graph context. 
     Default value: http://example.org/context/
 """,
-    "use_file_server": """Boolean, `False` by default. 
-When set to `True`: local files will be exposed through a temporary HTTP server and loaded from it. 
-Support for different RDF file types and their compressed version depend on the triplstore. 
-The benefit is the that RDF data from `file`are processed with the same protocol as those supplied through `url`. 
-Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. 
+    "file_server_port": """Integer, `0` by default, i.e. the file server is turned off. 
+When set to a positive integer, say `8000`, local files will be exposed through a temporary 
+HTTP server and loaded from it. Support for different RDF file types and their compressed 
+version depend on the tripelstore. The benefit is the that RDF data from `file` are processed 
+with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, 
+file-size limits are suppressed and compressed formats are supported. 
 Beware that the used python-based server is potentially insecure
 (see [here](https://docs.python.org/3/library/http.server.html) for details). 
 This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.
 """,
-    "file_server_port": "File server port.",
     "server_config":  """Filename with the triplestore configuration, possibly a turtle file. 
 `graphdb_config` is a deprecated synonym. 
 This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, 
 thus permitting to reproduce the repository configuration elsewhere. 
 This file is used by the `-I` and `-F` options. 
 Beware that the repository ID could be hard-coded in the config file and 
-should be maintained in sync with `repository_id`.
+should be maintained in sync with `repository`.
 """,
     "graphs": "Mandatory key to specify the content of the knowledge graph in the triplestore",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
@@ -69,8 +69,9 @@ for serious Make-like system as for example git/dvc.
 """,
 "file": """List of files containing RDF data. 
 Wildcard `*` can be used.
-The strategy used to load these files will depends on the `use_file_server` Boolean value. 
-With GraphDB, if `use_file_server` is `false` there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. With `use_file_server` set to `true` these limitations are overcomed, but see the security warning described above. 
+The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). 
+With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. 
+Using a file server, these limitations are overcomed, but see the security warning described above. 
 """,
 "url": """List of url from which to load RDF data""",
 "zenodo": """Do not use!
@@ -116,13 +117,19 @@ class GraphDBConf( BaseModel ):
         title       = "Server config file",
         description = describe( "server_config" )
     )
+    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     prefixes          : Optional[ list[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
+    repository        : str= Field(
+        pattern = r"^\w{1,32}$",
+        title = "Repository ID",
+        description = describe( "repository" )
+    )
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "fuseki" ] = Field( 
+    server_brand : Literal[ "fuseki" ] = Field(
         title = "Fuseki brand",
         description = describe( "This fixed value determines the server brand" )
     )
@@ -131,6 +138,12 @@ class FusekiConf( BaseModel ):
         title       = "Server URL",
         description = describe( "server_url" )
     )
+    repository        : str= Field(
+        pattern = r"^\w{1,32}$",
+        title = "Repository ID",
+        description = describe( "repository" )
+    )
+    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
  
 class GraphConf( BaseModel ):
     name     : str = Field( 
@@ -194,15 +207,8 @@ class GraphSource( BaseModel ):
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     store : Union[ GraphDBConf, FusekiConf ]
-    repository_id     : str= Field(
-        pattern = r"^\w{1,32}$",
-        title = "Repository ID",
-        description = describe(  "repository_id" )
-    )
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
     context_base_IRI  : str = "http://example.org/context/"
-    file_server_port  : Optional[ int ]  = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
-    use_file_server   : Optional[ bool ] = Field( False, title = "Use loccal HTTP fileserver", description = describe( "use_file_server" ))
     queries           : list[str]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : list[str]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
@@ -217,7 +223,7 @@ def parse_yaml_conf( path : str ):
         config = parse_yaml_raw_as( KGStewardConf, file.read() ).model_dump( exclude_none = True )
     except ValidationError as e:
         stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
-    # if key not in [ "server_url", "endpoint", "username", "password", "repository_id", 
+    # if key not in [ "server_url", "endpoint", "username", "password", "repository", 
     #                     "setup_base_IRI", "context_base_IRI", "server_config", "graphdb_config", 
     #                     "use_file_server", "file_server_port", "graphs", "queries", "validations", 
     #                     "prefixes" ] :
@@ -285,15 +291,3 @@ def save_json_schema( path ):
     schema["description"] = describe( "schema" )
     with open( path, "w" ) as f:
         f.write( dumps( schema, indent=2 ))
-
-# c1 = parse_yaml_conf( "/Users/mpagni/gitlab.com/ReconXKG/reconxkg.yaml" )
-# print( c1 )
-
-# main_model_schema = KGStewardConf.model_json_schema()  # (1)!
-# print(json.dumps(main_model_schema, indent=2))  # (2)!
-
-# for graph in c1.graphs:
-#     print(graph.dataset)
-
-#c2 = parse_yaml_conf( "/Users/mpagni/gitlab.sib.swiss/sinergiawolfender/common/data/config/jlw.yaml" )
-#print( c2 )
