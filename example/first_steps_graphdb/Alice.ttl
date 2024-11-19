@@ -1,0 +1,26 @@
+@base           <http://example.org> .
+@prefix rdf:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> . @prefix ns1:	<http://kingsley.idehen.net/DAV/temp/> . @prefix foaf:	<http://xmlns.com/foaf/0.1/> . @prefix ns3:	<http://kingsley.idehen.net/DAV/temp/b5cf65aece2611537b3ae93ce125889d#> . @prefix dcterms:	<http://purl.org/dc/terms/> . @prefix ns5:	<http://kingsley.idehen.net/DAV/temp/doc1.ttl#> . @prefix wdrs:	<http://www.w3.org/2007/05/powder-s#> . @prefix rel:	<http://purl.org/vocab/relationship/> . @prefix ns8:	<http://kingsley.idehen.net/DAV/temp/org.ttl#> . 
+### Source document ###
+@prefix rdf:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix foaf:	<http://xmlns.com/foaf/0.1/> .
+@prefix owl:	<http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:	<http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ldp:	<http://www.w3.org/ns/ldp#> .
+@prefix wdrs:	<http://www.w3.org/2007/05/powder-s#> .
+@prefix rel:	<http://purl.org/vocab/relationship/> .
+@prefix gr:	<http://purl.org/goodrelations/v1#> .
+
+<>
+a foaf:Document ;
+foaf:name "A Document that describes a Person literally identified as 'Alice'" ;
+dcterms:descripton "A collection of RDF sentences that describe a Person literally identified (or labeled) as 'Alice'" ;
+foaf:primaryTopic <#alice> .
+
+<#alice>
+	rdf:type	foaf:Person ;
+	foaf:name	"Alice" ;
+	foaf:knows	<#bob> ;
+	foaf:depiction <http://clipart-library.com/images/kiMb8ggKT.jpg> ;
+	rel:employedBy	<#exampleCars> ;
+	wdrs:describedby	<> .
+
