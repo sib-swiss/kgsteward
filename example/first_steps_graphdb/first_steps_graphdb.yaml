@@ -2,7 +2,7 @@ store:
   server_brand:  graphdb
   server_url:    http://localhost:7200
   server_config: BEATLES_DEMO-config.ttl 
-repository_id: BEATLES_DEMO
+  repository:    BEATLES_DEMO
 graphs:
   - name: beatles
     url:
