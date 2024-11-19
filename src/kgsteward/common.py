@@ -29,11 +29,11 @@ def replace_env_var( txt ) :
     else:
         return txt
 
-def http_call( request_args, status_code=[200], echo=True ):
+def http_call( request_args, status_code = [ 200 ], echo = True ):
     """A simple wrapper arround requests.request() which main purpose is to
     (1) validate status code
 	(1) print elapsed time
-    (2) print query parameters in case of an unexpected status code."""     
+    (2) print query parameters in case of an unexpected status code."""
     if echo :   
         report( request_args['method'], request_args['url'] )
     start_time = time.time()
@@ -41,8 +41,8 @@ def http_call( request_args, status_code=[200], echo=True ):
     end_time = time.time() 
     if r.status_code not in status_code :
         dumper.dump( request_args )
-        print( r.status_code, flush=True )
-        print( r.text if not r.text is None else '', flush=True )
+        print_warn( "Status code = " + str( r.status_code ))
+        print_warn( r.text if not r.text is None else '' )
         raise RuntimeError( "HTTP request failed!" )
     report( "elapsed time", end_time - start_time ) 
     return r
