@@ -117,7 +117,7 @@ class GraphDBClient( GenericClient ):
     def sparql_update( 
         self, 
         sparql, 
-        headers = { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
         status_code_ok = [ 204 ],
         echo = True
     ):
