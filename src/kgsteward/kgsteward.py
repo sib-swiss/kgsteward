@@ -172,30 +172,15 @@ def get_sha256( config, name ) :
             info = r.json()
             for record in info["files"] :
                 sha256.update( record["checksum"].encode('utf-8'))
+    if "replace" in target:
+        for key in sorted( target["replace"].keys()):
+            sha256.update( key.encode( 'utf-8' ))
+            sha256.update( target["replace"][key].encode( 'utf-8' ))
     if "update" in target :
-        for token in target["update"] :
-            sparql_update = []
-            replace       = []
-            if isinstance( token , dict ):
-                for key, value in token.items(): # first pass
-                    if key == "sparql_update_file" :
-                        for filename in value:
-                            with open( replace_env_var( filename )) as f: sparql = f.read()
-                            sparql_update.append( sparql )
-                    elif key != "replace":
-                        raise RuntimeError("Unsupported key: " + key )
-                    for key, value in token.items(): # second pass
-                        if key == "replace":
-                            for d in value:
-                                for k, v in d.items():
-                                    for i in range( len( sparql_update )):
-                                        sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
-                    for sparql in sparql_update:
-                        sha256.update( sparql.encode('utf-8'))
-            else:
-                filename = token
-                with open( replace_env_var( filename )) as f: sparql = f.read()
-                sha256.update( sparql.encode('utf-8'))
+        for filename in target["update"] :
+            with open( replace_env_var( filename )) as f: 
+                sparql = f.read()
+            sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
 def update_config( store, config ) :
@@ -380,8 +365,11 @@ def main():
         print_break()
         print_task( "update record " + name )
         context = name2context[ name ] # get_context( config, name )
-        store.sparql_update( f"DROP SILENT GRAPH <{context}>" )
         os.environ["TARGET_GRAPH_CONTEXT"] = context
+        replace = {}
+
+        store.sparql_update( f"DROP SILENT GRAPH <{context}>" )
+    
         if "system" in target :
             for cmd in target["system"] :
                 cmd2 = replace_env_var( cmd )
@@ -432,6 +420,7 @@ INSERT DATA {{
         <{context}> void:dataDump <file://{filename}>
     }}
 }}""" )
+        
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -447,32 +436,19 @@ INSERT DATA {{
         <{context}> void:dataDump <{path}>
     }}
 }}""" )
+        
+        if "replace" in target:
+            for key in target["replace"]:
+                replace[key] = replace_env_var( target["replace"][key] )
 
         if "update" in target :
-            for token in target["update"] :
-                sparql_update = []
-                replace       = []
-                if isinstance( token , dict ):
-                    for key, value in token.items(): # first pass
-                        if key == "sparql_update_file" :
-                            for filename in value:
-                                with open( replace_env_var( filename )) as f: sparql = f.read()
-                                sparql_update.append( sparql )
-                        elif key != "replace":
-                            raise RuntimeError("Unsupported key: " + key )
-                    for key, value in token.items(): # second pass
-                        if key == "replace":
-                            for d in value:
-                                for k, v in d.items():
-                                    for i in range( len( sparql_update )):
-                                        sparql_update[i] = sparql_update[i].replace( replace_env_var( k ), replace_env_var( v ))
-                    for sparql in sparql_update:
-                        store.sparql_update( sparql )
-                else:
-                    filename = token
-                    with open( replace_env_var( filename )) as f: sparql = f.read()
-                    store.sparql_update( sparql )
-
+            for filename in target["update"]:
+                with open( replace_env_var( filename )) as f: 
+                    sparql = f.read()
+                if replace is not None: 
+                    for key in sorted( replace.keys()):
+                        sparql = sparql.replace( key, replace[ key ])
+                store.sparql_update( sparql )
         update_dataset_info( store, config, name )
 
     # --------------------------------------------------------- #

@@ -79,12 +79,12 @@ Fetch turtle files from zenodo.
 This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
 """,
 "update": """List of files containing SPARQL update commands. 
-Wildcard `*`can be used.
+Wildcard are not supported here!
 """,
 "source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
 and inserted in the current graphs list.
 """,
-    "parent": """A list of name to encode dependency between datasets. 
+    "parent": """A list of names to declare dependency between graph records. 
 Updating the parent datset will provoke the update of its children.
 """,
     "stamp": """List of paths to files which last modification dates will used.
@@ -104,98 +104,33 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "graphdb" ] = Field( 
-        title = "GraphDB brand",
-        description = describe( "server_brand" )
-    )
-    server_url        : str = Field( 
-        default = "http://localhost:7200",
-        title       = "Server URL",
-        description = describe( "server_url" )
-    )
-    server_config     : str = Field(
-        title       = "Server config file",
-        description = describe( "server_config" )
-    )
-    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    server_brand : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
+    server_url        : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "server_url" ))
+    server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
+    file_server_port  : Optional[ int ] = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     prefixes          : Optional[ list[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
-    repository        : str= Field(
-        pattern = r"^\w{1,32}$",
-        title = "Repository ID",
-        description = describe( "repository" )
-    )
+    repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "fuseki" ] = Field(
-        title = "Fuseki brand",
-        description = describe( "This fixed value determines the server brand" )
-    )
-    server_url        : str = Field( 
-        default = "http://localhost:3030",
-        title       = "Server URL",
-        description = describe( "server_url" )
-    )
-    repository        : str= Field(
-        pattern = r"^\w{1,32}$",
-        title = "Repository ID",
-        description = describe( "repository" )
-    )
+    server_brand : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "This fixed value determines the server brand" ))
+    server_url        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "server_url" ))
+    repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
- 
+
 class GraphConf( BaseModel ):
-    name     : str = Field( 
-        title = "Short name of a graphs reccord",
-        description = describe( "name" ),
-        pattern = r"^[a-zA-Z]\w{0,31}$"
-    )
-    parent   : Optional[ List[ str ]] = Field(
-        None,
-        title = "Parent(s) of a graphs record",
-        description = describe(  "parent" )
-    )
-    context  : Optional[ str ]        = Field( 
-        None,
-        title = "Full IRI of a context/named graph",
-        description = describe(  "context" )
-    )
-    system   : Optional[ List[ str ]] = Field( 
-        None,
-        title = "UNIX system command(s)",
-        description = describe(  "system" )
-    )
-    file     : Optional[ list[ str ]] = Field( 
-        None,
-        title = "Load RDF from file(s)",
-        description = describe(  "file" )
-    )
-    url      : Optional[ list[ str ]] = Field( 
-        None,
-        title = "Load RDF from URL(s)",
-        description = describe(  "url" )
-    )
-    stamp    : Optional[ list[ str ]] = Field( 
-        None,
-        title = "Stamp file(s)",
-        description = describe(  "stamp" )
-    )
-    replace  : Optional[ list[ dict [ str, str ]]] = Field( 
-        None,
-        title = "String subtitution in SPARQL update(s)",
-        description = describe(  "replace" )
-    )
-    update   : Optional[ list[ str ]] = Field( 
-        None,
-        title = "SPARQL update file(s)",
-        description = describe(  "update" )
-    )
-    zenodo   : Optional[ list[ int ]] = Field( 
-        None,
-        title = "Ignore me",
-        description = describe(  "zenodo" )
-    )
+    name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a graphs reccord", description = describe( "name" ))
+    parent   : Optional[ List[ str ]] = Field( None, title = "Parent(s) of a graphs record", description = describe(  "parent" ))
+    context  : Optional[ str ]        = Field( None, title = "Full IRI of a context/named graph", description = describe(  "context" ))
+    system   : Optional[ List[ str ]] = Field( None, title = "UNIX system command(s)", description = describe(  "system" ))
+    file     : Optional[ list[ str ]] = Field( None, title = "Load RDF from file(s)", description = describe(  "file" ))
+    url      : Optional[ list[ str ]] = Field( None, title = "Load RDF from URL(s)", description = describe(  "url" ))
+    stamp    : Optional[ list[ str ]] = Field( None, title = "Stamp file(s)", description = describe(  "stamp" ))
+    replace  : Optional[ dict [ str, str ]] = Field( None, title = "String subtitution in SPARQL update(s)", description = describe(  "replace" ))
+    update   : Optional[ list[ str ]] = Field( None, title = "SPARQL update file(s)", description = describe(  "update" ))
+    zenodo   : Optional[ list[ int ]] = Field( None, title = "Ignore me", description = describe(  "zenodo" ))
 
 class GraphSource( BaseModel ):
     source : str = Field( 
@@ -209,12 +144,11 @@ class KGStewardConf( BaseModel ):
     store : Union[ GraphDBConf, FusekiConf ]
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
     context_base_IRI  : str = "http://example.org/context/"
-    queries           : list[str]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
-    validations       : list[str]  = Field( None, title = "Validation queries", description = describe( "validations" ))
+    queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
+    validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 class SourceGraphConf( BaseModel ):
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
-
 
 def parse_yaml_conf( path : str ):
     dir_yaml, filename = os.path.split( os.path.abspath( path ))

@@ -13,7 +13,7 @@ class FusekiClient( GenericClient ):
         super().__init__(  
             fuseki_url + "/" + repository_id + "/sparql", 
             fuseki_url + "/" + repository_id + "/update",
-            fuseki_url + "/" + repository_id + "/data"
+            fuseki_url + "/" + repository_id + "/store"
         )
 
     def ping( self ):

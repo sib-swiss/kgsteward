@@ -11,21 +11,20 @@ import lzma
 
 from termcolor import colored
 
-RE_CATCH_ENV_VAR     = re.compile( "\\$\\{([^\\}]+)\\}" )
-RE_CATCH_BEGIN_SPACE = re.compile( "^(\\s*)" )
-RE_CATCH_END_SPACE   = re.compile( "(\\s*)$" )
-RE_CATCH_TAB         = re.compile( "(\\t)" )
+RE_CATCH_ENV_VAR     = re.compile( r"\$\{([^\}]+)\}" )
+RE_CATCH_BEGIN_SPACE = re.compile( r"^(\s*)" )
+RE_CATCH_END_SPACE   = re.compile( r"(\s*)$" )
+RE_CATCH_TAB         = re.compile( r"(\t)" )
 
 def replace_env_var( txt ) :
     """ A helper sub with no magic """
-    m = RE_CATCH_ENV_VAR.match( txt )
+    m = RE_CATCH_ENV_VAR.search( txt )
     if m:
-        val = os.getenv( m.group( 1 ) )
-        if val:
-            txt = RE_CATCH_ENV_VAR.sub( val, txt )
-            return replace_env_var( txt ) # recursion
+        env_var = m.group( 1 )
+        if env_var in os.environ:
+            return replace_env_var( txt.replace( "${" + env_var + "}", os.getenv( env_var ))) # recursion
         else:
-            sys.exit(f"Environment variable not set: {m.group(1)}")
+            stop_error(f"Environment variable not set: env_var")
     else:
         return txt
 
