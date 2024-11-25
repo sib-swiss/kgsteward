@@ -13,6 +13,12 @@ class GenericClient():
         self.endpoint_update = endpoint_update
         self.endpoint_store  = endpoint_store
 
+    def get_endpoint_query( self ):
+        return self.endpoint_query
+
+    def get_endpoint_update( self ):
+        return self.endpoint_update
+   
     def ping( self, echo = True ):
         """ ping server """
         sparql = "SELECT ?hello WHERE{ BIND( 'Hello' AS ?hello )}"

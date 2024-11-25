@@ -1,4 +1,6 @@
-#https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
+# https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
+# https://app.soos.io/research/packages/Python/-/pydantic-yaml-parser/
+
 from dumper        import dump
 from enum          import Enum
 from typing        import List, Dict, Optional, Union, Literal
@@ -120,6 +122,13 @@ class FusekiConf( BaseModel ):
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
+class RDF4JConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    server_brand : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe( "This fixed value determines the server brand" ))
+    server_url        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "server_url" ))
+    repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
+    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+
 class GraphConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a graphs reccord", description = describe( "name" ))
     parent   : Optional[ List[ str ]] = Field( None, title = "Parent(s) of a graphs record", description = describe(  "parent" ))
@@ -141,7 +150,7 @@ class GraphSource( BaseModel ):
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    store : Union[ GraphDBConf, FusekiConf ]
+    store : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
     context_base_IRI  : str = "http://example.org/context/"
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))

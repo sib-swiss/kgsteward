@@ -121,19 +121,15 @@ def get_target( config, name ):
             return rec
     raise RuntimeError( "Target name not found: " + name )
 
-# def get_context( config, name ):
-#     target = get_target( config, name )
-#     if "target_graph_context" in target :
-#         context = "<" + replace_env_var( target["target_graph_context"] ) + ">"
-#     else:
-#         context = "<" + config["context_base_IRI"] + name + ">"
-#     return context
-
+# Compute checksums of graphs record
+#  
 def get_sha256( config, name ) :
-    sha256 = hashlib.sha256()
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
+    os.environ["kgsteward_graphs_name"]    = name
+    os.environ["kgsteward_graphs_context"] = context
+    sha256 = hashlib.sha256()
     if "system" in target :
         for cmd in target["system"] :
             sha256.update( cmd.encode( 'utf-8' ))
@@ -148,7 +144,7 @@ def get_sha256( config, name ) :
         for link in target["stamp"] :
             path = replace_env_var( link )
             sha256.update( path.encode('utf-8') )
-            if( path.startswith( "http:" )):
+            if( path.startswith( "http" )):
                 info = get_head_info( path ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
@@ -186,7 +182,7 @@ def get_sha256( config, name ) :
 def update_config( store, config ) :
     """ Add information about the currrent repository status """
     print_break()
-    print_task( "retrieve current status" )
+    print_task( "Retrieve current status" )
     name2item = {}
     for item in config["graphs"] :
         name = item["name"]
@@ -207,7 +203,7 @@ WHERE{
              ex:has_sha256 ?sha256 .
 }
 """ )
-    try: 
+    try:
         for rec in r.json()["results"]["bindings"] :
             if rec["context"]["value"] in context2name:
                 name = context2name[rec["context"]["value"]]
@@ -243,9 +239,9 @@ INSERT {{
     GRAPH <{context}> {{
         <{context}> a void:Dataset ;
             void:triples               ?c   ;
-            void:distinctSubjects      ?cs  ;
-            void:properties            ?cp  ;
-            void:distinctObjects       ?co  ;
+            #void:distinctSubjects      ?cs  ;
+            #void:properties            ?cp  ;
+            #void:distinctObjects       ?co  ;
             dct:modified               ?now ;
             ex:has_sha256              "{sha256}" .
     }}
@@ -254,9 +250,9 @@ WHERE {{
     GRAPH <{context}> {{
         SELECT
             ( COUNT( * ) AS ?c )
-            ( COUNT( DISTINCT( ?s )) AS ?cs )
-            ( COUNT( DISTINCT( ?p )) AS ?cp )
-            ( COUNT( DISTINCT( ?o )) AS ?co )
+            #( COUNT( DISTINCT( ?s )) AS ?cs )
+            #( COUNT( DISTINCT( ?p )) AS ?cp )
+            #( COUNT( DISTINCT( ?o )) AS ?co )
             ( NOW() AS ?now )
         WHERE {{
             ?s ?p ?o
@@ -283,26 +279,34 @@ def main():
 
     # if not "server_url" in config :
     #    config["server_url"] = input( "Enter server_url : " )
-    if "username" in config and not "password" in config :
-        config["password"] = getpass.getpass( prompt = "Enter password : " )
+    #if "username" in config and not "password" in config :
+    #    config["password"] = getpass.getpass( prompt = "Enter password : " )
 
     # --------------------------------------------------------- #
     # Initalise connection with the right triplestore
     # --------------------------------------------------------- #
 
+    if "username" in config["store"]:
+        username = replace_env_var( config["store"]["username"] )
+        password = replace_env_var( config["store"]["password"] )
+    else:
+        username = None
+        password = None
+
     if config["store"]["server_brand"] == "graphdb":
-        if "username" in config["store"]:
-            username = replace_env_var( config["store"]["username"] )
-            password = replace_env_var( config["store"]["password"] )
-        else:
-            username = None
-            password = None
         store = GraphDBClient(
             replace_env_var( config["store"]["server_url"] ),
             username,
             password,
             replace_env_var( config["store"]["repository"] )
         )
+    elif config["store"]["server_brand"] == "rdf4j":
+        store = GraphDBClient(
+            replace_env_var( config["store"]["server_url"] ),
+            username,
+            password,
+            replace_env_var( config["store"]["repository"] )
+        )    
     elif config["store"]["server_brand"] == "fuseki":
         store = FusekiClient(
             replace_env_var( config["store"]["server_url"] ),
@@ -315,10 +319,13 @@ def main():
     else:
         stop_error( "Unknown server brand: " + config["store"]["server_brand"] )
 
+    for key in config["store"].keys():
+        os.environ[ "kgsteward_store_" + key ] = config["store"][key]
+    os.environ[ "kgsteward_store_endpoint_query"]  = store.get_endpoint_query()
+    os.environ[ "kgsteward_store_endpoint_update"] = store.get_endpoint_update()
+    
     # --------------------------------------------------------- #
-    # Create a new empty repository
-    # turn autocomplete ON
-    # turn free-access ON if required
+    # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
 
     if args.I :
@@ -328,11 +335,12 @@ def main():
              store.rewrite_repository()
 
     # --------------------------------------------------------- #
-    # Establish the list of contexts/graphs to update
+    # Establish the list of contexts to update
     # --------------------------------------------------------- #
 
-    rdf_graph_all = set()
+    rdf_graph_all       = set()
     rdf_graph_to_update = set()
+
     for target in config["graphs"] :
         rdf_graph_all.add( target["name"] )
 
@@ -343,9 +351,9 @@ def main():
             if name in rdf_graph_all :
                 rdf_graph_to_update.add( name )
             else :
-                raise RuntimeError( "Invalid name: " + name )
+                raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( store, config ) # takes a while
+        config = update_config( store, config ) # may takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -353,7 +361,7 @@ def main():
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
-    # graphs, update void stats.
+    # graphs
     # --------------------------------------------------------- #
 
     for target in config["graphs"] :
@@ -363,9 +371,11 @@ def main():
             continue
 
         print_break()
-        print_task( "update record " + name )
-        context = name2context[ name ] # get_context( config, name )
+        print_task( "Update graphs record: " + name )
+        context = name2context[ name ]
         os.environ["TARGET_GRAPH_CONTEXT"] = context
+        os.environ["kgsteward_graphs_name"]    = name
+        os.environ["kgsteward_graphs_context"] = context
         replace = {}
 
         store.sparql_update( f"DROP SILENT GRAPH <{context}>" )
@@ -376,16 +386,16 @@ def main():
                 print( colored( cmd2, "cyan" ))
                 exit_code = os.system( cmd2 )
                 if not exit_code == 0 :
-                    raise RuntimeError( 'System cmd failed: ' + cmd2 )
+                    raise stop_error( 'System cmd failed: ' + cmd2 )
 
         if "url" in target :
             for urlx in target["url"] :
-                path = "<" + replace_env_var( urlx ) + ">"
-                store.sparql_update( f"LOAD SILENT {path} INTO GRAPH <{context}>" )
+                path = replace_env_var( urlx )
+                store.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
                 store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
-        <{context}> void:dataDump {path}
+        <{context}> void:dataDump <{path}>
     }}
 }}""" )
 
@@ -394,11 +404,17 @@ INSERT DATA {{
                 fs = LocalFileServer( port = config["store"][ "file_server_port" ] )
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
+                    if not filenames:
+                        stop_error( "File not found: " + path )
                     for filename in filenames :
                         dir, file = os.path.split( replace_env_var( filename ) )
                         fs.expose( dir  )
-                        path = "http://localhost:" + str( config["store"][ "file_server_port" ] ) + "/" + file
-                        store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                        try:
+                            path = "http://localhost:" + str( config["store"][ "file_server_port" ] ) + "/" + file
+                            store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                        except Exception as X: # second attemp from within a container (?)
+                            path = "http://host.docker.internal:" + str( config["store"][ "file_server_port" ] ) + "/" + file
+                            store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         path = "file://" + replace_env_var( filename )
                         store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
@@ -420,7 +436,7 @@ INSERT DATA {{
         <{context}> void:dataDump <file://{filename}>
     }}
 }}""" )
-        
+
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -445,10 +461,11 @@ INSERT DATA {{
             for filename in target["update"]:
                 with open( replace_env_var( filename )) as f: 
                     sparql = f.read()
-                if replace is not None: 
-                    for key in sorted( replace.keys()):
-                        sparql = sparql.replace( key, replace[ key ])
+                # if replace is not None: 
+                for key in sorted( replace.keys()):
+                    sparql = sparql.replace( key, replace[ key ])
                 store.sparql_update( sparql )
+
         update_dataset_info( store, config, name )
 
     # --------------------------------------------------------- #
