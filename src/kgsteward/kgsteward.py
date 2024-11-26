@@ -595,7 +595,7 @@ INSERT DATA {{
 
     contexts = store.get_contexts()
     print_break()
-    print_task( "show current status" )
+    print_task( "Show current status" )
     print( colored("                            name        #triple        last modified    status", "blue" ))
     print( colored("================================        =======     =================== ======", "blue" ))
     for item in config["graphs"] :

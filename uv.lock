@@ -206,6 +206,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-yaml" },
     { name = "pyyaml" },
+    { name = "rdflib" },
     { name = "requests" },
     { name = "termcolor" },
 ]
@@ -224,6 +225,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-yaml" },
     { name = "pyyaml" },
+    { name = "rdflib", specifier = ">=6.3.2" },
     { name = "requests" },
     { name = "termcolor" },
 ]
