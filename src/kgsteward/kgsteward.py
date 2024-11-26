@@ -7,6 +7,7 @@ import re
 import hashlib
 import glob
 import requests  # https://docs.python-requests.org/en/master/user/quickstart/
+import rdflib
 import getpass
 from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
@@ -92,6 +93,11 @@ def get_user_input():
         help   = 'Validate the repository content.'
     )
     parser.add_argument(
+        '-P',
+        action = 'store_true',
+        help   = "Reset all prefixes"
+    )
+    parser.add_argument(
         '-Q',
         action = 'store_true',
         help   = "Clean, test and reload all SPARQL queries. This is a GraphDB "
@@ -100,9 +106,9 @@ def get_user_input():
                  "It may fail on SPARQL syntax error!"
     )
     parser.add_argument(
-        '-P',
+        '-r',
         action = 'store_true',
-        help   = "Reset all prefixes"
+        help   = "Save prefix and queries in supplied dir"
     )
     args = parser.parse_args()
 
@@ -320,7 +326,7 @@ def main():
         stop_error( "Unknown server brand: " + config["store"]["server_brand"] )
 
     for key in config["store"].keys():
-        os.environ[ "kgsteward_store_" + key ] = config["store"][key]
+        os.environ[ "kgsteward_store_" + str( key )] = str( config["store"][key] )
     os.environ[ "kgsteward_store_endpoint_query"]  = store.get_endpoint_query()
     os.environ[ "kgsteward_store_endpoint_update"] = store.get_endpoint_update()
     
@@ -443,7 +449,7 @@ INSERT DATA {{
                 if not r.status_code == 200 :
                     raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
                 info = r.json()
-                for record in info["files"] :
+                for record in info["files"]:
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
                     store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                     store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -543,6 +549,36 @@ INSERT DATA {{
                     'json'    : { 'name': name, 'body': sparql, "shared": "true" }
                 }, [ 201 ] )
 
+    if args.r:
+        if not os.path.isdir( args.r ):
+            stop_error( "Not a directory: " + args.r )
+        counter = 0
+        for path in config["queries"] :
+            filenames = sorted( glob.glob( replace_env_var( path )))
+            for filename in filenames :
+                counter = counter + 1
+                with open( filename ) as f: sparql = f.read()
+                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
+                RDF    = Namespace( "" )
+                RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
+                SCHEMA = Namespace( "https://schema.org/" )
+                SH     = Namespace( "http://www.w3.org/ns/shacl#" )
+                SPEX   = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
+                g = Graph()
+                g.bind( "ex",     EX )
+                g.bind( "rdfs",   RDFS )
+                g.bind( "schema", SCHEMA )
+                g.bind( "sh",     SH)
+                g.bind( "spex",   SPEX )
+                iri = EX["query_" + str( counter )]
+                g.add(( iri, RDF.type, SH.SPARQLExecutable ))
+                g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
+                g.add(( iri, RDFS.comment,  Literal( comment )))
+                g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
+                g.add(( iri, SH.select,     Literal( )))
+                g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
+
     # --------------------------------------------------------- #
     # Turn free access ON
     # --------------------------------------------------------- #
@@ -556,6 +592,7 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     
     config = update_config( store, config )
+
     contexts = store.get_contexts()
     print_break()
     print_task( "show current status" )
