@@ -152,7 +152,7 @@ class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     store : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
-    context_base_IRI  : str = "http://example.org/context/"
+    context_base_IRI  : str # = "http://example.org/context/"
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
