@@ -36,7 +36,7 @@ class RFD4JClient( GenericClient ):
             'method' : 'DELETE',
             'url'    : self.server_url + '/repositories/' + self.repository_id,
 #            'headers' : self.headers
-        }, [ 204, 405 ] )
+        }, [ 204, 404 ] ) # 204: cleared; 404 unknown
         http_call({
             'method'  : 'PUT',
             'url'     : self.server_url + '/repositories/' + self.repository_id,
