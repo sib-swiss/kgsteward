@@ -32,17 +32,18 @@ class RFD4JClient( GenericClient ):
 
     def rewrite_repository( self, rdf4j_config_filename ):
         # "curl -H 'content-type: text/turtle' --upload-file common/data/config/JLW_Native_Lucene.config.ttl http://localhost:8080/rdf4j-server/repositories/JLW_Native_Lucene"
-#        http_call({
-#            'method' : 'DELETE',
-#            'url'    : self.server_url + '/rest/repositories/' + self.repository_id,
+        http_call({
+            'method' : 'DELETE',
+            'url'    : self.server_url + '/repositories/' + self.repository_id,
 #            'headers' : self.headers
-#        }, [ 204, 405 ] )
+        }, [ 204, 405 ] )
         http_call({
             'method'  : 'PUT',
             'url'     : self.server_url + '/repositories/' + self.repository_id,
             'headers' : { **self.headers, "content-type": "text/turtle" },
             'files'   : { 'config' : open( rdf4j_config_filename , 'rb' )}
         }, [ 204, 409 ] ) # 204: crated; 409 repository already exists (and don't care)
+        # self.sparql_update( "DROP SILENT ALL" )
 
     def sparql_query( 
         self, 
