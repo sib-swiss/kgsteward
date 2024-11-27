@@ -16,7 +16,7 @@ from .common     import *
 from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
-# from .rdf4j      import RDF4JClient     # in preparation
+from .rdf4j      import RFD4JClient     # in preparation
 # from .oxigraph   import OxigraphClient  # in preparation     
 # from .virtuoso   import VirtuosoClient  # in preparation
 from .fileserver import LocalFileServer 
@@ -307,7 +307,7 @@ def main():
             replace_env_var( config["store"]["repository"] )
         )
     elif config["store"]["server_brand"] == "rdf4j":
-        store = GraphDBClient(
+        store = RFD4JClient(
             replace_env_var( config["store"]["server_url"] ),
             username,
             password,
