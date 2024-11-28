@@ -11,6 +11,7 @@ import rdflib
 import getpass
 from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
+from   rdflib    import *
 
 from .common     import *
 from .yamlconfig import parse_yaml_conf
