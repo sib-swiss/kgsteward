@@ -561,7 +561,7 @@ INSERT DATA {{
                 comment = []
                 select  = []
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                with open( filename ) as f: 
+                with open( filename ) as file: 
                     for line in file:
                         if re.match( "#(.+)" ):
                             comment.append( re.sub( "^#", "", line ))
