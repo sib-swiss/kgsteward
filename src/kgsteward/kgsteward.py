@@ -580,7 +580,8 @@ INSERT DATA {{
                 g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
                 g.add(( iri, SH.select,     Literal( "\n".join( comments ))))
                 g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
-        stop_error( "toto")
+                g.serialize( format="turtle", destination = args.r + "/query_" + str( counter ) + ".rq" )    
+        stop_error( "done")
 
     # --------------------------------------------------------- #
     # Turn free access ON
