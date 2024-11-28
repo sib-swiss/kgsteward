@@ -558,11 +558,17 @@ INSERT DATA {{
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
                 counter = counter + 1
-                with open( filename ) as f: sparql = f.read()
+                comment = []
+                select  = []
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                comments = re.findall( "^\#(.+)", sparql ) 
+                with open( filename ) as f: 
+                    for line in file:
+                        if re.match( "#(.+)" ):
+                            comment.append( re.sub( "^#", "", line ))
+                        else:
+                            select.append( line )
                 EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
-                RDF    = Namespace( "" )
+                RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
                 SCHEMA = Namespace( "https://schema.org/" )
                 SH     = Namespace( "http://www.w3.org/ns/shacl#" )
@@ -571,14 +577,14 @@ INSERT DATA {{
                 g.bind( "ex",     EX )
                 g.bind( "rdfs",   RDFS )
                 g.bind( "schema", SCHEMA )
-                g.bind( "sh",     SH)
+                g.bind( "sh",     SH )
                 g.bind( "spex",   SPEX )
                 iri = EX["query_" + str( counter )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                g.add(( iri, RDFS.comment,  Literal( " ".join( comments ))))
+                g.add(( iri, RDFS.comment,  Literal( " ".join( comment ))))
                 g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
-                g.add(( iri, SH.select,     Literal( "\n".join( comments ))))
+                g.add(( iri, SH.select,     Literal( "\n".join( select ))))
                 g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
                 g.serialize( format="turtle", destination = args.r + "/query_" + str( counter ) + ".rq" )    
         stop_error( "done")
