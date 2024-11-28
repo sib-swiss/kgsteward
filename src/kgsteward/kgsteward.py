@@ -576,7 +576,7 @@ INSERT DATA {{
                 iri = EX["query_" + str( counter )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                g.add(( iri, RDFS.comment,  Literal( comment )))
+                g.add(( iri, RDFS.comment,  Literal( " ".join( comments ))))
                 g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
                 g.add(( iri, SH.select,     Literal( "\n".join( comments ))))
                 g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
