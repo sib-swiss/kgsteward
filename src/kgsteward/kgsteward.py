@@ -107,9 +107,9 @@ def get_user_input():
     )
     parser.add_argument(
         '-r',
-        action = 'store_true',
-        help   = "Save prefix and queries in supplied dir"
+        help   = "Save prefix and queries into supplied dir"
     )
+
     args = parser.parse_args()
 
     # Further processing of command line arguments
@@ -558,7 +558,8 @@ INSERT DATA {{
             for filename in filenames :
                 counter = counter + 1
                 with open( filename ) as f: sparql = f.read()
-                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                comments = re.findall( "^\#(.+)", sparql ) 
                 EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
                 RDF    = Namespace( "" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
@@ -576,7 +577,7 @@ INSERT DATA {{
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
                 g.add(( iri, RDFS.comment,  Literal( comment )))
                 g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
-                g.add(( iri, SH.select,     Literal( )))
+                g.add(( iri, SH.select,     Literal( "\n".join( comments ))))
                 g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
 
     # --------------------------------------------------------- #
