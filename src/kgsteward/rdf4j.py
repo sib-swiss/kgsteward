@@ -31,19 +31,24 @@ class RFD4JClient( GenericClient ):
             stop_error( "Cannot contact server at url: " + self.server_url )
 
     def rewrite_repository( self, rdf4j_config_filename ):
-        # "curl -H 'content-type: text/turtle' --upload-file common/data/config/JLW_Native_Lucene.config.ttl http://localhost:8080/rdf4j-server/repositories/JLW_Native_Lucene"
-        http_call({
+        # FIXME: this does not work!
+        try: # attempt to erase the repo and its content
+            # curl -X DELETE http://localhost:8080/rdf4j-server/repositories/TEST
+            http_call({ # slower alternative self.sparql_update( "DROP SILENT ALL" )
             'method' : 'DELETE',
             'url'    : self.server_url + '/repositories/' + self.repository_id,
-#            'headers' : self.headers
+            'headers' : self.headers
         }, [ 204, 404 ] ) # 204: cleared; 404 unknown
+        except: # case repo does not exist yet 
+            pass
+        # "curl -H 'content-type: text/turtle' --upload-file common/data/config/JLW_Native_Lucene.config.ttl http://localhost:8080/rdf4j-server/repositories/JLW_Native_Lucene"
         http_call({
             'method'  : 'PUT',
             'url'     : self.server_url + '/repositories/' + self.repository_id,
             'headers' : { **self.headers, "content-type": "text/turtle" },
             'files'   : { 'config' : open( rdf4j_config_filename , 'rb' )}
-        }, [ 204, 409 ] ) # 204: crated; 409 repository already exists (and don't care)
-        # self.sparql_update( "DROP SILENT ALL" )
+        }, [ 204, 409 ] ) # 204: created; 409 repository already exists (and don't care)
+        stop_error( "toto")
 
     def sparql_query( 
         self, 
