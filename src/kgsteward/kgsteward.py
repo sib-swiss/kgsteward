@@ -554,19 +554,26 @@ INSERT DATA {{
         if not os.path.isdir( args.r ):
             stop_error( "Not a directory: " + args.r )
         counter = 0
+        prefix = {}
+        catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
+        catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
+                report( "parse file", filename )
                 counter = counter + 1
                 comment = []
                 select  = []
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file: 
                     for line in file:
-                        if re.match( "#(.+)", line ):
-                            comment.append( re.sub( "^#", "", line ))
+                        if re.match( "^#", line ):
+                            comment.append( re.sub( "^#\s*", "", line.rstrip() ))
                         else:
-                            select.append( line )
+                            select.append( line.rstrip() )
+                            match = catch_key_value_rq.search( line )
+                            if match:
+                                prefix[match.group( 1 )] = match.group( 2 )
                 EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
                 RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
@@ -583,12 +590,43 @@ INSERT DATA {{
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
                 g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
-                g.add(( iri, SH.prefixes,   BNode( "sparql_examples_prefixes" )))
-                g.add(( iri, SH.select,     Literal( "".join( select ))))
+                g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
+                g.add(( iri, SH.select,     Literal( "\n".join( select ))))
                 g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
-                g.serialize( format="turtle", destination = args.r + "/query_" + str( counter ) + ".rq" )    
-        stop_error( "done")
-
+                g.serialize( 
+                    format="turtle", 
+                    destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
+                )    
+        if "prefixes" in config:
+            for filename in config["prefixes"] :
+                report( "parse file", filename )
+                file = open( replace_env_var( filename ))
+                for line in file:
+                    match = catch_key_value_ttl.search( line )
+                if match:
+                    prefix[match.group( 1 )] = match.group( 2 )
+        SH     = Namespace( "http://www.w3.org/ns/shacl#" )
+        XSD    = Namespace( "http://www.w3.org/2001/XMLSchema#" )
+        RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
+        RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
+        OWL    = Namespace( "http://www.w3.org/2002/07/owl#" )
+        g = Graph()
+        g.bind( "sh",   SH )
+        g.bind( "rdf",  RDF )        
+        g.bind( "rdfs", RDFS )
+        g.bind( "owl",  OWL )
+        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDF.type,     OWL.ontology ))
+        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDFS.comment, Literal( "toto" )))
+        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), OWL.imports,  URIRef( 'http://www.w3.org/ns/shacl#' )))
+        for key in prefix:
+            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), SH.declare, URIRef( 'http://example.org/prefixes/prefix_' + key )))
+            g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.prefix,    Literal( key )))
+            g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
+        g.serialize(
+            format="turtle", 
+            destination = args.r + "/prefixes.ttl"
+        )
+        stop_error( "toto" )
     # --------------------------------------------------------- #
     # Turn free access ON
     # --------------------------------------------------------- #
