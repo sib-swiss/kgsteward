@@ -32,7 +32,7 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
     """A simple wrapper arround requests.request() which main purpose is to
     (1) validate status code
 	(1) print elapsed time
-    (2) print query parameters in case of an unexpected status code."""
+    (2) print request parameters in case of an unexpected status code."""
     if echo :   
         report( request_args['method'], request_args['url'] )
     start_time = time.time()
@@ -43,7 +43,7 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
         print_warn( "Status code = " + str( r.status_code ))
         print_warn( r.text if not r.text is None else '' )
         raise RuntimeError( "HTTP request failed!" )
-    report( "elapsed time", end_time - start_time ) 
+    report( "elapsed time", end_time - start_time )
     return r
 
 def get_head_info( url, echo = True ):
@@ -60,11 +60,11 @@ def download_file( url, filename ):
             shutil.copyfileobj(r.raw, f)
 
 def any_open( filename, mode = "rb"):    
-    if filename.endswith("gz"):
+    if filename.endswith(".gz"):
         return gzip.open( filename, mode )
-    elif filename.endswith("bz2"):
+    elif filename.endswith(".bz2"):
         return bz2.open( filename, mode )
-    elif filename.endswith("xz"):
+    elif filename.endswith(".xz"):
         return lzma.open( filename, mode )
     else:
         return open( filename, mode )
@@ -103,7 +103,7 @@ def guess_mime_type( filename ):
 def print_break():
     print( '# -----------------------------------------------------------------')
 
-def print_strip( txt, color = None ):
+def print_strip( txt, color = 'black' ):
     """Print after removing leading/trailing spaces"""
     txt = RE_CATCH_TAB.sub( '    ', RE_CATCH_END_SPACE.sub( '', RE_CATCH_BEGIN_SPACE.sub( '', txt )))
     if color :
