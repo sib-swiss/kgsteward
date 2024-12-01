@@ -110,6 +110,10 @@ def get_user_input():
         '-r',
         help   = "Save prefix and queries into supplied dir"
     )
+    parser.add_argument(
+        '-x',
+        help   = "Dump query results in nt format"
+    )
 
     args = parser.parse_args()
 
@@ -574,6 +578,7 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
+                store.validate_sparql_query( "\n".join( select ), echo=False)
                 EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
                 RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
@@ -627,6 +632,25 @@ INSERT DATA {{
             destination = args.r + "/prefixes.ttl"
         )
         stop_error( "toto" )
+
+    if args.x:
+        if not os.path.isdir( args.x ):
+            stop_error( "Not a directory: " + args.x )
+        for path in config["queries"] :
+            filenames = sorted( glob.glob( replace_env_var( path )))
+            for filename in filenames :
+                report( "read file", filename )
+                name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                with open( filename ) as file:
+                    sparql = file.read()
+                r = store.sparql_query_to_tsv( sparql, echo =False )
+                s = r.text.splitlines( keepends = True )
+                out_path =  args.x + "/" + name + ".nt"
+                report( "write file", out_path )
+                with open( out_path, "w" ) as file:
+                    file.write( "".join( s[ :1 ] ))
+                    file.write( "".join( sorted( s[ 1: ])))
+
     # --------------------------------------------------------- #
     # Turn free access ON
     # --------------------------------------------------------- #
