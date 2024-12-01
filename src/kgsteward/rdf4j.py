@@ -110,8 +110,8 @@ class RFD4JClient( GenericClient ):
             'method'  : 'POST',
             'url'     : self.server_url + "/repositories/" + self.repository_id,
             'headers' : {
-                'Accept'        : 'text/tab-separated-values',
-                'Authorization' : self.authorization
+                'Accept'        : 'text/tab-separated-values'
+                # 'Authorization' : self.authorization
             },
             'params'  : {
                 'query'   : sparql,
