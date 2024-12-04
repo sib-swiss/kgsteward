@@ -185,8 +185,9 @@ def get_sha256( config, name ) :
             sha256.update( target["replace"][key].encode( 'utf-8' ))
     if "update" in target :
         for filename in target["update"] :
+            sha256.update( filename.encode('utf-8')) # is this 
             with open( replace_env_var( filename )) as f: 
-                sparql = f.read()
+                sparql = f.read()           
             sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
@@ -643,9 +644,9 @@ INSERT DATA {{
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = store.sparql_query_to_tsv( sparql, echo =False )
+                r = store.sparql_query_to_tsv( sparql, echo = True )
                 s = r.text.splitlines( keepends = True )
-                out_path =  args.x + "/" + name + ".nt"
+                out_path =  args.x + "/" + name + ".tsv"
                 report( "write file", out_path )
                 with open( out_path, "w" ) as file:
                     file.write( "".join( s[ :1 ] ))
