@@ -1,5 +1,5 @@
 import os
-import requests 
+import requests
 import shutil
 import time
 import re
@@ -24,11 +24,11 @@ def replace_env_var( txt ) :
         if env_var in os.environ:
             return replace_env_var( txt.replace( "${" + env_var + "}", os.getenv( env_var ))) # recursion
         else:
-            stop_error(f"Environment variable not set: env_var")
+            stop_error(f"Environment variable not set: {env_var}")
     else:
         return txt
 
-def update_path( path, yaml_dir ):            
+def update_path( path, yaml_dir ):
     dir, filename = os.path.split( os.path.normpath( replace_env_var( path )))
     if not dir:
         dir = yaml_dir
@@ -41,11 +41,11 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
     (1) validate status code
 	(1) print elapsed time
     (2) print request parameters in case of an unexpected status code."""
-    if echo :   
+    if echo :
         report( request_args['method'], request_args['url'] )
     start_time = time.time()
     r = requests.request( **request_args )
-    end_time = time.time() 
+    end_time = time.time()
     if r.status_code not in status_code :
         dumper.dump( request_args )
         print_warn( "Status code = " + str( r.status_code ))
@@ -67,7 +67,7 @@ def download_file( url, filename ):
         with open( filename, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
 
-def any_open( filename, mode = "rb"):    
+def any_open( filename, mode = "rb"):
     if filename.endswith(".gz"):
         return gzip.open( filename, mode )
     elif filename.endswith(".bz2"):

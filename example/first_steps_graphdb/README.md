@@ -1,6 +1,6 @@
 # First steps with GraphDB
 
-1. Clone kgsteward from GitHub, Create an environement variable that point to its root dir: 
+1. Clone kgsteward from GitHub, Create an environement variable that point to its root dir:
 
 ```
 [change dir to where you like to clone from github]
@@ -26,7 +26,7 @@ The file `first_steps_graphdb.yaml` contains:
 store:
   server_brand:  graphdb
   server_url:    http://localhost:7200
-  server_config: config-graphdb-beatles.ttl 
+  server_config: config-graphdb-beatles.ttl
 repository_id: BEATLES_DEMO
 graphs:
   - name: beatles
@@ -55,12 +55,3 @@ http://stardog.com/tutorial/Ringo_Starr
 ```
 
 Congratulations: you have populated a graphdb repository using kgsteward :-)
-
-
-
-
-
-
-
-
-

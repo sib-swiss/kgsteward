@@ -1,0 +1,16 @@
+# A docker compose to start graphdb in development
+services:
+  graphdb:
+    image: docker.io/ontotext/graphdb:10.8.1
+    restart: unless-stopped
+    ports:
+      - 7200:7200
+    # container_name: graphdb
+    # environment:
+    #   GDB_JAVA_OPTS: >-
+    #     -Xmx4g -Xms4g
+    #     -Dgraphdb.home=/opt/graphdb/home
+    #     -Dgraphdb.workbench.importDirectory=/opt/graphdb/home/graphdb-import
+    #     -Dgraphdb.workbench.cors.enable=true
+    # volumes:
+    #   - ./graphdb-data:/opt/graphdb/home

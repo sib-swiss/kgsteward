@@ -18,9 +18,9 @@ from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient     # in preparation
-# from .oxigraph   import OxigraphClient  # in preparation     
+# from .oxigraph   import OxigraphClient  # in preparation
 # from .virtuoso   import VirtuosoClient  # in preparation
-from .fileserver import LocalFileServer 
+from .fileserver import LocalFileServer
 
 name2context = {} # global helper dict
 context2name = {} # same
@@ -133,7 +133,7 @@ def get_target( config, name ):
     raise RuntimeError( "Target name not found: " + name )
 
 # Compute checksums of dataset record
-#  
+#
 def get_sha256( config, name ) :
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
@@ -185,9 +185,9 @@ def get_sha256( config, name ) :
             sha256.update( target["replace"][key].encode( 'utf-8' ))
     if "update" in target :
         for filename in target["update"] :
-            sha256.update( filename.encode('utf-8')) # is this 
-            with open( replace_env_var( filename )) as f: 
-                sparql = f.read()           
+            sha256.update( filename.encode('utf-8')) # is this
+            with open( replace_env_var( filename )) as f:
+                sparql = f.read()
             sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
@@ -318,7 +318,7 @@ def main():
             username,
             password,
             replace_env_var( config["server"]["repository"] )
-        )    
+        )
     elif config["server"]["version"] == "fuseki":
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
@@ -335,7 +335,7 @@ def main():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
     os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
     os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
-    
+
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
@@ -398,7 +398,7 @@ def main():
         replace = {}
 
         server.sparql_update( f"DROP SILENT GRAPH <{context}>" )
-    
+
         if "system" in target :
             for cmd in target["system"] :
                 cmd2 = replace_env_var( cmd )
@@ -472,16 +472,16 @@ INSERT DATA {{
         <{context}> void:dataDump <{path}>
     }}
 }}""" )
-        
+
         if "replace" in target:
             for key in target["replace"]:
                 replace[key] = replace_env_var( target["replace"][key] )
 
         if "update" in target :
             for filename in target["update"]:
-                with open( replace_env_var( filename )) as f: 
+                with open( replace_env_var( filename )) as f:
                     sparql = f.read()
-                # if replace is not None: 
+                # if replace is not None:
                 for key in sorted( replace.keys()):
                     sparql = sparql.replace( key, replace[ key ])
                 server.sparql_update( sparql )
@@ -578,7 +578,7 @@ INSERT DATA {{
                 comment = []
                 select  = []
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                with open( filename ) as file: 
+                with open( filename ) as file:
                     for line in file:
                         if re.match( "^#", line ):
                             comment.append( re.sub( "^#\s*", "", line.rstrip() ))
@@ -607,10 +607,10 @@ INSERT DATA {{
                 g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
                 g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
-                g.serialize( 
-                    format="turtle", 
+                g.serialize(
+                    format="turtle",
                     destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
-                )    
+                )
         if "prefixes" in config:
             for filename in config["prefixes"] :
                 report( "parse file", filename )
@@ -626,7 +626,7 @@ INSERT DATA {{
         OWL    = Namespace( "http://www.w3.org/2002/07/owl#" )
         g = Graph()
         g.bind( "sh",   SH )
-        g.bind( "rdf",  RDF )        
+        g.bind( "rdf",  RDF )
         g.bind( "rdfs", RDFS )
         g.bind( "owl",  OWL )
         g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDF.type,     OWL.ontology ))
@@ -637,7 +637,7 @@ INSERT DATA {{
             g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.prefix,    Literal( key )))
             g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
         g.serialize(
-            format="turtle", 
+            format="turtle",
             destination = args.r + "/prefixes.ttl"
         )
         stop_error( "toto" )
@@ -672,7 +672,7 @@ INSERT DATA {{
     # Print final repository status
     # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
-    
+
     config = update_config( server, config )
 
     contexts = server.get_contexts()
@@ -681,10 +681,10 @@ INSERT DATA {{
     print( colored("                            name        #triple        last modified    status", "blue" ))
     print( colored("================================        =======     =================== ======", "blue" ))
     for item in config["dataset"] :
-        print( colored( '{:>32}   {:>12}    {:>20} {}'.format( 
-            item["name"], 
-            item["count"], 
-            item["date"], 
+        print( colored( '{:>32}   {:>12}    {:>20} {}'.format(
+            item["name"],
+            item["count"],
+            item["date"],
             item["status"]
         ), "blue" ))
         context = item[ "context" ]
@@ -695,7 +695,7 @@ INSERT DATA {{
     print_break()
 
     #  save_json_schema(  "doc/kgsteward.schema.json" )
-    
+
 # --------------------------------------------------------- #
 # Main
 # --------------------------------------------------------- #

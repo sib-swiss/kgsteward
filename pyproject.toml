@@ -11,16 +11,16 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
- "dumper",
- "requests",
- "pathlib",
- "PyYAML",
- "termcolor",
- "pydantic >=2.0.0",
- "pydantic-yaml",
- "pprintpp >=0.4.0",
- "rdflib>=6.3.2",
- "pyyaml-include>=2.2",
+  "dumper",
+  "requests",
+  "pathlib",
+  "PyYAML",
+  "termcolor",
+  "pydantic >=2.0.0",
+  "pydantic-yaml",
+  "pprintpp >=0.4.0",
+  "rdflib>=6.3.2",
+  "pyyaml-include>=2.2",
 ]
 
 [project.urls]
@@ -35,9 +35,14 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
-    "jsonschema-markdown>=0.2.1",
-    "rdflib>=6.3.2",
+  "jsonschema-markdown>=0.2.1",
+  "rdflib>=6.3.2",
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "testcontainers",
 ]
 
 [project.scripts]
 kgsteward = "kgsteward:run_kgsteward"
+# kgsteward = "kgsteward.__init__:run_kgsteward"

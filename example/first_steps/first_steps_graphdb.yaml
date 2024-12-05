@@ -2,10 +2,11 @@ version: kgsteward2.0
 server:
   version:  graphdb
   location:    http://localhost:7200
-  server_config: first_steps_graphdb.config.ttl 
+  server_config: first_steps_graphdb.config.ttl
   username:      ${GRAPHDB_USERNAME}
   password:      ${GRAPHDB_PASSWORD}
+  # NOTE: by default graphdb login is user: admin / pw: root
   repository:    first_steps
 dataset: !include dataset.yaml
-validations: 
+validations:
   -  ${KGSTEWARD_ROOT_DIR}/example/first_steps/sparql/validate/there_are_677_triples.rq

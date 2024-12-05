@@ -10,3 +10,6 @@ kgsteward.egg-info/
 Pipfile
 Pipfile.lock
 .vscode
+.venv/
+.coverage
+htmlcov/
