@@ -1,6 +1,8 @@
 # https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
 # https://app.soos.io/research/packages/Python/-/pydantic-yaml-parser/
 
+import yaml
+import yaml_include
 from dumper        import dump
 from enum          import Enum
 from typing        import List, Dict, Optional, Union, Literal
@@ -21,7 +23,7 @@ description = {
     Especially useful is `${graphs.name}` that can be used in be used in `graphs.replace` clause to indicate the current "active" context/named graph.
 """,
     "server_brand": """One of 'graphdb' or 'fuseki' ( 'graphdb' by default).""",
-    "server_url" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
+    "location" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
     "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
@@ -106,8 +108,8 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
-    server_url        : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "server_url" ))
+    version           : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
+    location        : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     file_server_port  : Optional[ int ] = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
@@ -117,15 +119,15 @@ class GraphDBConf( BaseModel ):
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "This fixed value determines the server brand" ))
-    server_url        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "server_url" ))
+    version           : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "This fixed value determines the server brand" ))
+    location        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    server_brand : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe( "This fixed value determines the server brand" ))
-    server_url        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "server_url" ))
+    version           : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe( "This fixed value determines the server brand" ))
+    location        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
@@ -150,9 +152,10 @@ class GraphSource( BaseModel ):
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    store : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
-    graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
-    context_base_IRI  : str # = "http://example.org/context/"
+    version           : Literal[ "kgsteward2.0" ] = Field( title = "YAML syntax version", description = describe( "This fixed value determines the admissible YAML syntax" ))
+    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
+    dataset           : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+    context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = "toto" )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
@@ -160,57 +163,32 @@ class SourceGraphConf( BaseModel ):
     graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
 
 def parse_yaml_conf( path : str ):
+    """Parsing kgsteward YAML config file(s) is a three step process:
+    1. Parse YAML file(s) and execute !include directive
+    2. Test YAML version
+    3. Content-aware validation through pydantic
+    """
     dir_yaml, filename = os.path.split( os.path.abspath( path ))
     file = open( path )
+    yaml.add_constructor( "!include", yaml_include.Constructor( base_dir = dir_yaml ))
+    with open( path ) as f:
+        data = yaml.full_load(f)
+        dump( data )
+    if "version" not in data:
+        stop_error( "Key 'version' not found! you should upgrade YAML syntax to a recent one!" ) 
     try:
-        config = parse_yaml_raw_as( KGStewardConf, file.read() ).model_dump( exclude_none = True )
+        config = KGStewardConf( **data ).model_dump( exclude_none = True )
     except ValidationError as e:
         stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
-    # if key not in [ "server_url", "endpoint", "username", "password", "repository", 
-    #                     "setup_base_IRI", "context_base_IRI", "server_config", "graphdb_config", 
-    #                     "use_file_server", "file_server_port", "graphs", "queries", "validations", 
-    #                     "prefixes" ] :
-    #     print_warn( "Ignored config key in YAML: " + key ) # FIXME: the above parser remove ignored key
-    #     del config[key]
-    if "endpoint" in config and "server_url" not in config :
-        config[ "server_url" ] = config[ "endpoint" ]
-        del config[ "endpoint" ]
-        print_warn( '"endpoint" is deprecated, use "server_url" instead' )
-    if "setup_base_IRI" in config and "context_base_IRI" not in config :
-        config[ "context_base_IRI" ] = config[ "setup_base_IRI" ]
-        del config[ "setup_base_IRI" ]
-        print_warn( '"setup_base_IRI" is deprecated, use "context_base_IRI" instead' )
-    if "dataset_base_IRI" in config and "context_base_IRI"  not in config :
-        config[ "context_base_IRI" ] = config[ "dataset_base_IRI" ]
-        del config[ "dataset_base_IRI" ]
-        print_warn( '"dataset_base_IRI" is deprecated, use "context_base_IRI" instead' )
-    if "graphdb_config" in config and "server_config" not in config :
-        config[ "server_config" ] = config[ "graphdb_config" ]
-        del config[ "graphdb_config" ]
-        print_warn( '"graphdb_config" is deprecated, use "server_config" instead' )
 
-    if "username" in config and not "password" in config :
-        config["password"] = getpass.getpass( prompt = "Enter password : " )
+    config["kgsteward_yaml_directory"] = dir_yaml
+    config["kgsteward_yaml_filename"]  = filename
+    if "username" in config["server"] and not "password" in config["server"] :
+        config["server"]["password"] = getpass.getpass( prompt = "Enter password : " )
 
     graphs = list()
-    for item in config["graphs"] :
-        if "source" in item:
-            try:
-                dir_old = os.getcwd()
-                os.chdir( dir_yaml )
-                file = open( replace_env_var( item["source"] ))
-                conf = parse_yaml_raw_as( SourceGraphConf, file.read()).model_dump( exclude_none = True )
-                os.chdir( dir_old )
-            except ValidationError as e:
-                stop_error( "YAML syntax error in file " + path + ":\n" + pformat( e.errors() ))
-            graphs.extend( conf["graphs"] )
-        else:
-            graphs.append( item )
-    config["graphs"] = graphs
-    # verify structure, complete context
-    graphs = list()
-    seen   = []    
-    for item in config["graphs"] :
+    seen   = []
+    for item in config["dataset"] :
         if item["name"] in seen:
             stop_error( "Duplicated name: " +  item["name"] )
         if "parent" in item:
@@ -225,7 +203,7 @@ def parse_yaml_conf( path : str ):
         if "context" not in item:
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
         graphs.append( item )
-    config["graphs"] = graphs
+    config["dataset"] = graphs
     dump( config )
     return config 
 

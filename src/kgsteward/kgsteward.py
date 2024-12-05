@@ -26,7 +26,7 @@ name2context = {} # global helper dict
 context2name = {} # same
 
 # ---------------------------------------------------------#
-# The RDF source graphs configuration
+# The RDF source dataset configuration
 #
 # Nota Bene: some resources are splitted into several files
 # because there exists a limit of 200 MB per file in GraphDB
@@ -75,7 +75,7 @@ def get_user_input():
     parser.add_argument(
         '-C',
         action = 'store_true',
-        help   = "Load missing/incomplete graphs to complete the repository."
+        help   = "Load missing/incomplete dataset to complete the repository."
     )
     parser.add_argument(
         '-L',
@@ -127,19 +127,19 @@ def get_user_input():
 
 def get_target( config, name ):
     """ An inefficient helper function """
-    for rec in config["graphs"] :
+    for rec in config["dataset"] :
         if rec["name"] == name :
             return rec
     raise RuntimeError( "Target name not found: " + name )
 
-# Compute checksums of graphs record
+# Compute checksums of dataset record
 #  
 def get_sha256( config, name ) :
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
-    os.environ["kgsteward_graphs_name"]    = name
-    os.environ["kgsteward_graphs_context"] = context
+    os.environ["kgsteward_dataset_name"]    = name
+    os.environ["kgsteward_dataset_context"] = context
     sha256 = hashlib.sha256()
     if "system" in target :
         for cmd in target["system"] :
@@ -191,19 +191,19 @@ def get_sha256( config, name ) :
             sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
-def update_config( store, config ) :
+def update_config( server, config ) :
     """ Add information about the currrent repository status """
     print_break()
     print_task( "Retrieve current status" )
     name2item = {}
-    for item in config["graphs"] :
+    for item in config["dataset"] :
         name = item["name"]
         name2item[name]    = item
         item["count"]      = ""
         item["date"]       = ""
         item["sha256_old"] = ""
         item["status"]     = "EMPTY"
-    r = store.sparql_query( """
+    r = server.sparql_query( """
 PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
@@ -232,18 +232,18 @@ WHERE{
                 item["status"] = "UPDATE"
     except RequestsJSONDecodeError:
         pass
-    for item in config["graphs"] :
+    for item in config["dataset"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
                 if name2item[parent]["status"] != "ok" :
                     item["status"] = "PROPAGATE"
     return config
 
-def update_dataset_info( store, config, name ) :
+def update_dataset_info( server, config, name ) :
     print_break()
     context = name2context[ name ]
     sha256 = get_sha256( config, name )
-    store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
 
@@ -285,12 +285,12 @@ def main():
     print_break()
     print_task( "read YAML config" );
     config = parse_yaml_conf( replace_env_var( args.yamlfile[0] ))
-    for item in config["graphs"]:
+    for item in config["dataset"]:
         name2context[ item["name"] ] = item["context"]
         context2name[ item["context"] ] = item["name"]
 
-    # if not "server_url" in config :
-    #    config["server_url"] = input( "Enter server_url : " )
+    # if not "location" in config :
+    #    config["location"] = input( "Enter location : " )
     #if "username" in config and not "password" in config :
     #    config["password"] = getpass.getpass( prompt = "Enter password : " )
 
@@ -298,53 +298,60 @@ def main():
     # Initalise connection with the right triplestore
     # --------------------------------------------------------- #
 
-    if "username" in config["store"]:
-        username = replace_env_var( config["store"]["username"] )
-        password = replace_env_var( config["store"]["password"] )
+    if "username" in config["server"]:
+        username = replace_env_var( config["server"]["username"] )
+        password = replace_env_var( config["server"]["password"] )
     else:
         username = None
         password = None
 
-    if config["store"]["server_brand"] == "graphdb":
-        store = GraphDBClient(
-            replace_env_var( config["store"]["server_url"] ),
+    if config["server"]["version"] == "graphdb":
+        server = GraphDBClient(
+            replace_env_var( config["server"]["location"] ),
             username,
             password,
-            replace_env_var( config["store"]["repository"] )
+            replace_env_var( config["server"]["repository"] )
         )
-    elif config["store"]["server_brand"] == "rdf4j":
-        store = RFD4JClient(
-            replace_env_var( config["store"]["server_url"] ),
+    elif config["server"]["version"] == "rdf4j":
+        server = RFD4JClient(
+            replace_env_var( config["server"]["location"] ),
             username,
             password,
-            replace_env_var( config["store"]["repository"] )
+            replace_env_var( config["server"]["repository"] )
         )    
-    elif config["store"]["server_brand"] == "fuseki":
-        store = FusekiClient(
-            replace_env_var( config["store"]["server_url"] ),
-            replace_env_var( config["store"]["repository"] )
+    elif config["server"]["version"] == "fuseki":
+        server = FusekiClient(
+            replace_env_var( config["server"]["location"] ),
+            replace_env_var( config["server"]["repository"] )
         )
-#    elif config["store"]["server_brand"] == "oxigraph":
-#        store = OxigraphClient(
-#            replace_env_var( config["store"]["server_url"] )
+#    elif config["server"]["version"] == "oxigraph":
+#        server = OxigraphClient(
+#            replace_env_var( config["server"]["location"] )
 #        )
     else:
-        stop_error( "Unknown server brand: " + config["store"]["server_brand"] )
+        stop_error( "Unknown server brand: " + config["server"]["version"] )
 
-    for key in config["store"].keys():
-        os.environ[ "kgsteward_store_" + str( key )] = str( config["store"][key] )
-    os.environ[ "kgsteward_store_endpoint_query"]  = store.get_endpoint_query()
-    os.environ[ "kgsteward_store_endpoint_update"] = store.get_endpoint_update()
+    for key in config["server"].keys():
+        os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
+    os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
+    os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
     
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
 
     if args.I :
-        if "server_config" in config["store"]:
-            store.rewrite_repository( replace_env_var( config["store"]["server_config"] ))
+        if "server_config" in config["server"]:
+            dir, filename = update_path( config["server"]["server_config"], config["kgsteward_yaml_directory"] )
+#            dir, name = os.path.split( replace_env_var( config["server"]["server_config"] ))
+#            if not dir:
+#                dir = config["kgsteward_yaml_directory"]
+#            print( dir )
+#            print( name )
+            # server.rewrite_repository( replace_env_var( config["server"]["server_config"] ))
+            server.rewrite_repository( dir + '/' + filename )
         else:
-             store.rewrite_repository()
+             server.rewrite_repository()
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
@@ -353,7 +360,7 @@ def main():
     rdf_graph_all       = set()
     rdf_graph_to_update = set()
 
-    for target in config["graphs"] :
+    for target in config["dataset"] :
         rdf_graph_all.add( target["name"] )
 
     if args.D :
@@ -365,7 +372,7 @@ def main():
             else :
                 raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( store, config ) # may takes a while
+        config = update_config( server, config ) # may takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -373,24 +380,24 @@ def main():
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
-    # graphs
+    # dataset
     # --------------------------------------------------------- #
 
-    for target in config["graphs"] :
+    for target in config["dataset"] :
 
         name = target["name"]
         if not name in rdf_graph_to_update :
             continue
 
         print_break()
-        print_task( "Update graphs record: " + name )
+        print_task( "Update dataset record: " + name )
         context = name2context[ name ]
         os.environ["TARGET_GRAPH_CONTEXT"] = context
-        os.environ["kgsteward_graphs_name"]    = name
-        os.environ["kgsteward_graphs_context"] = context
+        os.environ["kgsteward_dataset_name"]    = name
+        os.environ["kgsteward_dataset_context"] = context
         replace = {}
 
-        store.sparql_update( f"DROP SILENT GRAPH <{context}>" )
+        server.sparql_update( f"DROP SILENT GRAPH <{context}>" )
     
         if "system" in target :
             for cmd in target["system"] :
@@ -403,8 +410,8 @@ def main():
         if "url" in target :
             for urlx in target["url"] :
                 path = replace_env_var( urlx )
-                store.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
-                store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                server.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
+                server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
@@ -412,37 +419,38 @@ INSERT DATA {{
 }}""" )
 
         if "file" in target :
-            if config["store"]["file_server_port"] > 0 :
-                fs = LocalFileServer( port = config["store"][ "file_server_port" ] )
+            if config["server"]["file_server_port"] > 0 :
+                fs = LocalFileServer( port = config["server"][ "file_server_port" ] )
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
-                    if not filenames:
-                        stop_error( "File not found: " + path )
                     for filename in filenames :
-                        dir, file = os.path.split( replace_env_var( filename ) )
-                        fs.expose( dir  )
+                        dir, fn = update_path( filename, config["kgsteward_yaml_directory"] )
+                        # dir, file = os.path.split( replace_env_var( filename ))
+                        # print( "LOAD: " + dir + "/" + name )
+                        fs.expose( dir ) # cache already exposed directory
                         try:
-                            path = "http://localhost:" + str( config["store"][ "file_server_port" ] ) + "/" + file
-                            store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                            path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
+                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         except Exception as X: # second attemp from within a container (?)
-                            path = "http://host.docker.internal:" + str( config["store"][ "file_server_port" ] ) + "/" + file
-                            store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                            path = "http://host.docker.internal:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
+                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         path = "file://" + replace_env_var( filename )
-                        store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
     }}
 }}""" )
                 fs.terminate()
-            else: # config["store"]["file_server_port"] == 0
+            else: # config["server"]["file_server_port"] == 0
                 for path in target["file"] :
                     filenames = sorted( glob.glob( replace_env_var( path )))
                     for filename in filenames :
-                        store.load_from_file( filename, context )
+                        dir, fn = update_path( filename, config["kgsteward_yaml_directory"] )
+                        server.load_from_file( dir + "/" + fn, context )
                         # path = "file://" + replace_env_var( filename )
-                        # store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
-                        store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                        # server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
@@ -457,8 +465,8 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"]:
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    store.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
-                    store.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
@@ -476,9 +484,9 @@ INSERT DATA {{
                 # if replace is not None: 
                 for key in sorted( replace.keys()):
                     sparql = sparql.replace( key, replace[ key ])
-                store.sparql_update( sparql )
+                server.sparql_update( sparql )
 
-        update_dataset_info( store, config, name )
+        update_dataset_info( server, config, name )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -486,7 +494,7 @@ INSERT DATA {{
 
     if args.P and "prefixes" in config:
         print_task( "rewrite prefixes" )
-        store.rewrite_prefixes()
+        server.rewrite_prefixes()
         catch_key_value = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>" )
         for filename in config["prefixes"] :
             report( "parse file", filename )
@@ -494,14 +502,14 @@ INSERT DATA {{
             for line in file:
                 match = catch_key_value.search( line )
                 if match:
-                    store.set_prefix( match.group( 1 ), match.group( 2 ))
+                    server.set_prefix( match.group( 1 ), match.group( 2 ))
 
     # --------------------------------------------------------- #
     # Force update dataset info
     # --------------------------------------------------------- #
 
     if args.U :
-        for target in config["graphs"] :
+        for target in config["dataset"] :
             update_dataset_info( target )
 
     # --------------------------------------------------------- #
@@ -515,7 +523,7 @@ INSERT DATA {{
                 print( '----------------------------------------------------------')
                 print( filename )
                 with open( filename ) as f: sparql = f.read()
-                r = store.sparql_query_to_tsv( sparql, echo = False )
+                r = server.sparql_query_to_tsv( sparql, echo = False )
                 if r.text.count( "\n" ) == 1 :
                     print( "---- Pass ;-) ----")
                 else:
@@ -529,10 +537,10 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.Q:
-        r = store.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
+        r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
         for item in r.json() :
             print( f"DELETE: {item['name']}" ) # GraphDB builtin queries cannot be deleted
-            store.graphdb_call({
+            server.graphdb_call({
                 'url'    : '/rest/sparql/saved-queries',
                 'method' : 'DELETE',
                 'params' : { 'name': item['name']}
@@ -543,9 +551,9 @@ INSERT DATA {{
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 print( "TEST:   " + name)
-                store.validate_sparql_query( sparql, echo=False)
+                server.validate_sparql_query( sparql, echo=False)
                 print( "LOAD:   " + name)
-                store.graphdb_call({
+                server.graphdb_call({
                     'url'    : '/rest/sparql/saved-queries',
                     'method'  : 'POST',
                     'headers' : {
@@ -579,8 +587,8 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                store.validate_sparql_query( "\n".join( select ), echo=False)
-                EX     = Namespace( store.get_endpoint_query() + "/.well-known/sparql-examples/" )
+                server.validate_sparql_query( "\n".join( select ), echo=False)
+                EX     = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
                 RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
                 SCHEMA = Namespace( "https://schema.org/" )
@@ -598,7 +606,7 @@ INSERT DATA {{
                 g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
                 g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
-                g.add(( iri, SCHEMA.target, URIRef( store.get_endpoint_query())))
+                g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
                 g.serialize( 
                     format="turtle", 
                     destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
@@ -644,7 +652,7 @@ INSERT DATA {{
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = store.sparql_query_to_tsv( sparql, echo = True )
+                r = server.sparql_query_to_tsv( sparql, echo = True )
                 s = r.text.splitlines( keepends = True )
                 out_path =  args.x + "/" + name + ".tsv"
                 report( "write file", out_path )
@@ -658,21 +666,21 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.L :
-        store.free_access()
+        server.free_access()
 
     # --------------------------------------------------------- #
     # Print final repository status
     # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
     
-    config = update_config( store, config )
+    config = update_config( server, config )
 
-    contexts = store.get_contexts()
+    contexts = server.get_contexts()
     print_break()
     print_task( "Show current status" )
     print( colored("                            name        #triple        last modified    status", "blue" ))
     print( colored("================================        =======     =================== ======", "blue" ))
-    for item in config["graphs"] :
+    for item in config["dataset"] :
         print( colored( '{:>32}   {:>12}    {:>20} {}'.format( 
             item["name"], 
             item["count"], 

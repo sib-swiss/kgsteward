@@ -28,6 +28,14 @@ def replace_env_var( txt ) :
     else:
         return txt
 
+def update_path( path, yaml_dir ):            
+    dir, filename = os.path.split( os.path.normpath( replace_env_var( path )))
+    if not dir:
+        dir = yaml_dir
+    if not os.path.isfile( dir + "/" + filename ):
+        stop_error( "File does not exists: " + dir + "/" + filename )
+    return dir, filename
+
 def http_call( request_args, status_code = [ 200 ], echo = True ):
     """A simple wrapper arround requests.request() which main purpose is to
     (1) validate status code
