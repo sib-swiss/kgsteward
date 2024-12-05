@@ -581,7 +581,7 @@ INSERT DATA {{
                 with open( filename ) as file:
                     for line in file:
                         if re.match( "^#", line ):
-                            comment.append( re.sub( "^#\s*", "", line.rstrip() ))
+                            comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                         else:
                             select.append( line.rstrip() )
                             match = catch_key_value_rq.search( line )
