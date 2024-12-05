@@ -2,27 +2,21 @@
 
 [![Tests](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml/badge.svg)](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml)
 
-A command line tool to help manage RDF store (GraphDB). Written in python.
+A command line tool to help manage RDF store (GraphDB, Fuseki, RDF4J...). Written in python.
 
 ## Installation
 
-The code only depends on very standard Python packages.
-Its installation should be straightforward.
+The code only depends on very standard Python packages. Its installation should be straightforward.
+
 The easiest option is to install `kgsteward` with `pip3`:
 
 ```shell
-pip3 install git+https://github.com/sib-swiss/kgsteward
-
-# To update your installation to a newer version.
-pip3 install --upgrade git+https://github.com/sib-swiss/kgsteward
+pip3 install kgsteward
 ```
 
-Alternatively, you can also clone/download the content of this repo to your
-local machine, and then run kgsteward using the script `./kgsteward`.
+Alternatively, you can also clone/download the content of this repo to your local machine, and then run kgsteward using the script `./kgsteward`.
 
-**Important:** if the above installation fails or does not build properly
-(e.g. the package name is set to `UNKNOWN`), make sure that your versions of
-`pip` and `setuptools` are up-to-date:
+**Important:** if the above installation fails or does not build properly (e.g. the package name is set to `UNKNOWN`), make sure that your versions of `pip` and `setuptools` are up-to-date:
 
 ```shell
 pip install --upgrade pip
@@ -46,7 +40,7 @@ The syntax of the YAML configuration file is given [here](doc/yamldoc.md)
 > - [`uv`](https://docs.astral.sh/uv/) for development.
 > - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
-Run tests:
+Run tests, `-s` will print all outputs:
 
 ```bash
 uv run pytest -s

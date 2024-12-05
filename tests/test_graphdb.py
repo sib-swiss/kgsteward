@@ -12,7 +12,7 @@ TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.1'
 
 env = os.environ.copy()
 env["GRAPHDB_USERNAME"] = "admin"
-# env["GRAPHDB_PASSWORD"] = "root"
+env["GRAPHDB_PASSWORD"] = "root"
 env["KGSTEWARD_ROOT_DIR"] = os.getcwd()
 
 @pytest.fixture(scope="module")
@@ -38,15 +38,28 @@ def run_cmd(cmd: list[str]):
         env=env
     )
 
-def test_cli(triplestore):
+def test_cli_graphdb(triplestore):
     res_init = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-I"])
-    assert res_init.returncode == 0
     print(res_init.stdout)
+    assert res_init.returncode == 0
 
     res_complete = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-C"])
-    assert res_complete.returncode == 0
     print(res_complete.stdout)
+    assert res_complete.returncode == 0
 
     res_validate = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-V"])
-    assert res_validate.returncode == 0
     print(res_validate.stdout)
+    assert res_validate.returncode == 0
+
+# def test_cli_graphdb_fileserver(triplestore):
+#     res_init = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb_fileserver.yaml", "-I"])
+#     print(res_init.stdout)
+#     assert res_init.returncode == 0
+
+#     res_complete = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb_fileserver.yaml", "-C"])
+#     print(res_complete.stdout)
+#     assert res_complete.returncode == 0
+
+#     res_validate = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb_fileserver.yaml", "-V"])
+#     print(res_validate.stdout)
+#     assert res_validate.returncode == 0

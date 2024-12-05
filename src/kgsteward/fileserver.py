@@ -1,4 +1,4 @@
-# The code below was strongly inspired by 
+# The code below was strongly inspired by
 #    https://github.com/python/cpython/blob/3.12/Lib/http/server.py
 # eventhough aI don't understand all the technical details
 
@@ -17,6 +17,7 @@ class MyServer( http.server.ThreadingHTTPServer ):
 
 def _expose_directory( directory, port = 8000 ):
     HandlerClass = http.server.SimpleHTTPRequestHandler
+    print("DIIIIIIIIIIIIIIIIIIR", directory)
     httpd        = MyServer(( "", port ), HandlerClass, directory )
     httpd.serve_forever()
 
@@ -36,7 +37,7 @@ class LocalFileServer() :
                 self.terminate()
         self.directory = directory
         mp_context = multiprocessing.get_context( 'fork' )
-        self.thread = mp_context.Process( 
+        self.thread = mp_context.Process(
             target=_expose_directory,
             args=( self.directory, self.port ),
             daemon=True
@@ -44,7 +45,7 @@ class LocalFileServer() :
         self.thread.start()
         print( f"# Directory {self.directory} is exposed on http://localhost:{self.port}" )
         time.sleep( 0.2 ) # leaves some time for the seerver to start
-        
+
     def terminate( self ) :
         if( self.thread and self.thread.is_alive() ):
             self.thread.terminate();
@@ -54,7 +55,7 @@ class LocalFileServer() :
 def test():
     lfs = LocalFileServer( 8000 )
     lfs.expose( "/Users/mpagni/github.com" )
-    time.sleep( 2 ) 
+    time.sleep( 2 )
     lfs.expose( "/Users/mpagni/gitlab.com" )
     time.sleep( 2 )
     lfs.terminate()
