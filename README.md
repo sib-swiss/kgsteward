@@ -13,47 +13,33 @@ The easiest option is to install `kgsteward` with `pip3`:
 ```shell
 pip3 install kgsteward
 ```
-or alternatively, if you don't like to play yourself with python package dependencies 
+or alternatively, if you don't like to play yourself with virtual environment and package dependencies 
 
 ```shell
 uv tool install kgsteward
 ```
-
-You can also clone/download the content of this repo to your local machine, and then 
-run kgsteward using the script `./kgsteward` at its root, or using
+or, you can also clone/download the content of this repo to your local machine, and then 
+run kgsteward using the script `./kgsteward` at its root, or alternatively
 
 ```shell
 uv run ./kgsteward
 ```
-that will manage the python environment automatically.
-
-**Important:** if the above installation fails or does not build properly (e.g. the package name is set to `UNKNOWN`), make sure that your versions of `pip` and `setuptools` are up-to-date:
-
-```shell
-pip install --upgrade pip
-pip install --upgrade setuptools
-```
-
-... or give a try to `uv`.
-
-## Running kgsteward
-
-```shell
-kgsteward -h
-```
+that should manage the python environment for you.
 
 ## Documentation
 
-Basic examples to start with are available from [fist steps documentation](doc/first_steps/README.md). 
+- Basic examples to start with `kgsteward` are available from the [fist steps documentation](doc/first_steps/README.md). 
 
-The syntax of the YAML configuration file is given [here](doc/yamldoc.md)
+- The syntax of the YAML configuration file is documented [here](doc/yamldoc.md)
+
+- A discussion about the differents servers and their performances is available [soon](doc/discussion/README.md).
 
 ## Development
 
-> Requirements:
->
-> - [`uv`](https://docs.astral.sh/uv/) for development.
-> - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
+Requirements:
+
+- [`uv`](https://docs.astral.sh/uv/) for development.
+- [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
 Run tests, `-s` will print all outputs:
 
