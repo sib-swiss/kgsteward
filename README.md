@@ -44,7 +44,7 @@ kgsteward -h
 
 ## Documentation
 
-Basic example to start with are available from [fist steps documentation](doc/first_steps/README.md). 
+Basic examples to start with are available from [fist steps documentation](doc/first_steps/README.md). 
 
 The syntax of the YAML configuration file is given [here](doc/yamldoc.md)
 
