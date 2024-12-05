@@ -1,0 +1,10 @@
+SELECT *
+WHERE{
+	{
+        SELECT ( COUNT( * ) AS ?c )
+		WHERE{
+			?s ?p ?o
+		}
+    }
+    FILTER( ?c != 677 )
+}

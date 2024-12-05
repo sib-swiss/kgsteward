@@ -7,4 +7,5 @@ server:
   password:      ${GRAPHDB_PASSWORD}
   repository:    first_steps
 dataset: !include dataset.yaml
- 
+validations: 
+  -  ${KGSTEWARD_ROOT_DIR}/example/first_steps/sparql/validate/there_are_677_triples.rq
