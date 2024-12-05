@@ -39,7 +39,10 @@ The syntax of the YAML configuration file is given [here](doc/yamldoc.md)
 
 ## Development
 
-We use [`uv`](https://docs.astral.sh/uv/) for development.
+> Requirements:
+>
+> - [`uv`](https://docs.astral.sh/uv/) for development.
+> - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
 Run tests:
 
