@@ -1,7 +1,8 @@
 # import pytest
-# import requests
 # from testcontainers.core.container import DockerContainer
 # from testcontainers.core.waiting_utils import wait_for_logs
+
+# from . import run_cmd, env
 
 # TRIPLESTORE_IMAGE = 'stain/jena-fuseki:latest'
 # TRIPLESTORE_PASSWORD = 'password'
@@ -11,7 +12,7 @@
 #     """Start Fuseki container as a fixture."""
 #     # with DockerContainer(TRIPLESTORE_IMAGE) as container:
 #     container = DockerContainer(TRIPLESTORE_IMAGE)
-#     container.with_exposed_ports(3030)
+#     container.with_exposed_ports(3030).with_bind_ports(3030, 3030)
 #     container.with_env("ADMIN_PASSWORD", TRIPLESTORE_PASSWORD)
 #     container.start()
 #     delay = wait_for_logs(container, "Fuseki is available")
@@ -20,32 +21,16 @@
 #     # print(container.get_logs())
 #     yield base_url
 
-# def test_sparql_query(triplestore):
-#     """Test SPARQL query execution."""
-#     # sparql_endpoint = f"{triplestore_container}/repositories/{GRAPHDB_REPO_NAME}"
 
-#     # Insert a sample RDF triple into the repository
-#     insert_query = """PREFIX ex: <http://example.org/>
-#     INSERT DATA { ex:subject ex:predicate ex:object . }
-#     """
-#     resp = requests.post(
-#         f"{triplestore}",
-#         data={"update": insert_query},
-#         auth=('admin', TRIPLESTORE_PASSWORD),
-#     )
-#     print(resp.text)
-#     resp.raise_for_status()
+# def test_cli_fuseki(triplestore):
+#     res_init = run_cmd(["kgsteward", "example/first_steps/first_steps_fuseki.yaml", "-I"], env)
+#     print(res_init.stdout)
+#     assert res_init.returncode == 0
 
-#     query = """SELECT ?s ?p ?o WHERE {
-#         ?s ?p ?o .
-#     }"""
-#     resp = requests.post(f"{triplestore}", data={"query": query}, headers={"Accept": "application/sparql-results+json"})
-#     resp.raise_for_status()
+#     res_complete = run_cmd(["kgsteward", "example/first_steps/first_steps_fuseki.yaml", "-C"], env)
+#     print(res_complete.stdout)
+#     assert res_complete.returncode == 0
 
-#     # Check if the triple was inserted and queried correctly
-#     print(resp.text)
-#     result = resp.json()
-#     assert len(result['results']['bindings']) == 1
-#     assert result['results']['bindings'][0]['s']['value'] == 'http://example.org/subject'
-#     assert result['results']['bindings'][0]['p']['value'] == 'http://example.org/predicate'
-#     assert result['results']['bindings'][0]['o']['value'] == 'http://example.org/object'
+#     res_validate = run_cmd(["kgsteward", "example/first_steps/first_steps_fuseki.yaml", "-V"], env)
+#     print(res_validate.stdout)
+#     assert res_validate.returncode == 0
