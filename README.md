@@ -34,7 +34,7 @@ pip install --upgrade pip
 pip install --upgrade setuptools
 ```
 
-... or give a tra to `uv`.
+... or give a try to `uv`.
 
 ## Running kgsteward
 
