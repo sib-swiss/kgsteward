@@ -29,9 +29,7 @@ that should manage the python environment for you.
 ## Documentation
 
 - Basic examples to start with `kgsteward` are available from the [fist steps documentation](doc/first_steps/README.md). 
-
 - The syntax of the YAML configuration file is documented [here](doc/yamldoc.md)
-
 - A discussion about the differents servers and their performances is available [soon](doc/discussion/README.md).
 
 ## Development
@@ -39,6 +37,7 @@ that should manage the python environment for you.
 Requirements:
 
 - [`uv`](https://docs.astral.sh/uv/) for development.
+
 - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
 Run tests, `-s` will print all outputs:
