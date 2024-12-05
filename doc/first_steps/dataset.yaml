@@ -1,0 +1,12 @@
+- name: foaf_ontology
+  url:
+    - http://xmlns.com/foaf/spec/20140114.rdf
+- name: foaf_data
+  file:
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/Alice.ttl
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/Bob.ttl
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/company.ttl
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/product.ttl
+- name: update_data
+  update:
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/update/a_blue_car_for_Alice.rq

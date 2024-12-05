@@ -14,6 +14,7 @@ env["GRAPHDB_USERNAME"] = "admin"
 env["GRAPHDB_PASSWORD"] = "root"
 
 @pytest.fixture(scope="module")
+
 def triplestore():
     """Start GraphDB container as a fixture."""
     container = DockerContainer(TRIPLESTORE_IMAGE)
@@ -29,15 +30,15 @@ def triplestore():
 
 
 def test_cli_graphdb(triplestore):
-    res_init = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-I"], env)
+    res_init = run_cmd(["kgsteward", "doc/first_steps/first_steps_graphdb.yaml", "-I"], env)
     print(res_init.stdout)
     assert res_init.returncode == 0
 
-    res_complete = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-C"], env)
+    res_complete = run_cmd(["kgsteward", "doc/first_steps/first_steps_graphdb.yaml", "-C"], env)
     print(res_complete.stdout)
     assert res_complete.returncode == 0
 
-    res_validate = run_cmd(["kgsteward", "example/first_steps/first_steps_graphdb.yaml", "-V"], env)
+    res_validate = run_cmd(["kgsteward", "doc/first_steps/first_steps_graphdb.yaml", "-V"], env)
     print(res_validate.stdout)
     assert res_validate.returncode == 0
 

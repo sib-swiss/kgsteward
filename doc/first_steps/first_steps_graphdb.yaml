@@ -9,4 +9,4 @@ server:
   repository:    first_steps
 dataset: !include dataset.yaml
 validations: 
-  -  ${KGSTEWARD_ROOT_DIR}/example/first_steps/sparql/validate/*.rq
+  -  ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/validate/*.rq
