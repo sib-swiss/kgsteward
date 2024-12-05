@@ -18,7 +18,7 @@ or alternatively, if you don't like to play yourself with virtual environment an
 ```shell
 uv tool install kgsteward
 ```
-or, you can also clone/download the content of this repo to your local machine, and then 
+You can also clone/download the content of this repo to your local machine, and then 
 run kgsteward using the script `./kgsteward` at its root, or alternatively
 
 ```shell
