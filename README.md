@@ -13,11 +13,12 @@ The easiest option is to install `kgsteward` with `pip3`:
 ```shell
 pip3 install kgsteward
 ```
-or alternatively (if you don't like to deal with python package dependencies) 
+or alternatively, if you don't like to play yourself with python package dependencies 
 
 ```shell
 uv tool install kgsteward
 ```
+
 You can also clone/download the content of this repo to your local machine, and then 
 run kgsteward using the script `./kgsteward` at its root, or using
 
