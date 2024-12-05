@@ -8,5 +8,5 @@ server:
   # NOTE: by default graphdb login is user: admin / pw: root
   repository:    first_steps
 dataset: !include dataset.yaml
-validations:
-  -  ${KGSTEWARD_ROOT_DIR}/example/first_steps/sparql/validate/there_are_677_triples.rq
+validations: 
+  -  ${KGSTEWARD_ROOT_DIR}/example/first_steps/sparql/validate/*.rq
