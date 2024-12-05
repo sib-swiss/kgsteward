@@ -8,7 +8,7 @@ A command line tool to help manage the content of RDF store (GraphDB, Fuseki, RD
 
 The code is available frpm PyPI and only depends on very standard Python packages. Its installation should be straightforward.
 
-The easiest option is to install `kgsteward` with `pip3`:
+The standard option is to install `kgsteward` with `pip3`:
 
 ```shell
 pip3 install kgsteward
