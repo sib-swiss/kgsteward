@@ -1,0 +1,10 @@
+version: kgsteward2.0
+server:
+  version:  graphdb
+  location:    http://localhost:7200
+  server_config: first_steps_graphdb.config.ttl 
+  username:      ${GRAPHDB_USERNAME}
+  password:      ${GRAPHDB_PASSWORD}
+  repository:    first_steps
+dataset: !include dataset.yaml
+ 
