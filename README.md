@@ -1,5 +1,7 @@
 # kgsteward - Knowledge Graph Steward
 
+[![Tests](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml/badge.svg)](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml)
+
 A command line tool to help manage RDF store (GraphDB). Written in python.
 
 ## Installation

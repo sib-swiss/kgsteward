@@ -12,7 +12,7 @@ TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.1'
 
 env = os.environ.copy()
 env["GRAPHDB_USERNAME"] = "admin"
-env["GRAPHDB_PASSWORD"] = "root"
+# env["GRAPHDB_PASSWORD"] = "root"
 env["KGSTEWARD_ROOT_DIR"] = os.getcwd()
 
 @pytest.fixture(scope="module")
