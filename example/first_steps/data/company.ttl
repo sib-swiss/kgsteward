@@ -1,0 +1,22 @@
+@base           <http://example.org> .
+@prefix rdf:	<http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix foaf:	<http://xmlns.com/foaf/0.1/> .
+@prefix owl:	<http://www.w3.org/2002/07/owl#> .
+@prefix rdfs:	<http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ldp:	<http://www.w3.org/ns/ldp#> .
+@prefix gr:	<http://purl.org/goodrelations/v1#> .
+@prefix dcterms:	<http://purl.org/dc/terms/> .
+@prefix wdrs:	<http://www.w3.org/2007/05/powder-s#> .
+
+<>
+a foaf:Document ;
+foaf:name "A Document that describes an Organization literally identified as 'Example Cars & Co.'" ;
+dcterms:description "A collection of RDF sentences that describe an Organization literally identified (or labeled) as 'Example Cars & Co.'" ;
+foaf:primaryTopic <#exampleCars> .
+
+<#exampleCars>
+	rdf:type	gr:BusinessEntity , foaf:Organization ;
+	foaf:name	"Example Cars & Co." ;
+	foaf:depiction <https://thumb1.shutterstock.com/display_pic_with_logo/3648824/532862638/stock-vector-silhouette-automated-production-line-robotic-factory-banner-532862638.jpg> ;
+	foaf:made	<#CoolRedCar> ;
+	wdrs:describedby	<> .
