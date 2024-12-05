@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml/badge.svg)](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml)
 
-A command line tool to help manage RDF store (GraphDB, Fuseki, RDF4J...). Written in python.
+A command line tool to help manage the content of RDF store (GraphDB, Fuseki, RDF4J...). Written in python.
 
 ## Installation
 
