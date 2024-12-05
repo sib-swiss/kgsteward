@@ -1,0 +1,13 @@
+PREFIX gr:	<http://purl.org/goodrelations/v1#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+
+INSERT DATA{
+    GRAPH <http://example.org/context/update_data> {
+    	<http://example.org#NiceBlueCar>
+			rdf:type	gr:ProductOrService ;
+			foaf:name	"Cool Blue Car -- Japanese Brand" ;
+			foaf:maker	<http://example.org#exampleCars> .
+        <http://example.org#alice> gr:owns <http://example.org#NiceBlueCar>
+    }
+}
