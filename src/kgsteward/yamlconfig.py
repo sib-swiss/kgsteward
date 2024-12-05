@@ -173,7 +173,6 @@ def parse_yaml_conf( path : str ):
     yaml.add_constructor( "!include", yaml_include.Constructor( base_dir = dir_yaml ))
     with open( path ) as f:
         data = yaml.full_load(f)
-        dump( data )
     if "version" not in data:
         stop_error( "Key 'version' not found! you should upgrade YAML syntax to a recent one!" ) 
     try:
@@ -204,7 +203,6 @@ def parse_yaml_conf( path : str ):
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
         graphs.append( item )
     config["dataset"] = graphs
-    dump( config )
     return config 
 
 def save_json_schema( path ):
