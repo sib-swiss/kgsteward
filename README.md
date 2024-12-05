@@ -13,8 +13,18 @@ The easiest option is to install `kgsteward` with `pip3`:
 ```shell
 pip3 install kgsteward
 ```
+or alternatively (if you don't like to deal with python package dependencies) 
 
-Alternatively, you can also clone/download the content of this repo to your local machine, and then run kgsteward using the script `./kgsteward`.
+```shell
+uv tool install kgsteward
+```
+You can also clone/download the content of this repo to your local machine, and then 
+run kgsteward using the script `./kgsteward` at its root, or using
+
+```shell
+uv run ./kgsteward
+```
+that will manage the python environment automatically.
 
 **Important:** if the above installation fails or does not build properly (e.g. the package name is set to `UNKNOWN`), make sure that your versions of `pip` and `setuptools` are up-to-date:
 
@@ -23,6 +33,8 @@ pip install --upgrade pip
 pip install --upgrade setuptools
 ```
 
+... or give a tra to `uv`.
+
 ## Running kgsteward
 
 ```shell
@@ -30,6 +42,8 @@ kgsteward -h
 ```
 
 ## Documentation
+
+Basic example to start with are available from [fist steps documentation](doc/first_steps/README.md). 
 
 The syntax of the YAML configuration file is given [here](doc/yamldoc.md)
 
