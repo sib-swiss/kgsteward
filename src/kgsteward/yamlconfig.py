@@ -108,8 +108,8 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
-    location        : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))
+    brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
+    location          : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     file_server_port  : Optional[ int ] = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
@@ -119,15 +119,15 @@ class GraphDBConf( BaseModel ):
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "This fixed value determines the server brand" ))
-    location        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
+    brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
+    location          : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe( "This fixed value determines the server brand" ))
-    location        : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
+    brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
+    location          : str = Field( default = "http://localhost:3030", title = "Server URL", description = describe( "location" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 

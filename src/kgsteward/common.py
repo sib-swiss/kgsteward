@@ -1,4 +1,5 @@
 import os
+import glob
 import requests
 import shutil
 import time
@@ -28,13 +29,33 @@ def replace_env_var( txt ) :
     else:
         return txt
 
-def update_path( path, yaml_dir ):
-    dir, filename = os.path.split( os.path.normpath( replace_env_var( path )))
-    if not dir:
-        dir = yaml_dir
-    if not os.path.isfile( dir + "/" + filename ):
-        stop_error( "File does not exists: " + dir + "/" + filename )
-    return dir, filename
+def update_path( path, default_dir ):
+    """Expand path environment variables"""
+    dir, fn = os.path.split( os.path.normpath( replace_env_var( path ))) # handles ".." correctly
+    if not dir.startswith( "/" ):
+        dir = default_dir + "/" + dir
+    filename = dir + "/" + fn
+    if not os.path.isfile( filename ):
+        stop_error( "File does not exists: " + filename )
+    return filename
+
+def expand_path( path, default_dir ):
+    """Expand path on wildcard and environment variables"""
+    dir, filename = os.path.split( os.path.normpath( replace_env_var( path ))) # handles ".." correctly
+    res = []
+    if not dir.startswith( "/" ):
+        dir = default_dir + "/" + dir
+    if "*" in dir or  "*" in filename:
+        paths = glob.glob( dir + "/" + filename )
+        if not paths:
+            stop_error( "Not a single file found: " + dir + "/" + filename )
+        for p in sorted( paths ):
+            res.append( os.path.split( p ))
+    else:
+        if not os.path.isfile( dir + "/" + filename ):
+            stop_error( "File does not exists: " + dir + "/" + filename )
+        res.append([ dir, filename ])
+    return res
 
 def http_call( request_args, status_code = [ 200 ], echo = True ):
     """A simple wrapper arround requests.request() which main purpose is to
@@ -51,7 +72,7 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
         print_warn( "Status code = " + str( r.status_code ))
         print_warn( r.text if not r.text is None else '' )
         raise RuntimeError( "HTTP request failed!" )
-    report( "elapsed time", end_time - start_time )
+    report( "elapsed time", ( "%.3f" % ( end_time - start_time )))
     return r
 
 def get_head_info( url, echo = True ):
@@ -109,7 +130,7 @@ def guess_mime_type( filename ):
         stop_error( "cannot guess RDF mime-type from filename: " + filename )
 
 def print_break():
-    print( '# -----------------------------------------------------------------')
+    print( '# ----------------------------------------------------------------------------')
 
 def print_strip( txt, color = 'black' ):
     """Print after removing leading/trailing spaces"""

@@ -166,11 +166,15 @@ def get_sha256( config, name ) :
                             sha256.update( chunk )
     if "file" in target :
         for path in target["file"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
-                with open( replace_env_var( filename ), "rb") as f :
+            for dir, filename in expand_path( path, config["kgsteward_yaml_directory"] ):
+                with open( replace_env_var( dir + "/" + filename ), "rb") as f :
                     for chunk in iter( lambda: f.read(4096), b"") :
                         sha256.update( chunk )
+ #           filenames = sorted( glob.glob( replace_env_var( path )))
+ #           for filename in filenames :
+ #               with open( replace_env_var( filename ), "rb") as f :
+ #                   for chunk in iter( lambda: f.read(4096), b"") :
+ #                       sha256.update( chunk )
     if "zenodo" in target :
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -185,7 +189,7 @@ def get_sha256( config, name ) :
             sha256.update( target["replace"][key].encode( 'utf-8' ))
     if "update" in target :
         for filename in target["update"] :
-            sha256.update( filename.encode('utf-8')) # is this
+            # sha256.update( filename.encode('utf-8'))
             with open( replace_env_var( filename )) as f:
                 sparql = f.read()
             sha256.update( sparql.encode('utf-8'))
@@ -305,31 +309,31 @@ def main():
         username = None
         password = None
 
-    if config["server"]["version"] == "graphdb":
+    if config["server"]["brand"] == "graphdb":
         server = GraphDBClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["version"] == "rdf4j":
+    elif config["server"]["brand"] == "rdf4j":
         server = RFD4JClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["version"] == "fuseki":
+    elif config["server"]["brand"] == "fuseki":
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
             replace_env_var( config["server"]["repository"] )
         )
-#    elif config["server"]["version"] == "oxigraph":
+#    elif config["server"]["brand"] == "oxigraph":
 #        server = OxigraphClient(
 #            replace_env_var( config["server"]["location"] )
 #        )
     else:
-        stop_error( "Unknown server brand: " + config["server"]["version"] )
+        stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
@@ -342,14 +346,8 @@ def main():
 
     if args.I :
         if "server_config" in config["server"]:
-            dir, filename = update_path( config["server"]["server_config"], config["kgsteward_yaml_directory"] )
-#            dir, name = os.path.split( replace_env_var( config["server"]["server_config"] ))
-#            if not dir:
-#                dir = config["kgsteward_yaml_directory"]
-#            print( dir )
-#            print( name )
-            # server.rewrite_repository( replace_env_var( config["server"]["server_config"] ))
-            server.rewrite_repository( dir + '/' + filename )
+            config_file = update_path( config["server"]["server_config"], config["kgsteward_yaml_directory"] )
+            server.rewrite_repository( config_file )
         else:
              server.rewrite_repository()
 
@@ -422,11 +420,7 @@ INSERT DATA {{
             if config["server"]["file_server_port"] > 0 :
                 fs = LocalFileServer( port = config["server"][ "file_server_port" ] )
                 for path in target["file"] :
-                    filenames = sorted( glob.glob( replace_env_var( path )))
-                    for filename in filenames :
-                        dir, fn = update_path( filename, config["kgsteward_yaml_directory"] )
-                        # dir, file = os.path.split( replace_env_var( filename ))
-                        # print( "LOAD: " + dir + "/" + name )
+                    for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         fs.expose( dir ) # cache already exposed directory
                         try:
                             path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
@@ -434,22 +428,19 @@ INSERT DATA {{
                         except Exception as X: # second attemp from within a container (?)
                             path = "http://host.docker.internal:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
                             server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
-                        path = "file://" + replace_env_var( filename )
+                        filename = dir + "/" + fn
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
-        <{context}> void:dataDump <{path}>
+        <{context}> void:dataDump <file://{filename}>
     }}
 }}""" )
                 fs.terminate()
             else: # config["server"]["file_server_port"] == 0
                 for path in target["file"] :
-                    filenames = sorted( glob.glob( replace_env_var( path )))
-                    for filename in filenames :
-                        dir, fn = update_path( filename, config["kgsteward_yaml_directory"] )
-                        server.load_from_file( dir + "/" + fn, context )
-                        # path = "file://" + replace_env_var( filename )
-                        # server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                    for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                        filename = dir + "/" + fn
+                        server.load_from_file( filename, context )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
@@ -517,20 +508,25 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.V :
+        print_break()
+        print_task( "Run assert queries to validate repository content " )
+        exit_code = 0
         for path in config["validations"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
-                print( '----------------------------------------------------------')
-                print( filename )
+            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                filename = dir + "/" + fn
+                report( 'query file', filename )
+                # print( '----------------------------------------------------------')
                 with open( filename ) as f: sparql = f.read()
                 r = server.sparql_query_to_tsv( sparql, echo = False )
                 if r.text.count( "\n" ) == 1 :
-                    print( "---- Pass ;-) ----")
+                    report( "Result", "Pass ;-)" )
                 else:
                     print( colored( sparql, "green" ))
                     print( colored( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )), "red" ))
+                    report( "Result", "Failed ;-(" )
+                    exit_code = 1
         print( '----------------------------------------------------------')
-        sys.exit( 0 )
+        sys.exit( exit_code )
 
     # --------------------------------------------------------- #
     # Refresh all GraphDB preloaded queries
