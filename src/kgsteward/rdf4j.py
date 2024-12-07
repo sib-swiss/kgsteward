@@ -55,7 +55,6 @@ class RFD4JClient( GenericClient ):
             'headers' : { **self.headers, "content-type": "text/turtle" },
             'data'    : open( rdf4j_config_filename , 'rb' )
         }, [ 204, 409 ] ) # 204: created; 409 repository already exists (and don't care)
-        stop_error( "toto")
 
     def sparql_query( 
         self, 

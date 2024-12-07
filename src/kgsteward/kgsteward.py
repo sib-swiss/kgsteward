@@ -636,7 +636,8 @@ INSERT DATA {{
             format="turtle",
             destination = args.r + "/prefixes.ttl"
         )
-        stop_error( "toto" )
+        sys.exit( 0 )
+        
 
     if args.x:
         if not os.path.isdir( args.x ):
@@ -655,7 +656,7 @@ INSERT DATA {{
                 with open( out_path, "w" ) as file:
                     file.write( "".join( s[ :1 ] ))
                     file.write( "".join( sorted( s[ 1: ])))
-
+        sys.exit( 0 )
 
     # --------------------------------------------------------- #
     # Turn free access ON
