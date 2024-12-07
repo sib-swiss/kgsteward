@@ -1,0 +1,16 @@
+@prefix config: <tag:rdf4j.org,2023:config/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+[] a config:Repository;
+  rdfs:label "kgsteward_demo_rdf4j";
+  config:rep.id "kgsteward_demo_rdf4j";
+  config:rep.impl [
+      config:rep.type "openrdf:SailRepository";
+      config:sail.impl [
+          config:native.tripleIndexes "spoc,posc";
+          config:sail.defaultQueryEvaluationMode "STRICT";
+          config:sail.iterationCacheSyncThreshold "10000"^^xsd:long;
+          config:sail.type "openrdf:NativeStore"
+        ]
+    ] .

@@ -1,0 +1,11 @@
+version: kgsteward2.0
+server:
+  brand            : rdf4j
+  location         : http://localhost:8080/rdf4j-server
+  server_config    : demo_rdf4j.config.ttl 
+  repository       : kgsteward_demo_rdf4j
+  file_server_port : 8002
+dataset: !include dataset.yaml
+validations:
+  - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/validate/*.rq
+

@@ -9,17 +9,17 @@ from .generic import GenericClient
 
 class RFD4JClient( GenericClient ):
 
-    def __init__( self, server_url, username, password, repository_id ):
+    def __init__( self, server_url, username, password, repository ):
         super().__init__(  
-            server_url + "/repositories/" + repository_id,
-            server_url + "/repositories/" + repository_id + "/statements",
-            server_url + "/repositories/" + repository_id + "/rdf-graphs/service"
+            server_url + "/repositories/" + repository,
+            server_url + "/repositories/" + repository + "/statements",
+            server_url + "/repositories/" + repository + "/rdf-graphs/service"
         )
-        self.server_url          = server_url
-        self.username            = username
-        self.password            = password
-        self.repository_id       = repository_id
-        self.headers             = {} # to be updated below
+        self.server_url    = server_url
+        self.username      = username
+        self.password      = password
+        self.repository    = repository
+        self.headers       = {} # to be updated below
         print_break()
         print_task( "Contacting server" )
         try:
@@ -29,24 +29,31 @@ class RFD4JClient( GenericClient ):
             }, [ 200 ])
         except:
             stop_error( "Cannot contact server at url: " + self.server_url )
+#        try:
+#            http_call({
+#                'url'    : self.endpoint_query
+#                'method' : 'GET',
+#        except:
+#            }, [ 200 ])
+#            stop_error( "Server is running, but repository does not exist: " + self.repository )
 
     def rewrite_repository( self, rdf4j_config_filename ):
         # FIXME: this does not work!
         try: # attempt to erase the repo and its content
             # curl -X DELETE http://localhost:8080/rdf4j-server/repositories/TEST
             http_call({ # slower alternative self.sparql_update( "DROP SILENT ALL" )
-            'method' : 'DELETE',
-            'url'    : self.server_url + '/repositories/' + self.repository_id,
-            'headers' : self.headers
-        }, [ 204, 404 ] ) # 204: cleared; 404 unknown
+                'method' : 'DELETE',
+                'url'    : self.server_url + '/repositories/' + self.repository,
+                'headers' : self.headers
+            }, [ 204, 404 ] ) # 204: cleared; 404 unknown
         except: # case repo does not exist yet 
             pass
         # "curl -H 'content-type: text/turtle' --upload-file common/data/config/JLW_Native_Lucene.config.ttl http://localhost:8080/rdf4j-server/repositories/JLW_Native_Lucene"
         http_call({
             'method'  : 'PUT',
-            'url'     : self.server_url + '/repositories/' + self.repository_id,
+            'url'     : self.server_url + '/repositories/' + self.repository,
             'headers' : { **self.headers, "content-type": "text/turtle" },
-            'files'   : { 'config' : open( rdf4j_config_filename , 'rb' )}
+            'data'    : open( rdf4j_config_filename , 'rb' )
         }, [ 204, 409 ] ) # 204: created; 409 repository already exists (and don't care)
         stop_error( "toto")
 
@@ -89,7 +96,7 @@ class RFD4JClient( GenericClient ):
     def get_contexts( self, echo = True ) :
         r = http_call({
             'method'  : 'GET',
-            'url'     : self.server_url + "/repositories/" + self.repository_id + "/contexts",
+            'url'     : self.server_url + "/repositories/" + self.repository + "/contexts",
             'headers' : { **self.headers, 'Accept': 'application/json' },
         }, [ 200 ], echo )
         contexts = set()
@@ -108,7 +115,7 @@ class RFD4JClient( GenericClient ):
     def validate_sparql_query( self, sparql, echo = False ) :
         r = http_call({
             'method'  : 'POST',
-            'url'     : self.server_url + "/repositories/" + self.repository_id,
+            'url'     : self.server_url + "/repositories/" + self.repository,
             'headers' : {
                 'Accept'        : 'text/tab-separated-values'
                 # 'Authorization' : self.authorization
@@ -138,7 +145,7 @@ class RFD4JClient( GenericClient ):
         return
         r = http_call({
             'method'  : 'DELETE',
-            'url'     : self.server_url + "/repositories/" + self.repository_id + "/namespaces",
+            'url'     : self.server_url + "/repositories/" + self.repository + "/namespaces",
             'headers' : self.headers,
         }, [204], echo )
 
@@ -146,7 +153,7 @@ class RFD4JClient( GenericClient ):
         return
         r = http_call({
             'method'  : 'PUT',
-            'url'     : self.server_url + "/repositories/" + self.repository_id + "/namespaces/" + short,
+            'url'     : self.server_url + "/repositories/" + self.repository + "/namespaces/" + short,
             'headers' : self.headers.copy().update({ 'Accept', 'text/plain' }),
             'data'    : long
         }, [204], echo )
