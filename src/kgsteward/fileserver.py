@@ -17,7 +17,6 @@ class MyServer( http.server.ThreadingHTTPServer ):
 
 def _expose_directory( directory, port = 8000 ):
     HandlerClass = http.server.SimpleHTTPRequestHandler
-    print("DIIIIIIIIIIIIIIIIIIR", directory)
     httpd        = MyServer(( "", port ), HandlerClass, directory )
     httpd.serve_forever()
 
