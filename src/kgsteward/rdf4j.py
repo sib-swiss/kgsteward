@@ -28,7 +28,7 @@ class RFD4JClient( GenericClient ):
                 'url'    : self.server_url
             }, [ 200 ])
         except:
-            stop_error( "Cannot contact server at url: " + self.server_url )
+            stop_error( "Cannot contact server at location: " + self.server_url )
 #        try:
 #            http_call({
 #                'url'    : self.endpoint_query
