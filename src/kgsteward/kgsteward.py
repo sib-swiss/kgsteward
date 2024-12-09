@@ -166,10 +166,14 @@ def get_sha256( config, name ) :
                             sha256.update( chunk )
     if "file" in target :
         for path in target["file"] :
-            for dir, filename in expand_path( path, config["kgsteward_yaml_directory"] ):
-                with open( replace_env_var( dir + "/" + filename ), "rb") as f :
-                    for chunk in iter( lambda: f.read(4096), b"") :
-                        sha256.update( chunk )
+            try:
+                for dir, filename in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    with open( replace_env_var( dir + "/" + filename ), "rb") as f :
+                        for chunk in iter( lambda: f.read(4096), b"") :
+                            sha256.update( chunk )
+            except:
+                pass
+                #print_warn( "File status unknown: " + path )
  #           filenames = sorted( glob.glob( replace_env_var( path )))
  #           for filename in filenames :
  #               with open( replace_env_var( filename ), "rb") as f :
