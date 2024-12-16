@@ -202,7 +202,7 @@ def update_config( server, config ) :
         item["count"]      = ""
         item["date"]       = ""
         item["sha256_old"] = ""
-        item["status"]     = "FROZEN" if config["dataset"]["frozen"] else "EMPTY"
+        item["status"]     = "FROZEN" if item["frozen"] else "EMPTY"
     r = server.sparql_query( """
 PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
