@@ -166,19 +166,10 @@ def get_sha256( config, name ) :
                             sha256.update( chunk )
     if "file" in target :
         for path in target["file"] :
-            try:
-                for dir, filename in expand_path( path, config["kgsteward_yaml_directory"] ):
-                    with open( replace_env_var( dir + "/" + filename ), "rb") as f :
-                        for chunk in iter( lambda: f.read(4096), b"") :
-                            sha256.update( chunk )
-            except:
-                pass
-                #print_warn( "File status unknown: " + path )
- #           filenames = sorted( glob.glob( replace_env_var( path )))
- #           for filename in filenames :
- #               with open( replace_env_var( filename ), "rb") as f :
- #                   for chunk in iter( lambda: f.read(4096), b"") :
- #                       sha256.update( chunk )
+            for dir, filename in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
+                with open( replace_env_var( dir + "/" + filename ), "rb") as f :
+                    for chunk in iter( lambda: f.read(4096), b"") :
+                        sha256.update( chunk )
     if "zenodo" in target :
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -200,7 +191,8 @@ def get_sha256( config, name ) :
     return sha256.hexdigest()
 
 def update_config( server, config ) :
-    """ Add information about the currrent repository status """
+    """ Compute current status information about the records in repository.
+        Take dependency into account."""
     print_break()
     print_task( "Retrieve current status" )
     name2item = {}
@@ -210,7 +202,7 @@ def update_config( server, config ) :
         item["count"]      = ""
         item["date"]       = ""
         item["sha256_old"] = ""
-        item["status"]     = "EMPTY"
+        item["status"]     = "FROZEN" if config["dataset"]["frozen"] else "EMPTY"
     r = server.sparql_query( """
 PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
@@ -223,7 +215,7 @@ WHERE{
              ex:has_sha256 ?sha256 .
 }
 """ )
-    try:
+    try: 
         for rec in r.json()["results"]["bindings"] :
             if rec["context"]["value"] in context2name:
                 name = context2name[rec["context"]["value"]]
@@ -234,16 +226,16 @@ WHERE{
             item["date"]       = rec["t"]["value"]
             item["sha256_old"] = str( rec["sha256"]["value"] )
             item["sha256_new"] = get_sha256( config, name )
-            if item["sha256_old"] == item["sha256_new"] :
+            if item["sha256_old"] == item["sha256_new"]:
                 item["status"] = "ok"
-            else :
+            elif not item["status"] == "FROZEN":
                 item["status"] = "UPDATE"
-    except RequestsJSONDecodeError:
-        pass
+    except RequestsJSONDecodeError: # test before and remove this typ/excep block 
+        stop_error( "Failed parsing server response! ")
     for item in config["dataset"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
-                if name2item[parent]["status"] != "ok" :
+                if name2item[parent]["status"] == "UPDATE" :
                     item["status"] = "PROPAGATE"
     return config
 
@@ -367,7 +359,7 @@ def main():
 
     if args.D :
         rdf_graph_to_update = rdf_graph_all
-    elif args.d :
+    elif args.d : # status not checked here
         for name in args.d.split( "," ) :
             if name in rdf_graph_all :
                 rdf_graph_to_update.add( name )

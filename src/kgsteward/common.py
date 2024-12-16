@@ -29,7 +29,7 @@ def replace_env_var( txt ) :
     else:
         return txt
 
-def update_path( path, default_dir ):
+def update_path( path, default_dir, fatal = True  ):
     """Expand path environment variables"""
     dir, fn = os.path.split( os.path.normpath( replace_env_var( path ))) # handles ".." correctly
     if not dir.startswith( "/" ):
@@ -39,7 +39,7 @@ def update_path( path, default_dir ):
         stop_error( "File does not exists: " + filename )
     return filename
 
-def expand_path( path, default_dir ):
+def expand_path( path, default_dir, fatal = True ):
     """Expand path on wildcard and environment variables"""
     dir, filename = os.path.split( os.path.normpath( replace_env_var( path ))) # handles ".." correctly
     res = []
@@ -47,14 +47,22 @@ def expand_path( path, default_dir ):
         dir = default_dir + "/" + dir
     if "*" in dir or  "*" in filename:
         paths = glob.glob( dir + "/" + filename )
-        if not paths:
-            stop_error( "Not a single file found: " + dir + "/" + filename )
-        for p in sorted( paths ):
-            res.append( os.path.split( p ))
+        if paths:
+            for p in sorted( paths ):
+                res.append( os.path.split( p ))
+        else:
+            if fatal:
+                stop_error( "Not a single file found: " + dir + "/" + filename )
+            else:
+                print_warn( "Not a single file found: " + dir + "/" + filename )
     else:
-        if not os.path.isfile( dir + "/" + filename ):
-            stop_error( "File does not exists: " + dir + "/" + filename )
-        res.append([ dir, filename ])
+        if os.path.isfile( dir + "/" + filename ):
+            res.append([ dir, filename ])
+        else:
+            if fatal:
+                stop_error( "File does not exists: " + dir + "/" + filename )
+            else:
+                print_warn( "File does not exists: " + dir + "/" + filename )
     return res
 
 def http_call( request_args, status_code = [ 200 ], echo = True ):

@@ -41,6 +41,13 @@ class GraphDBClient( GenericClient ):
         self.headers              = {} # to be updated below
         print_break()
         print_task( "contacting server" )
+#        try:
+#            http_call({
+#                'method' : 'GET',
+#                'url'    : self.graphdb_url
+#            }, [ 200 ])
+#        except:
+#            stop_error( "Cannot contact server at url: " + self.graphdb_url )
         if self.username is not None :
             r = http_call({
                 'method'  : 'POST',

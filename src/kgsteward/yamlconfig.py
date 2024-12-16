@@ -133,15 +133,16 @@ class RDF4JConf( BaseModel ):
 
 class GraphConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a graphs reccord", description = describe( "name" ))
-    parent   : Optional[ List[ str ]] = Field( None, title = "Parent(s) of a graphs record", description = describe(  "parent" ))
-    context  : Optional[ str ]        = Field( None, title = "Full IRI of a context/named graph", description = describe(  "context" ))
-    system   : Optional[ List[ str ]] = Field( None, title = "UNIX system command(s)", description = describe(  "system" ))
-    file     : Optional[ list[ str ]] = Field( None, title = "Load RDF from file(s)", description = describe(  "file" ))
-    url      : Optional[ list[ str ]] = Field( None, title = "Load RDF from URL(s)", description = describe(  "url" ))
-    stamp    : Optional[ list[ str ]] = Field( None, title = "Stamp file(s)", description = describe(  "stamp" ))
+    context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
+    parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a graphs record", description = describe(  "parent" ))
+    frozen   : Optional[ bool ]       = Field( False, title = "Frozen graphs record", description ="Frozen record, use -d <name> can update it manually, -C has no effect" )
+    system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
+    file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
+    url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))
+    stamp    : Optional[ list[ str ]] = Field( None,  title = "Stamp file(s)", description = describe(  "stamp" ))
     replace  : Optional[ dict [ str, str ]] = Field( None, title = "String subtitution in SPARQL update(s)", description = describe(  "replace" ))
-    update   : Optional[ list[ str ]] = Field( None, title = "SPARQL update file(s)", description = describe(  "update" ))
-    zenodo   : Optional[ list[ int ]] = Field( None, title = "Ignore me", description = describe(  "zenodo" ))
+    update   : Optional[ list[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
+    zenodo   : Optional[ list[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
 
 class GraphSource( BaseModel ):
     source : str = Field( 
