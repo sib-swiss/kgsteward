@@ -1,21 +1,22 @@
 
 # kgsteward config file: supported YAML syntax
 
-Full YAML 2.0 syntax is supported. 
+YAML 1.1 syntax is supported. 
 
-A single YAML extension is implemented: the `!include <filename>` directive, that will insert in place the content of `filename`.
-The path of `<filename>` is interpreted with directory of the parent YAML file as default. 
-This inclusion mechanism is executed early, before the full YAML configuration is checked.  
+A YAML extension is available: `!include <filename>`. 
+This directive will insert in place the content of `filename`.
+The path of `<filename>` is interpreted with the directory of the parent YAML file as default directory. 
+This inclusion mechanism is executed early, before the YAML configuration is validated.  
 
 Within the YAM config file(s), UNIX environment variables can by referred to using `${...}` syntax. 
-Their evaluation is performed late, at the time of command execution. 
-`${...}` syntax cannot be used in `!include`directive.
+Evaluation of these is performed at the time of command execution. 
+Hence `${...}` syntax cannot be used in `!include` directive.
 
 # kgsteward YAML syntax
 
 # KGStewardConf
 
-Top level of the YAML syntax supported by kgsteward
+Top level YAML keys
 
 | Property | Type | Required | Possible Values | Deprecated | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
@@ -114,4 +115,4 @@ Top level of the YAML syntax supported by kgsteward
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 15:23:27.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 15:51:40.

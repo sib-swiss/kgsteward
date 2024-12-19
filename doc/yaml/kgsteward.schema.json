@@ -472,5 +472,5 @@
   ],
   "title": "KGStewardConf",
   "type": "object",
-  "description": "Top level of the YAML syntax supported by kgsteward"
+  "description": "Top level YAML keys"
 }
