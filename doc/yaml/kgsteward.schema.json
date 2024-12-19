@@ -3,16 +3,16 @@
     "FusekiConf": {
       "additionalProperties": true,
       "properties": {
-        "server_brand": {
+        "brand": {
           "const": "fuseki",
-          "description": "No description",
+          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
           "enum": [
             "fuseki"
           ],
           "title": "Fuseki brand",
           "type": "string"
         },
-        "server_url": {
+        "location": {
           "default": "http://localhost:3030",
           "description": "URL of the server. The SPARL endpoint is different and server specific.",
           "title": "Server URL",
@@ -39,7 +39,7 @@
         }
       },
       "required": [
-        "server_brand",
+        "brand",
         "repository"
       ],
       "title": "FusekiConf",
@@ -52,6 +52,19 @@
           "pattern": "^[a-zA-Z]\\w{0,31}$",
           "title": "Short name of a graphs reccord",
           "type": "string"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology.  If missing, contect IRI will be built by concataining `context_base_IRI` and `name`",
+          "title": "Full IRI of a context/named graph"
         },
         "parent": {
           "anyOf": [
@@ -66,21 +79,21 @@
             }
           ],
           "default": null,
-          "description": "A list of name to encode dependency between datasets.  Updating the parent datset will provoke the update of its children.",
+          "description": "A list of names to declare dependency between graph records.  Updating the parent datset will provoke the update of its children.",
           "title": "Parent(s) of a graphs record"
         },
-        "context": {
+        "frozen": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "boolean"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology.  If missing, contect IRI will be built by concataining `context_base_IRI` and `name`",
-          "title": "Full IRI of a context/named graph"
+          "default": false,
+          "description": "Frozen record, use -d <name> can update it manually, -C has no effect",
+          "title": "Frozen graphs record"
         },
         "system": {
           "anyOf": [
@@ -149,13 +162,10 @@
         "replace": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
+              "additionalProperties": {
+                "type": "string"
               },
-              "type": "array"
+              "type": "object"
             },
             {
               "type": "null"
@@ -178,7 +188,7 @@
             }
           ],
           "default": null,
-          "description": "List of files containing SPARQL update commands.  Wildcard `*`can be used.",
+          "description": "List of files containing SPARQL update commands.  Wildcard are not supported here!",
           "title": "SPARQL update file(s)"
         },
         "zenodo": {
@@ -207,7 +217,7 @@
     "GraphDBConf": {
       "additionalProperties": true,
       "properties": {
-        "server_brand": {
+        "brand": {
           "const": "graphdb",
           "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
           "enum": [
@@ -216,7 +226,7 @@
           "title": "GraphDB brand",
           "type": "string"
         },
-        "server_url": {
+        "location": {
           "default": "http://localhost:7200",
           "description": "URL of the server. The SPARL endpoint is different and server specific.",
           "title": "Server URL",
@@ -290,7 +300,7 @@
         }
       },
       "required": [
-        "server_brand",
+        "brand",
         "server_config",
         "repository"
       ],
@@ -309,22 +319,79 @@
       ],
       "title": "GraphSource",
       "type": "object"
+    },
+    "RDF4JConf": {
+      "additionalProperties": true,
+      "properties": {
+        "brand": {
+          "const": "rdf4j",
+          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+          "enum": [
+            "rdf4j"
+          ],
+          "title": "RDF4J brand",
+          "type": "string"
+        },
+        "location": {
+          "default": "http://localhost:3030",
+          "description": "URL of the server. The SPARL endpoint is different and server specific.",
+          "title": "Server URL",
+          "type": "string"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
+        },
+        "file_server_port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+          "title": "file_server_port"
+        }
+      },
+      "required": [
+        "brand",
+        "repository"
+      ],
+      "title": "RDF4JConf",
+      "type": "object"
     }
   },
   "additionalProperties": true,
   "properties": {
-    "store": {
+    "version": {
+      "const": "kgsteward2.0",
+      "description": "No description",
+      "enum": [
+        "kgsteward2.0"
+      ],
+      "title": "YAML syntax version",
+      "type": "string"
+    },
+    "server": {
       "anyOf": [
         {
           "$ref": "#/$defs/GraphDBConf"
         },
         {
+          "$ref": "#/$defs/RDF4JConf"
+        },
+        {
           "$ref": "#/$defs/FusekiConf"
         }
       ],
-      "title": "Store"
+      "title": "Server"
     },
-    "graphs": {
+    "dataset": {
       "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
       "items": {
         "anyOf": [
@@ -341,32 +408,55 @@
       "type": "array"
     },
     "context_base_IRI": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": "http://example.org/context/",
-      "title": "Context Base Iri",
-      "type": "string"
+      "description": "toto",
+      "title": "Context Base Iri"
     },
     "queries": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": null,
       "description": "A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,  with a short timeout. The query result is not iteself checked.  Wildcard `*` can be used.",
-      "items": {
-        "type": "string"
-      },
-      "title": "GraphDB queries",
-      "type": "array"
+      "title": "GraphDB queries"
     },
     "validations": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
       "default": null,
       "description": "A list of paths to files contining SPARQL queries used to validate the repsository. Wildcard `*` can be used. By convention, a valid result should be empty, i.e. no row is returned.  Failed results should return rows permitting to diagnose the problems.",
-      "items": {
-        "type": "string"
-      },
-      "title": "Validation queries",
-      "type": "array"
+      "title": "Validation queries"
     }
   },
   "required": [
-    "store",
-    "graphs"
+    "version",
+    "server",
+    "dataset"
   ],
   "title": "KGStewardConf",
   "type": "object"
