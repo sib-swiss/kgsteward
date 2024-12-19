@@ -9,25 +9,23 @@ A command line tool to help manage the content of RDF store (GraphDB, Fuseki, RD
 The code is available from PyPI and only depends on rather standard Python packages. 
 Its installation should be straightforward.
 
-The standard option is to install `kgsteward` with `pip3`:
-
-```shell
-pip3 install kgsteward
-```
-
-or alternatively, if you don't like to play yourself with virtual environment and package dependencies
+The recommended option is to install `kgsteward` with [`uv`](https://docs.astral.sh/uv/)
 
 ```shell
 uv tool install kgsteward
 ```
 
-You can also clone/download the content of this repo to your local machine, and then
-run kgsteward using the script `./kgsteward` at its root, or alternatively
+or with `pip3`:
+
+```shell
+pip3 install kgsteward
+```
+
+You can also clone this repo, and launch kgsteward using the script `./kgsteward` at its root
 
 ```shell
 uv run ./kgsteward
 ```
-that should manage the python environment for you.
 
 ## Documentation
 
