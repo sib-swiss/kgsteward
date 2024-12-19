@@ -4,7 +4,7 @@ import jsonschema_markdown
 from kgsteward.yamlconfig import KGStewardConf
 
 main_model_schema = KGStewardConf.model_json_schema()
-main_model_schema["description"] = "Decription of the YAML syntax supported by kgsteward"
+main_model_schema["description"] = "Top level of the YAML syntax supported by kgsteward"
 
 with open( "kgsteward.schema.json", "w" ) as f:
 	f.write( json.dumps( main_model_schema, indent=2 ))

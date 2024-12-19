@@ -15,7 +15,7 @@ Their evaluation is performed late, at the time of command execution.
 
 # KGStewardConf
 
-Decription of the YAML syntax supported by kgsteward
+Top level of the YAML syntax supported by kgsteward
 
 | Property | Type | Required | Possible Values | Deprecated | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
@@ -114,4 +114,4 @@ Decription of the YAML syntax supported by kgsteward
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 12:44:30.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 15:23:27.
