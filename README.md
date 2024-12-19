@@ -6,18 +6,21 @@ A command line tool to help manage the content of RDF store (GraphDB, Fuseki, RD
 
 ## Installation
 
-The code is available frpm PyPI and only depends on very standard Python packages. Its installation should be straightforward.
+The code is available from PyPI and only depends on rather standard Python packages. 
+Its installation should be straightforward.
 
 The standard option is to install `kgsteward` with `pip3`:
 
 ```shell
 pip3 install kgsteward
 ```
+
 or alternatively, if you don't like to play yourself with virtual environment and package dependencies
 
 ```shell
 uv tool install kgsteward
 ```
+
 You can also clone/download the content of this repo to your local machine, and then
 run kgsteward using the script `./kgsteward` at its root, or alternatively
 
@@ -29,7 +32,6 @@ that should manage the python environment for you.
 ## Documentation
 
 See the [documentation website](https://sib-swiss.github.io/kgsteward)
-
 
 ## Development
 
