@@ -471,5 +471,6 @@
     "dataset"
   ],
   "title": "KGStewardConf",
-  "type": "object"
+  "type": "object",
+  "description": "Decription of the YAML syntax supported by kgsteward"
 }

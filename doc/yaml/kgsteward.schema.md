@@ -15,7 +15,7 @@ Their evaluation is performed late, at the time of command execution.
 
 # KGStewardConf
 
-JSON Schema missing a description, provide it using the `description` key in the root of the JSON document.
+Decription of the YAML syntax supported by kgsteward
 
 | Property | Type | Required | Possible Values | Deprecated | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
@@ -114,4 +114,4 @@ JSON Schema missing a description, provide it using the `description` key in the
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 12:39:57.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 12:44:30.
