@@ -6,11 +6,7 @@
 
 JSON Schema missing a description, provide it using the `description` key in the root of the JSON document.
 
-<<<<<<< HEAD
-| Property | Type | Required | Possible Values | Deprecated | Default | `           Description           ` |
-=======
 | Property | Type | Required | Possible Values | Deprecated | Default | ____________Description____________ |
->>>>>>> 518dde6 (testing)
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
 | version | `string` | ✅ | `kgsteward2.0`|  |  | No description |
 | server | `object` | ✅ | [GraphDBConf](#graphdbconf) or [RDF4JConf](#rdf4jconf) or [FusekiConf](#fusekiconf)|  |  |  |
@@ -106,4 +102,4 @@ JSON Schema missing a description, provide it using the `description` key in the
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 10:07:21.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 10:30:09.
