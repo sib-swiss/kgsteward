@@ -52,6 +52,12 @@ uv run pytest -s --cov --cov-report html
 python -m http.server 3000 --directory ./htmlcov
 ```
 
+Start documentation website in development:
+
+```bash
+uv run mkdocs serve
+```
+
 ## References
 
 __`kgsteward`__ was developped to manage experimental chemical data (LC-MS2) and experimental biological data (bio-activity) data together with reference chemical structures derived from public database (LOTUS, wikidata) as reported in [A Sample-Centric and Knowledge-Driven Computational Framework for Natural Products Drug Discovery](https://doi.org/10.1021/acscentsci.3c00800).
