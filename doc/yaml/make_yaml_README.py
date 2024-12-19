@@ -26,6 +26,6 @@ Their evaluation is performed late, at the time of command execution.
 
 """ )
     txt = jsonschema_markdown.generate( main_model_schema )
-    big_space = "&nbsp;" * 20
+    big_space = "&nbsp;" * 30
     txt = txt.replace( "| Description |",  "|" + big_space + "Description" + big_space + "|" ) # dirty patch to improve table layout
     f.write( txt )
