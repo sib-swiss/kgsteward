@@ -1,18 +1,18 @@
 site_name: kgsteward
-site_description: Knowledge Graph Steward - Command line tool to help manage RDF store
+site_description: Knowledge Graph Steward - Command line tool to manage RDF store
 site_author: Marco Pagni
 site_url: https://sib-swiss.github.io/kgsteward
 repo_name: sib-swiss/kgsteward
 repo_url: https://github.com/sib-swiss/kgsteward
 edit_uri: "edit/main/doc/"
 copyright: Copyright &copy; 2024 Marco Pagni
-docs_dir: doc
+docs_dir: .
 
 # Find icons: https://fontawesome.com/icons/
 # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
 nav:
   - Getting started: README.md
-  - Configuration: yaml/kgsteward.schema.md
+  - Configuration: doc/yaml/kgsteward.schema.md
   - Use-case: usecase.md
   # - Configuration:
   #   - Example bare HTML: javascript-example-html.md

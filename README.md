@@ -2,11 +2,12 @@
 
 [![Tests](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml/badge.svg)](https://github.com/sib-swiss/kgsteward/actions/workflows/tests.yml)
 
-A command line tool to help manage the content of RDF store (GraphDB, Fuseki, RDF4J...). Written in python.
+A command line tool to manage the content of RDF store (GraphDB, Fuseki, RDF4J...). Written in python.
 
 ## Installation
 
-The code is available from PyPI and only depends on rather standard Python packages. 
+kgsteward is available from [PyPI](https://pypi.org/project/kgsteward/).
+It depends on hopefully standard Python packages. 
 Its installation should be straightforward.
 
 The recommended option is to install `kgsteward` with [`uv`](https://docs.astral.sh/uv/)
