@@ -1,0 +1,121 @@
+site_name: kgsteward
+site_description: Knowledge Graph Steward - Command line tool to help manage RDF store
+site_author: Marco Pagni
+site_url: https://sib-swiss.github.io/kgsteward
+repo_name: sib-swiss/kgsteward
+repo_url: https://github.com/sib-swiss/kgsteward
+edit_uri: "edit/main/doc/"
+copyright: Copyright &copy; 2024 Marco Pagni
+docs_dir: doc
+
+# Find icons: https://fontawesome.com/icons/
+# https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
+nav:
+  - Getting started: README.md
+  - Configuration: yaml/kgsteward.schema.md
+  - Use-case: usecase.md
+  # - Configuration:
+  #   - Example bare HTML: javascript-example-html.md
+  #   - Example JS framework: javascript-example-framework.md
+
+
+theme:
+  name: "material"
+  favicon: assets/sib-logo.png
+  logo: assets/sib-logo.png
+  icon:
+    admonition:
+      server: material/server
+  language: en
+  # Change color: https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#primary-color
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.indexes
+    - navigation.sections
+    # - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - content.code.select
+    - content.tabs.link # Group tabs switch
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    # - header.autohide
+    # - navigation.tabs.sticky
+    # - navigation.expand
+    # - navigation.instant
+    # - content.tabs.link
+
+plugins:
+- search
+- open-in-new-tab
+- autorefs
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        options:
+          show_source: true
+    # custom_templates: templates
+
+markdown_extensions:
+  - admonition
+  - tables
+  # Supported admonititions: https://squidfunk.github.io/mkdocs-material/reference/admonitions/#supported-types
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+      # slugify: !!python/object/apply:pymdownx.slugs.slugify
+      #   kwds:
+      #     case: lower
+  - pymdownx.details
+  - pymdownx.extra
+  - abbr
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.snippets:
+      auto_append:
+        - lib/docs/includes/abbreviations.md
+  - attr_list
+  - smarty
+  # - md_in_html
+
+extra_css:
+  - assets/custom.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/kgsteward
+    - icon: fontawesome/brands/github
+      link: https://github.com/sib-swiss
+    # - icon: fontawesome/brands/docker
+    #   link: https://github.com/biopragmatics/curies.rs/pkgs/container/curies.rs
+
+watch:
+  # - ../src
+  - doc

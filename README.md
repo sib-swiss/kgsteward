@@ -13,12 +13,12 @@ The standard option is to install `kgsteward` with `pip3`:
 ```shell
 pip3 install kgsteward
 ```
-or alternatively, if you don't like to play yourself with virtual environment and package dependencies 
+or alternatively, if you don't like to play yourself with virtual environment and package dependencies
 
 ```shell
 uv tool install kgsteward
 ```
-You can also clone/download the content of this repo to your local machine, and then 
+You can also clone/download the content of this repo to your local machine, and then
 run kgsteward using the script `./kgsteward` at its root, or alternatively
 
 ```shell
@@ -28,9 +28,8 @@ that should manage the python environment for you.
 
 ## Documentation
 
-- Basic examples to start with `kgsteward` are available from the [fist steps documentation](doc/first_steps/README.md). 
-- The syntax of the YAML configuration file is documented [here](doc/yamldoc.md)
-- A discussion about the differents servers and their performances is available [soon](doc/discussion/README.md).
+See the [documentation website](https://sib-swiss.github.io/kgsteward)
+
 
 ## Development
 
