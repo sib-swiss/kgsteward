@@ -12,7 +12,7 @@ docs_dir: doc
 # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
 nav:
   - Getting started: README.md
-  - Configuration: doc/yaml/kgsteward.schema.md
+  - Configuration: yaml/kgsteward.schema.md
   - Use-case: usecase.md
   # - Configuration:
   #   - Example bare HTML: javascript-example-html.md
