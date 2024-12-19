@@ -107,6 +107,7 @@ def describe( term ):
         return "No description"
 
 class GraphDBConf( BaseModel ):
+    """ Top level description """
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))

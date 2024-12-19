@@ -216,6 +216,7 @@
     },
     "GraphDBConf": {
       "additionalProperties": true,
+      "description": "Top level description ",
       "properties": {
         "brand": {
           "const": "graphdb",

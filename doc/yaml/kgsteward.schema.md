@@ -70,7 +70,7 @@ JSON Schema missing a description, provide it using the `description` key in the
 
 ## GraphDBConf
 
-
+Top level description
 
 **Type:** `object`
 
@@ -113,4 +113,4 @@ JSON Schema missing a description, provide it using the `description` key in the
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 12:30:00.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 12:36:51.
