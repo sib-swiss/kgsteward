@@ -6,7 +6,7 @@ repo_name: sib-swiss/kgsteward
 repo_url: https://github.com/sib-swiss/kgsteward
 edit_uri: "edit/main/doc/"
 copyright: Copyright &copy; 2024 Marco Pagni
-docs_dir: .
+docs_dir: doc
 
 # Find icons: https://fontawesome.com/icons/
 # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
