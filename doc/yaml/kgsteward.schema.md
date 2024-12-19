@@ -2,7 +2,7 @@
 
 JSON Schema missing a description, provide it using the `description` key in the root of the JSON document.
 
-| Property | Type | Required | Possible Values | Deprecated | Default | Description |
+| Property | Type | Required | Possible Values | Deprecated | Default | `           Description           ` |
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
 | version | `string` | ✅ | `kgsteward2.0`|  |  | No description |
 | server | `object` | ✅ | [GraphDBConf](#graphdbconf) or [RDF4JConf](#rdf4jconf) or [FusekiConf](#fusekiconf)|  |  |  |
