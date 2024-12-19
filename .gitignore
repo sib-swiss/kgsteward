@@ -5,6 +5,7 @@ __pycache__/
 # Distribution / packaging
 build/
 kgsteward.egg-info/
+dist/
 
 # virtualenv
 Pipfile
