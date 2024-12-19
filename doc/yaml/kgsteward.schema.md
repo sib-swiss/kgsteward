@@ -115,4 +115,4 @@ JSON Schema missing a description, provide it using the `description` key in the
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 11:00:01.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2024-12-19 11:01:17.
