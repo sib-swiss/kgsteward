@@ -1,0 +1,12 @@
+version: kgsteward2.0
+server:
+  brand         : graphdb
+  location      : http://localhost:7200
+  server_config : graphdb.config.ttl
+  username      : ${GRAPHDB_USERNAME}
+  password      : ${GRAPHDB_PASSWORD}
+  # NOTE: by default graphdb login is user: admin / pw: root
+  repository    : first_steps
+dataset: !include dataset.yaml
+validations: 
+  - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/validate/*.rq
