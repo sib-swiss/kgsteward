@@ -1,0 +1,36 @@
+import pytest
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+
+# from . import run_cmd, env
+
+TRIPLESTORE_IMAGE = 'stain/jena-fuseki:latest'
+# TRIPLESTORE_PASSWORD = 'password'
+
+@pytest.fixture( scope = "module" )
+
+def triplestore():
+     """Start Fuseki container as a fixture."""
+     container = DockerContainer(TRIPLESTORE_IMAGE)
+     container.with_exposed_ports(3030).with_bind_ports(3030, 3030)
+#     container.with_env("ADMIN_PASSWORD", TRIPLESTORE_PASSWORD)
+     container.start()
+     delay = wait_for_logs(container, "Fuseki is available")
+     base_url = f"http://{container.get_container_host_ip()}:{container.get_exposed_port(3030)}"
+     print(f"Fuseki started in {delay:.0f}s at {base_url}")
+     # print(container.get_logs())
+     yield base_url
+
+
+def test_cli_fuseki(triplestore):
+     res_init = run_cmd(["kgsteward", "example/first_steps/fuseki.yaml", "-I"], env)
+     print(res_init.stdout)
+     assert res_init.returncode == 0
+
+     res_complete = run_cmd(["kgsteward", "example/first_steps/fuseki.yaml", "-C"], env)
+     print(res_complete.stdout)
+     assert res_complete.returncode == 0
+
+     res_validate = run_cmd(["kgsteward", "example/first_steps/fuseki.yaml", "-V"], env)
+     print(res_validate.stdout)
+     assert res_validate.returncode == 0
