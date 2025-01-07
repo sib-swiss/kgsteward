@@ -7,22 +7,32 @@ from .generic import GenericClient
 # FIXME: test env variable JVM_ARGS
 class FusekiClient( GenericClient ):
 
-    def __init__( self, fuseki_url, repository_id ):
+    def __init__( self, fuseki_url, username, password, repository_id ):
         self.fuseki_url = fuseki_url
         self.repository_id = repository_id
         super().__init__(  
-            fuseki_url + "/" + repository_id + "/sparql", 
+            fuseki_url + "/" + repository_id + "/query", 
             fuseki_url + "/" + repository_id + "/update",
             fuseki_url + "/" + repository_id + "/store"
         )
-
-    def ping( self ):
-        r = http_call({
-            'method'  : 'GET',
-            'url'     : self.fuseki_url + "/#/"
-        },[ 200 ] )
-        #ignore = super().ping()
-        #print( "OK" )
+        print_task( "contacting server" )
+        try:
+            r = http_call({
+                'method'  : 'GET',
+                'url'     : self.fuseki_url + "/$/ping"
+            },[ 200 ] )
+        except:
+            stop_error( "Cannot contact fuseki at location: " + self.fuseki_url ) 
+        if username is not None :
+            try:
+                r = http_call({
+                    'method'  : 'GET',
+                    'url'     : self.fuseki_url + "/$/server",
+                    'auth'    : ( username, password )
+                },[ 200 ] ) # returns 401 if authentification fail
+                self.cookies = requests.utils.dict_from_cookiejar( r.cookies )
+            except:
+                stop_error( "Authentication to fuseki server failed: + self.graphdb_url" )
 
     def rewrite_repository( self, server_config_filename ) :
         self.sparql_update( "DROP ALL")
@@ -35,22 +45,37 @@ class FusekiClient( GenericClient ):
 #            print( sparql, flush=True )
 #        r = http_call({
 #            'method'  : 'GET',
-#            'url'     : self.fuseki_url + "/" + self.repository_id + "/sparql",
-#            'params'  : { 'query': sparql }
+#            'url'     : "http://localhost:3030/#/dataset/first_step/query",
+#            'params'  : { 'query': sparql },
 #        }, status_code_ok, echo )
 #        return r
     
-    # on success fuseki return 200, not 204 !!!
-    def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        super().sparql_update( sparql, status_code_ok = [ 200 ], echo = echo )
+    def sparql_query( 
+        self, 
+        sparql, 
+        headers = { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        status_code_ok = [ 200 ], 
+        echo = True 
+    ):
+        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
 
-    def sparql_query_to_tsv( self, sparql, status_code_ok = [200], echo=True) :
-        return self.sparql_query(
-            sparql,
-            accept='text/tab-separated-values',
-            status_code_ok=status_code_ok,
-            echo=echo,
-        )
+    def sparql_update( 
+        self, 
+        sparql, 
+        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
+        status_code_ok = [ 200 ],  # on success fuseki return 200, not 204 !!!
+        echo = True
+    ):
+        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
+
+    def sparql_query_to_tsv(
+        self, 
+        sparql, 
+        headers = { 'Accept': 'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        status_code_ok = [ 200 ], 
+        echo = True
+    ):
+        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
         
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         print_warn( "Not yet implemented: FusekiClient.graphdb_call()" )
