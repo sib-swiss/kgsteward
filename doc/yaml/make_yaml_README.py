@@ -35,7 +35,7 @@ These variable are encoded with lowercase strings.
 
 * The terminology adopted here is a compromise. Different server brands utilise different namings for the same conecpt. 
 For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology.
-In this respect, `kgsteward` utilises 'context', because of the too many usages of ['graph'](https://en.wikipedia.org/wiki/Graph).  
+In this respect, `kgsteward` utilises 'context', because of the too many usages of '[graph](https://en.wikipedia.org/wiki/Graph)'.  
 
 ## kgsteward YAML syntax
 
