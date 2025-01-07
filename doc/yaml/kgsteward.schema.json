@@ -174,7 +174,7 @@
       "properties": {
         "brand": {
           "const": "fuseki",
-          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+          "description": "String identifying the server brand.",
           "enum": [
             "fuseki"
           ],
@@ -183,7 +183,7 @@
         },
         "location": {
           "default": "http://localhost:3030",
-          "description": "URL of the server. The SPARL endpoint is different and server specific.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
           "title": "Server URL",
           "type": "string"
         },
@@ -219,7 +219,7 @@
       "properties": {
         "brand": {
           "const": "graphdb",
-          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+          "description": "String identifying the server brand.",
           "enum": [
             "graphdb"
           ],
@@ -228,7 +228,7 @@
         },
         "location": {
           "default": "http://localhost:7200",
-          "description": "URL of the server. The SPARL endpoint is different and server specific.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
           "title": "Server URL",
           "type": "string"
         },
@@ -312,7 +312,7 @@
       "properties": {
         "brand": {
           "const": "rdf4j",
-          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+          "description": "String identifying the server brand.",
           "enum": [
             "rdf4j"
           ],
@@ -321,7 +321,7 @@
         },
         "location": {
           "default": "http://localhost:3030",
-          "description": "URL of the server. The SPARL endpoint is different and server specific.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
           "title": "Server URL",
           "type": "string"
         },

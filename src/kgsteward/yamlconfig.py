@@ -22,8 +22,8 @@ description = {
     `${}`, `${}` and `${}`.
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
-    "server_brand": """One of 'graphdb' or 'fuseki' ( 'graphdb' by default).""",
-    "location" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
+    "server_brand": """String identifying the server brand.""",
+    "location" :   """URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.""" ,
     "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
@@ -149,13 +149,6 @@ class DatasetConf( BaseModel ):
     update   : Optional[ list[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
     zenodo   : Optional[ list[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
 
-#class GraphSource( BaseModel ):
-#    source : str = Field( 
-#        title = "Path to a yaml file",
-#        # description = describe( 
-#        # "source" ),
-#    )
-
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
@@ -164,9 +157,6 @@ class KGStewardConf( BaseModel ):
     context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = "toto" )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
-
-# class SourceGraphConf( BaseModel ):
-#     graphs            : list[ Union[ DatasetConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a three step process:
