@@ -38,10 +38,17 @@
           "title": "Parent(s) of a dataset record"
         },
         "frozen": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": false,
-          "description": "No description",
-          "title": "Frozen dataset record",
-          "type": "boolean"
+          "description": "Frozen record, can only be updated explicitely with the `-d <name>` option. The option `-C` has no effect",
+          "title": "Frozen dataset record"
         },
         "system": {
           "anyOf": [
@@ -282,7 +289,7 @@
             }
           ],
           "default": null,
-          "description": "No description",
+          "description": "A list of Turtle files from which prefix definitions can be obtained.          This list will used to update the namespace definitions in GraphDB and RDF4J.         Otherwise it is ignored",
           "title": "GraphDB namespace"
         },
         "repository": {

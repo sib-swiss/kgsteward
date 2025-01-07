@@ -97,14 +97,19 @@ Wildcard `*` can be used.
 """,
     "replace": """Dictionary to perform string substitution in SPARQL queries from `update` list.
 Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.
-"""
+""",
+    "prefixes": """
+        A list of Turtle files from which prefix definitions can be obtained. 
+        This list will used to update the namespace definitions in GraphDB and RDF4J.
+        Otherwise it is ignored
+    """,
 }
 
 def describe( term ):
     if term in description:
         return description[ term ].replace( "\n", " " ).strip()
     else:
-        return "No description"
+        stop_error( "No description for: " + term )
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
@@ -135,7 +140,7 @@ class DatasetConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a dataset reccord", description = describe( "name" ))
     context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
     parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a dataset record", description = describe(  "parent" ))
-    frozen   : bool                   = Field( default = False, title = "Frozen dataset record", description = describe( "frozen ") )
+    frozen   : Optional[ bool ]       = Field( False, title = "Frozen dataset record", description = describe( "frozen") )
     system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
     file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
     url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))
