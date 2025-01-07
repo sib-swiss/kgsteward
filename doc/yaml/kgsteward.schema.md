@@ -1,18 +1,23 @@
 
-# kgsteward config file: supported YAML syntax
+# YAML syntax of kgsteward config file (version 2)
 
 YAML 1.1 syntax is supported. 
 
-A YAML extension is available: `!include <filename>`. 
+A single YAML extension is supported: `!include <filename>`. 
 This directive will insert in place the content of `filename`.
 The path of `<filename>` is interpreted with the directory of the parent YAML file as default directory. 
 This inclusion mechanism is executed early, before the YAML configuration is validated.  
 
 Within the YAM config file(s), UNIX environment variables can by referred to using `${...}` syntax. 
-Evaluation of these is performed at the time of command execution. 
+Evaluation of these is performed late, i.e. at the time of command execution. 
 Hence `${...}` syntax cannot be used in `!include` directive.
+The use of UNIX environment variables is recommended to ensure portability of the YAML config files.
+
+In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file, and the currently executed chunk. 
 
 # kgsteward YAML syntax
+
+The entry point (top level keys) is [KGStewardConf](#kgstewardconf).
 
 # KGStewardConf
 
@@ -114,4 +119,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 09:27:00.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 09:39:39.
