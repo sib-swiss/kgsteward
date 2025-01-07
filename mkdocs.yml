@@ -11,7 +11,7 @@ docs_dir: doc
 # Find icons: https://fontawesome.com/icons/
 # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/
 nav:
-  - Getting started: README.md
+  - Getting started: first_steps/README.md
   - Configuration: yaml/kgsteward.schema.md
   - Use-case: usecase.md
   # - Configuration:
