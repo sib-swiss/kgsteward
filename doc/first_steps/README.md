@@ -80,15 +80,15 @@ kgsteward fuseki.yaml -V # validate repository
 
 Congratulations: you have populated a repository using `kgsteward` :-) 
 
-5: ## Details
+5. ## Details
 
-The follwing files have been used
+The following files have been used
 
-* [dataset.yaml](dataset.yaml) describes the content of the repository, independantly from a particular store engine. This file was manually edited.
+* [dataset.yaml](dataset.yaml) describes the content of a repository, independantly from a particular store engine. This file was manually created. A diversity of syntax possiblities are shown.  
 
 * [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and include a links to [dataset.yaml](dataset.yaml). This file was manually edited. 
 
-* [graphdb.config.ttl](graphdb.yaml) describes the configuration from a GraphDB repository. This file was exported from the GraphDB user interface, it can be manually modifed to some extent. It permits to re-create the same configuration in another server instance.
+* [graphdb.config.ttl](graphdb.config.ttl) describes the configuration from a GraphDB repository. This file was exported from the GraphDB user interface, it can be manually modifed to some extent. It permits to re-create the same configuration in another server instance.
 
 * [fuseki.yaml](fuseki.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually edited.
 
