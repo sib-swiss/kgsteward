@@ -82,17 +82,20 @@ Congratulations: you have populated a repository using `kgsteward` :-)
 
 5. ## Details
 
-The following files have been used.
+The following iconfiguration files have been used:
 
 * [dataset.yaml](dataset.yaml) describes the RDF data content of a repository, independantly from a particular store engine. This file was manually created. It illustrates the diversity of supported syntaxes.
 
 * [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and include a links to [dataset.yaml](dataset.yaml). This file was manually edited. 
 
-* [graphdb.config.ttl](graphdb.config.ttl) describes the configuration from a GraphDB repository. This file was exported from the GraphDB user interface, it can be manually modifed to some extent. It permits to re-create the same configuration in another server instance.
+* [graphdb.config.ttl](graphdb.config.ttl) describes the configuration from a GraphDB repository. 
+  This file was obtained from the GraphDB user interface. 
+  It can be manually modifed to some extent. 
+  It permits to re-create the same GraphDB repository in another server instance.
 
 * [fuseki.yaml](fuseki.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually edited.
 
-* [rdf4j.yaml](rdf4j.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually created.
+* [rdf4j.yaml](rdf4j.yaml) describes how to access RDF4J, and include a links to [dataset.yaml](dataset.yaml) . This file was manually created.
 
 * [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
 
