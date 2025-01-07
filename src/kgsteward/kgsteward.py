@@ -40,9 +40,9 @@ def get_user_input():
     """Generate argparse CLI and return user input."""
 
     parser = argparse.ArgumentParser(
-        description = "Manage a GraphDB repository using HTTP requests. "
-            "This script rely on three environment variables (GRAPHDB_URL, "
-            "GRAPHDB_USERNAME, GRAPHDB_PASSWORD) and a YAML config file."
+        description = "A command line tool to manage the content of RDF store. "
+            "This script rely on a YAML config file (version 2). "
+            "Source code and documentation are available from https://github.com/sib-swiss/kgsteward"
     )
     parser.add_argument(
         'yamlfile',

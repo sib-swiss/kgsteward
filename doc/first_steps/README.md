@@ -4,7 +4,7 @@
    Create an environement variable `${KGSTEWARD_ROOT_DIR}` that point to its root directory:
 
 ```sh
-cd [where you like to clone from github]
+# change dir to where you like to clone kgsteward
 git clone https://github.com/sib-swiss/kgsteward.git kgsteward
 export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
@@ -34,14 +34,16 @@ By default, the user interface of Fuseki becomes available at http://localhost:3
 
 </details>
 
-3. Install `kgsteward` globally as a cli tool, following the instructions. 
-   Or if you have `uv` installed, you may try temporarily 
+3. Install `kgsteward` globally as a cli tool, following the [instructions](https://github.com/sib-swiss/kgsteward/README.md). 
+   Or alternatively, if you have `uv` installed, you may try 
 
 ```sh
-alias kgsteward="uv run $KGSTEWARD_ROOT_DIR"
+alias kgsteward="uv run $KGSTEWARD_ROOT_DIR/kgsteward"
 ```
 
-4. Create and populate the repository
+4. ## Create and populate the repository. 
+
+The different stores are accessed through different YAML config file. The description of the dataset to be stored is hared by the different configs.
 
 <details>
 <summary>GraphDB</summary>
