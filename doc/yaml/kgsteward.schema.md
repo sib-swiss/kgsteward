@@ -22,8 +22,8 @@ The most useful of these variables is certainly `${kgsteward_dataset_context"}` 
 These variable are encoded with lowercase strings.
 
 * The terminology adopted here is a compromise. Different server brands utilise different namings for the same conecpt. 
-For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology -  
-`kgsteward` utilises 'context', because of the too many usages of [graph](https://en.wikipedia.org/wiki/Graph).  
+For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology.
+In this respect, `kgsteward` utilises 'context', because of the too many usages of ['graph'](https://en.wikipedia.org/wiki/Graph).  
 
 ## kgsteward YAML syntax
 
@@ -118,4 +118,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:56:37.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:58:05.
