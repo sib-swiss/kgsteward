@@ -55,10 +55,12 @@ The different stores are accessed through different YAML config file. The descri
 <summary>GraphDB</summary>
 
 ```sh
-cd $KGSTEWARD_ROOT_DIR/example/first_steps_graphdb
-kgsteward first_steps_graphdb.yaml -I # rewrite repository
-kgsteward first_steps_graphdb.yaml -C # populate repository
-kgsteward first_steps_graphdb.yaml -V # validate repository
+export GRAPHDB_USERNAME=admin  # default of GraphDB fresh installation
+export GRAPHDB_PASSWORD=root   # default of GraphDB fresh installation
+cd $KGSTEWARD_ROOT_DIR/doc/first_steps
+kgsteward graphdb.yaml -I # rewrite repository
+kgsteward graphdb.yaml -C # populate repository
+kgsteward graphdb.yaml -V # validate repository
 ```
 
 </details>
@@ -67,10 +69,10 @@ kgsteward first_steps_graphdb.yaml -V # validate repository
 <summary>Fuseki</summary>
 
 ```sh
-cd $KGSTEWARD_ROOT_DIR/example/first_steps_graphdb
-kgsteward first_steps_fuseki.yaml -I # rewrite repository
-kgsteward first_steps_fuseki.yaml -C # populate repository
-kgsteward first_steps_fuseki.yaml -V # validate repository
+cd $KGSTEWARD_ROOT_DIR/example/first_steps
+kgsteward fuseki.yaml -I # rewrite repository
+kgsteward fuseki.yaml -C # populate repository
+kgsteward fuseki.yaml -V # validate repository
 ```
 
 </details>

@@ -1,4 +1,4 @@
-version: kgsteward2.0
+version: kgsteward_yaml_2
 server:
   brand         : graphdb
   location      : http://localhost:7200
