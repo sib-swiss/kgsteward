@@ -1,56 +1,11 @@
 {
   "$defs": {
-    "FusekiConf": {
-      "additionalProperties": true,
-      "properties": {
-        "brand": {
-          "const": "fuseki",
-          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
-          "enum": [
-            "fuseki"
-          ],
-          "title": "Fuseki brand",
-          "type": "string"
-        },
-        "location": {
-          "default": "http://localhost:3030",
-          "description": "URL of the server. The SPARL endpoint is different and server specific.",
-          "title": "Server URL",
-          "type": "string"
-        },
-        "repository": {
-          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
-          "pattern": "^\\w{1,32}$",
-          "title": "Repository ID",
-          "type": "string"
-        },
-        "file_server_port": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": 0,
-          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
-          "title": "file_server_port"
-        }
-      },
-      "required": [
-        "brand",
-        "repository"
-      ],
-      "title": "FusekiConf",
-      "type": "object"
-    },
-    "GraphConf": {
+    "DatasetConf": {
       "properties": {
         "name": {
-          "description": "Mandatory name of a graphs record.",
+          "description": "Mandatory name of a dataset record.",
           "pattern": "^[a-zA-Z]\\w{0,31}$",
-          "title": "Short name of a graphs reccord",
+          "title": "Short name of a dataset reccord",
           "type": "string"
         },
         "context": {
@@ -80,7 +35,7 @@
           ],
           "default": null,
           "description": "A list of names to declare dependency between graph records.  Updating the parent datset will provoke the update of its children.",
-          "title": "Parent(s) of a graphs record"
+          "title": "Parent(s) of a dataset record"
         },
         "frozen": {
           "anyOf": [
@@ -93,7 +48,7 @@
           ],
           "default": false,
           "description": "Frozen record, use -d <name> can update it manually, -C has no effect",
-          "title": "Frozen graphs record"
+          "title": "Frozen dataset record"
         },
         "system": {
           "anyOf": [
@@ -211,7 +166,52 @@
       "required": [
         "name"
       ],
-      "title": "GraphConf",
+      "title": "DatasetConf",
+      "type": "object"
+    },
+    "FusekiConf": {
+      "additionalProperties": true,
+      "properties": {
+        "brand": {
+          "const": "fuseki",
+          "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
+          "enum": [
+            "fuseki"
+          ],
+          "title": "Fuseki brand",
+          "type": "string"
+        },
+        "location": {
+          "default": "http://localhost:3030",
+          "description": "URL of the server. The SPARL endpoint is different and server specific.",
+          "title": "Server URL",
+          "type": "string"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
+        },
+        "file_server_port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+          "title": "file_server_port"
+        }
+      },
+      "required": [
+        "brand",
+        "repository"
+      ],
+      "title": "FusekiConf",
       "type": "object"
     },
     "GraphDBConf": {
@@ -307,19 +307,6 @@
       "title": "GraphDBConf",
       "type": "object"
     },
-    "GraphSource": {
-      "properties": {
-        "source": {
-          "title": "Path to a yaml file",
-          "type": "string"
-        }
-      },
-      "required": [
-        "source"
-      ],
-      "title": "GraphSource",
-      "type": "object"
-    },
     "RDF4JConf": {
       "additionalProperties": true,
       "properties": {
@@ -369,10 +356,10 @@
   "additionalProperties": true,
   "properties": {
     "version": {
-      "const": "kgsteward2.0",
+      "const": "kgsteward_yaml_2",
       "description": "No description",
       "enum": [
-        "kgsteward2.0"
+        "kgsteward_yaml_2"
       ],
       "title": "YAML syntax version",
       "type": "string"
@@ -394,14 +381,7 @@
     "dataset": {
       "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
       "items": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/GraphConf"
-          },
-          {
-            "$ref": "#/$defs/GraphSource"
-          }
-        ]
+        "$ref": "#/$defs/DatasetConf"
       },
       "required": true,
       "title": "Knowledge Graph content",

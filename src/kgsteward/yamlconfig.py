@@ -20,7 +20,7 @@ description = {
     For security reason, kgsteward checks that every used variable exitsts and is not an empty string. 
     In addition, to the environment variables available at statup of kgsteward, a certain number of variables are defined at run-time:  
     `${}`, `${}` and `${}`.
-    Especially useful is `${graphs.name}` that can be used in be used in `graphs.replace` clause to indicate the current "active" context/named graph.
+    Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
     "server_brand": """One of 'graphdb' or 'fuseki' ( 'graphdb' by default).""",
     "location" :   """URL of the server. The SPARL endpoint is different and server specific.""" ,
@@ -51,7 +51,7 @@ This file is used by the `-I` and `-F` options.
 Beware that the repository ID could be hard-coded in the config file and 
 should be maintained in sync with `repository`.
 """,
-    "graphs": "Mandatory key to specify the content of the knowledge graph in the triplestore",
+    "dataset": "Mandatory key to specify the content of the knowledge graph in the triplestore",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
 Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, 
 with a short timeout.
@@ -63,7 +63,7 @@ Wildcard `*` can be used.
 By convention, a valid result should be empty, i.e. no row is returned. 
 Failed results should return rows permitting to diagnose the problems.
 """,
-    "name": """Mandatory name of a graphs record.""",
+    "name": """Mandatory name of a dataset record.""",
     "context": """IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. 
 If missing, contect IRI will be built by concataining `context_base_IRI` and `name`
 """,
@@ -85,9 +85,9 @@ This is a completely ad hoc command developped for ENPKG (), that will be suppre
 "update": """List of files containing SPARQL update commands. 
 Wildcard are not supported here!
 """,
-"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
-and inserted in the current graphs list.
-""",
+#"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
+#and inserted in the current graphs list.
+#""",
     "parent": """A list of names to declare dependency between graph records. 
 Updating the parent datset will provoke the update of its children.
 """,
@@ -131,11 +131,11 @@ class RDF4JConf( BaseModel ):
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
-class GraphConf( BaseModel ):
-    name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a graphs reccord", description = describe( "name" ))
+class DatasetConf( BaseModel ):
+    name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a dataset reccord", description = describe( "name" ))
     context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
-    parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a graphs record", description = describe(  "parent" ))
-    frozen   : Optional[ bool ]       = Field( False, title = "Frozen graphs record", description ="Frozen record, use -d <name> can update it manually, -C has no effect" )
+    parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a dataset record", description = describe(  "parent" ))
+    frozen   : Optional[ bool ]       = Field( False, title = "Frozen dataset record", description ="Frozen record, use -d <name> can update it manually, -C has no effect" )
     system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
     file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
     url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))
@@ -144,24 +144,24 @@ class GraphConf( BaseModel ):
     update   : Optional[ list[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
     zenodo   : Optional[ list[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
 
-class GraphSource( BaseModel ):
-    source : str = Field( 
-        title = "Path to a yaml file",
-        # description = describe( 
-        # "source" ),
-    )
+#class GraphSource( BaseModel ):
+#    source : str = Field( 
+#        title = "Path to a yaml file",
+#        # description = describe( 
+#        # "source" ),
+#    )
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "kgsteward2.0" ] = Field( title = "YAML syntax version", description = describe( "This fixed value determines the admissible YAML syntax" ))
+    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = describe( "This fixed value determines the admissible YAML syntax" ))
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
-    dataset           : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+    dataset           : list[ DatasetConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = "toto" )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
-class SourceGraphConf( BaseModel ):
-    graphs            : list[ Union[ GraphConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
+# class SourceGraphConf( BaseModel ):
+#     graphs            : list[ Union[ DatasetConf, GraphSource ]] = Field( required=True, title = "Knowledge Graph content", description = describe( "graphs" ))
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a three step process:
@@ -186,7 +186,7 @@ def parse_yaml_conf( path : str ):
     if "username" in config["server"] and not "password" in config["server"] :
         config["server"]["password"] = getpass.getpass( prompt = "Enter password : " )
 
-    graphs = list()
+    dataset = list()
     seen   = []
     for item in config["dataset"] :
         if item["name"] in seen:
@@ -202,8 +202,8 @@ def parse_yaml_conf( path : str ):
         seen.append( item["name"] )
         if "context" not in item:
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
-        graphs.append( item )
-    config["dataset"] = graphs
+        dataset.append( item )
+    config["dataset"] = dataset
     return config 
 
 def save_json_schema( path ):

@@ -55,7 +55,6 @@ class GenericClient():
             },
             status_code_ok,
         )
-            echo
         return r
 
     def sparql_query_to_tsv( 
