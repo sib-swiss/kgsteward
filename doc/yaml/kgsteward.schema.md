@@ -14,8 +14,12 @@ This inclusion mechanism is executed early, before the YAML configuration is val
 Evaluation of these is performed late, i.e. at the time of command execution. 
 Hence `${...}` syntax cannot be used in `!include` directive.
 The use of UNIX environment variables is recommended to ensure portability of the YAML config files.
+These variable are usually encoded with uppercase strings.
 
-* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file, and the currently executed chunk. The most useful of these is certainly `${kgsteward_dataset_context"}` that designate the current target context. 
+* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file,
+and the currently executed chunk. 
+The most useful of these is certainly `${kgsteward_dataset_context"}` that contains the current target context. 
+These variable are encoded with lowercase strings.
 
 * The terminology adopted here is a compromise. Different server brands utilise different namings for the same conecpt. 
 For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology -  
@@ -114,4 +118,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:50:26.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:53:09.
