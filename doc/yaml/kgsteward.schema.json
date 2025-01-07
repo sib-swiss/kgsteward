@@ -34,7 +34,7 @@
             }
           ],
           "default": null,
-          "description": "A list of names to declare dependency between graph records.  Updating the parent datset will provoke the update of its children.",
+          "description": "A list of names to declare dependency between dataset records.  Updating the parent datset will provoke the update of its children, unless it is frozen.",
           "title": "Parent(s) of a dataset record"
         },
         "frozen": {
@@ -47,7 +47,7 @@
             }
           ],
           "default": false,
-          "description": "Frozen record, use -d <name> can update it manually, -C has no effect",
+          "description": "No description",
           "title": "Frozen dataset record"
         },
         "system": {

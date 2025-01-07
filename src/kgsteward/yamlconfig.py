@@ -77,6 +77,7 @@ With GraphDB, there might be a maximum file size (200 MB by default (?)) and com
 Using a file server, these limitations are overcomed, but see the security warning described above. 
 """,
 "url": """List of url from which to load RDF data""",
+"frozen": "Frozen record, can only be updated explicitely with the `-d <name>` option. The option `-C` has no effect",
 "zenodo": """Do not use!
 Fetch turtle files from zenodo. 
 This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
@@ -87,8 +88,8 @@ Wildcard are not supported here!
 #"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
 #and inserted in the current graphs list.
 #""",
-    "parent": """A list of names to declare dependency between graph records. 
-Updating the parent datset will provoke the update of its children.
+    "parent": """A list of names to declare dependency between dataset records. 
+Updating the parent datset will provoke the update of its children, unless it is frozen.
 """,
     "stamp": """List of paths to files which last modification dates will used.
 The file contents are ignored.
@@ -134,7 +135,7 @@ class DatasetConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a dataset reccord", description = describe( "name" ))
     context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
     parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a dataset record", description = describe(  "parent" ))
-    frozen   : Optional[ bool ]       = Field( False, title = "Frozen dataset record", description ="Frozen record, use -d <name> can update it manually, -C has no effect" )
+    frozen   : Optional[ bool ]       = Field( default = False, title = "Frozen dataset record", description = describe( "frozen ") )
     system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
     file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
     url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))

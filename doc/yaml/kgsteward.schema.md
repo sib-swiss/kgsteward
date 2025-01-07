@@ -59,8 +59,8 @@ Top level YAML keys
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
 | name | `string` | ✅ | [`^[a-zA-Z]\w{0,31}$`](https://regex101.com/?regex=%5E%5Ba-zA-Z%5D%5Cw%7B0%2C31%7D%24)|  |  | Mandatory name of a dataset record. |
 | context | `string` |  | string|  |  | The IRI of the target context. If missing, it will be built by concataining `context_base_IRI` and `name`. |
-| parent | `array` |  | string|  |  | A list of names to declare dependency between graph records.  Updating the parent datset will provoke the update of its children. |
-| frozen | `boolean` |  | boolean|  |  | Frozen record, use -d <name> can update it manually, -C has no effect |
+| parent | `array` |  | string|  |  | A list of names to declare dependency between dataset records.  Updating the parent datset will provoke the update of its children, unless it is frozen. |
+| frozen | `boolean` |  | boolean|  |  | No description |
 | system | `array` |  | string|  |  | A list of system command.  This is a simple convenience provided by kgsteward which is not meant to be a replacement  for serious Make-like system as for example git/dvc. |
 | file | `array` |  | string|  |  | List of files containing RDF data.  Wildcard `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`).  With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported.  Using a file server, these limitations are overcomed, but see the security warning described above. |
 | url | `array` |  | string|  |  | List of url from which to load RDF data |
@@ -118,4 +118,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:02:08.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:08:18.
