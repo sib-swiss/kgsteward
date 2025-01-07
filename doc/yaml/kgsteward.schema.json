@@ -217,18 +217,6 @@
     "GraphDBConf": {
       "additionalProperties": true,
       "properties": {
-        "description": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": "Top level description",
-          "title": "Description"
-        },
         "brand": {
           "const": "graphdb",
           "description": "One of 'graphdb' or 'fuseki' ( 'graphdb' by default).",
