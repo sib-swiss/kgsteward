@@ -1,7 +1,9 @@
 # First steps with `kgsteward`
 
-1. Clone kgsteward from GitHub. 
-   Create an environement variable `${KGSTEWARD_ROOT_DIR}` that point to its root directory:
+1. ## Clone kgsteward from GitHub.
+   
+   This is is to access the first-steps data and config files.
+   One create an environement variable `${KGSTEWARD_ROOT_DIR}` that point to its root directory.
 
 ```sh
 # change dir to where you like to clone kgsteward
@@ -9,7 +11,9 @@ git clone https://github.com/sib-swiss/kgsteward.git kgsteward
 export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
 
-2. Install a supported triplestore (see below). If you are new to RDF/SPARQL, you may opt for GraphDB, because of its rich documentation and convenient user interface.
+2. ## Install a supported triplestore. 
+
+	If you are new to RDF/SPARQL, you may opt for GraphDB, because of its rich documentation and convenient user interface.
 
 <details>
 <summary>GraphDB</summary>
@@ -34,8 +38,10 @@ By default, the user interface of Fuseki becomes available at http://localhost:3
 
 </details>
 
-3. Install `kgsteward` globally as a cli tool, following the [instructions](https://github.com/sib-swiss/kgsteward/README.md). 
-   Or alternatively, if you have `uv` installed, you may try 
+3. ## Install `kgsteward` 
+
+   You can install it globally, following the [instructions](https://github.com/sib-swiss/kgsteward/README.md). 
+   Or alternatively, if you have `uv` installed, you may define an alias
 
 ```sh
 alias kgsteward="uv run $KGSTEWARD_ROOT_DIR/kgsteward"
