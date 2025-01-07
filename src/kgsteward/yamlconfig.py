@@ -135,7 +135,7 @@ class DatasetConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a dataset reccord", description = describe( "name" ))
     context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
     parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a dataset record", description = describe(  "parent" ))
-    frozen   : Optional[ bool ]       = Field( default = False, title = "Frozen dataset record", description = describe( "frozen ") )
+    frozen   : bool                   = Field( default = False, title = "Frozen dataset record", description = describe( "frozen ") )
     system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
     file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
     url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))

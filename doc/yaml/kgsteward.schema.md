@@ -118,4 +118,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:08:18.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:10:07.

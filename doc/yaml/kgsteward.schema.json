@@ -38,17 +38,10 @@
           "title": "Parent(s) of a dataset record"
         },
         "frozen": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
           "default": false,
           "description": "No description",
-          "title": "Frozen dataset record"
+          "title": "Frozen dataset record",
+          "type": "boolean"
         },
         "system": {
           "anyOf": [
