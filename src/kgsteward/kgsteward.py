@@ -215,23 +215,25 @@ WHERE{
              ex:has_sha256 ?sha256 .
 }
 """ )
-    try: 
-        for rec in r.json()["results"]["bindings"] :
-            if rec["context"]["value"] in context2name:
-                name = context2name[rec["context"]["value"]]
-                item = name2item[ name ]
-            else:
-                continue
-            item["count"]      = rec["x"]["value"]
-            item["date"]       = rec["t"]["value"]
-            item["sha256_old"] = str( rec["sha256"]["value"] )
-            item["sha256_new"] = get_sha256( config, name )
-            if item["sha256_old"] == item["sha256_new"]:
-                item["status"] = "ok"
-            elif not item["status"] == "FROZEN":
-                item["status"] = "UPDATE"
-    except RequestsJSONDecodeError: # test before and remove this typ/excep block 
-        stop_error( "Failed parsing server response! ")
+    dump( r )
+    if r is not None:
+        try: 
+            for rec in r.json()["results"]["bindings"] :
+                if rec["context"]["value"] in context2name:
+                    name = context2name[rec["context"]["value"]]
+                    item = name2item[ name ]
+                else:
+                    continue
+                item["count"]      = rec["x"]["value"]
+                item["date"]       = rec["t"]["value"]
+                item["sha256_old"] = str( rec["sha256"]["value"] )
+                item["sha256_new"] = get_sha256( config, name )
+                if item["sha256_old"] == item["sha256_new"]:
+                    item["status"] = "ok"
+                elif not item["status"] == "FROZEN":
+                    item["status"] = "UPDATE"
+        except Exception as e: # test before and remove this typ/excep block 
+            stop_error( "Failed parsing server response: " + str( e ))
     for item in config["dataset"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
@@ -322,6 +324,8 @@ def main():
     elif config["server"]["brand"] == "fuseki":
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
+            username,
+            password,
             replace_env_var( config["server"]["repository"] )
         )
 #    elif config["server"]["brand"] == "oxigraph":
