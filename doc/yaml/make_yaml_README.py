@@ -27,7 +27,7 @@ Evaluation of these is performed late, i.e. at the time of command execution.
 Hence `${...}` syntax cannot be used in `!include` directive.
 The use of UNIX environment variables is recommended to ensure portability of the YAML config files.
 
-* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file, and the currently executed chunk. 
+* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file, and the currently executed chunk. The most useful of these is certainly `${kgsteward_dataset_context"}` that designate the current target context. 
 
 * The terminology adopted here is a compromise. Different server brands utilise different namings for the same conecpt. 
 For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology -  
