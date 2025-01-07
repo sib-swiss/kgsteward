@@ -28,9 +28,9 @@ Hence `${...}` syntax cannot be used in `!include` directive.
 The use of UNIX environment variables is recommended to ensure portability of the YAML config files.
 These variable are usually encoded with uppercase strings.
 
-* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file,
-and the currently executed chunk. 
-The most useful of these is certainly `${kgsteward_dataset_context"}` that contains the current target context. 
+* In addition to UNIX environment variables, `kgsteward` creates temporary variables reflecting the content of the YAML config file.
+For example `${kgsteward_server_brand}` contains the ... server brand, e.g. `graphdb`.
+The most useful of these variables is certainly `${kgsteward_dataset_context"}` that contains the IRI of the current target context.
 These variable are encoded with lowercase strings.
 
 * The terminology adopted here is a compromise. Different server brands utilise different namings for the same conecpt. 
