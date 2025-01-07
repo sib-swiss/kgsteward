@@ -11,7 +11,9 @@ class GenericClient():
     def __init__( self, endpoint_query, endpoint_update, endpoint_store ) :
         self.endpoint_query  = endpoint_query
         self.endpoint_update = endpoint_update
-        self.endpoint_store  = endpoint_store
+        self.endpoint_store  = endpoint_store   # FIXME: make it works
+        self.headers         = {}
+        self.cookies         = {}
 
     def get_endpoint_query( self ):
         return self.endpoint_query
@@ -19,12 +21,12 @@ class GenericClient():
     def get_endpoint_update( self ):
         return self.endpoint_update
    
-    def ping( self, echo = True ):
-        """ ping server """
-        sparql = "SELECT ?hello WHERE{ BIND( 'Hello' AS ?hello )}"
-        if echo :
-            print( sparql, flush = True )
-        self.sparql_query( sparql, echo = echo )
+#    def ping( self, echo = True ):
+#        """ ping server """
+#        sparql = "SELECT ?hello WHERE{ BIND( 'Hello' AS ?hello )}"
+#        if echo :
+#            print( sparql, flush = True )
+#        self.sparql_query( sparql, echo = echo )
     
     def get_contexts( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
@@ -36,7 +38,9 @@ class GenericClient():
 
     def sparql_query( self, 
         sparql,
-        headers = { 'Accept' : 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
+        headers = { 
+            'Accept' : 'application/json', 
+            'Content-Type': 'application/x-www-form-urlencoded' },
         status_code_ok = [ 200 ], 
         echo = True ):
         if echo :
@@ -46,11 +50,12 @@ class GenericClient():
                 'method'  : 'POST', 
                 'url'     : self.endpoint_query,
                 'headers' : headers,
-                'params'  : { 'query' : sparql }
+                'params'  : { 'query' : sparql },
+                'cookies' : self.cookies
             },
             status_code_ok,
-            echo
         )
+            echo
         return r
 
     def sparql_query_to_tsv( 
@@ -76,7 +81,9 @@ class GenericClient():
                 'method'  : 'POST',
                 'url'     : self.endpoint_update,
                 'headers' : headers,
-                'params'  : { 'update': sparql }
+                'cookies' : self.cookies,
+                'params'  : { 'update': sparql },
+                'cookies' : self.cookies
             }, 
             status_code_ok,
             echo
@@ -95,9 +102,9 @@ class GenericClient():
                         **headers,
                         'Content-Type' : guess_mime_type( file )
                     },
+                    'cookies' : self.cookies,
                     'data'    : f
                 },
                 [ 200, 201, 204 ], # fuseki 200, GraphDB 204
                 echo
-            )
-        
+            )       
