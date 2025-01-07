@@ -18,7 +18,7 @@
             }
           ],
           "default": null,
-          "description": "IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology.  If missing, contect IRI will be built by concataining `context_base_IRI` and `name`",
+          "description": "The IRI of the target context. If missing, it will be built by concataining `context_base_IRI` and `name`.",
           "title": "Full IRI of a context/named graph"
         },
         "parent": {

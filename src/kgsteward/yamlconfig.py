@@ -63,8 +63,8 @@ By convention, a valid result should be empty, i.e. no row is returned.
 Failed results should return rows permitting to diagnose the problems.
 """,
     "name": """Mandatory name of a dataset record.""",
-    "context": """IRI for 'context' in RDF4J/GraphDB terminology, or IRI for 'named graph' in RDF/SPARQL terminology. 
-If missing, contect IRI will be built by concataining `context_base_IRI` and `name`
+    "context": """ The IRI of the target context.
+If missing, it will be built by concataining `context_base_IRI` and `name`.
 """,
 "system": """A list of system command. 
 This is a simple convenience provided by kgsteward which is not meant to be a replacement 
