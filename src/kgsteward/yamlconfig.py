@@ -108,7 +108,6 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    description       : Optional[ int ] = Field( "Top level description" )
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
