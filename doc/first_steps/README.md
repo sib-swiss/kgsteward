@@ -25,13 +25,14 @@ Alternatively, you may use Docker ...
 </details>
 
 <details>
-<summary>Fuseki</summary>
+<summary>Fuseki through brew (OSX)</summary>
 
 
 ```sh
 brew install fuseki
 export FUSEKI_DIR=~/scratch/fuseki # FIXME: update path to where you would like to store the db
-( cd $FUSEKI_DIR && fuseki-server --config $FIRST_STEPS_DIR/fuseki.config.ttl )
+mkdir -p $FUSEKI_DIR
+( cd $FUSEKI_DIR && fuseki-server --config $FIRST_STEPS_DIR/fuseki.config.ttl > $FUSEKI_DIR/logs.txt )&
 ```
 
 By default, the user interface of Fuseki becomes available at http://localhost:3030.
@@ -69,7 +70,7 @@ kgsteward graphdb.yaml -V # validate repository
 <summary>Fuseki</summary>
 
 ```sh
-cd $KGSTEWARD_ROOT_DIR/example/first_steps
+cd $KGSTEWARD_ROOT_DIR/doc/first_steps
 kgsteward fuseki.yaml -I # rewrite repository
 kgsteward fuseki.yaml -C # populate repository
 kgsteward fuseki.yaml -V # validate repository

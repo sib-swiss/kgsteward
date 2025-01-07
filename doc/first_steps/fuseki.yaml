@@ -1,0 +1,10 @@
+version: kgsteward_yaml_2
+server:
+  brand            : fuseki
+  location         : http://localhost:3030
+  server_config    : fuseki.config.ttl # actually unused
+  repository       : first_steps
+  file_server_port : 8003
+dataset: !include dataset.yaml
+validations: 
+  - sparql/validate/*.rq
