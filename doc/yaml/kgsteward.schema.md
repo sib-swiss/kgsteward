@@ -25,7 +25,7 @@ Top level YAML keys
 
 | Property | Type | Required | Possible Values | Deprecated | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ---------- | ------- | ----------- |
-| version | `string` | ✅ | `kgsteward_yaml_2`|  |  | No description |
+| version | `string` | ✅ | `kgsteward_yaml_2`|  |  | This mandatory fixed value determines the admissible YAML syntax |
 | server | `object` | ✅ | [GraphDBConf](#graphdbconf) or [RDF4JConf](#rdf4jconf) or [FusekiConf](#fusekiconf)|  |  |  |
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf)|  |  | Mandatory key to specify the content of the knowledge graph in the triplestore |
 | context_base_IRI | `string` |  | string|  | `"http://example.org/context/"` | toto |
@@ -108,4 +108,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:07:14.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 10:10:14.

@@ -153,7 +153,7 @@ class DatasetConf( BaseModel ):
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = describe( "This fixed value determines the admissible YAML syntax" ))
+    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
     dataset           : list[ DatasetConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = "toto" )

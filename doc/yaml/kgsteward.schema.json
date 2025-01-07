@@ -357,7 +357,7 @@
   "properties": {
     "version": {
       "const": "kgsteward_yaml_2",
-      "description": "No description",
+      "description": "This mandatory fixed value determines the admissible YAML syntax",
       "enum": [
         "kgsteward_yaml_2"
       ],
