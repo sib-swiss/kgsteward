@@ -40,7 +40,7 @@ By default, the user interface of Fuseki becomes available at http://localhost:3
 
 3. ## Install `kgsteward` 
 
-   You can install it globally, following the [instructions](https://github.com/sib-swiss/kgsteward/README.md). 
+   You can install `kgsteward` globally, following the [instructions](https://github.com/sib-swiss/kgsteward). 
    Or alternatively, if you have `uv` installed, you may define an alias
 
 ```sh
