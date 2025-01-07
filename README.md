@@ -28,7 +28,7 @@ You can also clone this repo, and launch kgsteward using the script `./kgsteward
 uv run ./kgsteward
 ```
 
-## Documentation
+## Usage
 
 See the [documentation website](https://sib-swiss.github.io/kgsteward)
 

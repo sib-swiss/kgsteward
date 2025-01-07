@@ -25,7 +25,7 @@ These variable are encoded with lowercase strings.
 For example, 'context' in RDF4J/GraphDB terminology is the same as 'named graph' in RDF/SPARQL terminology.
 In this respect, `kgsteward` utilises 'context', because of the too many usages of '[graph](https://en.wikipedia.org/wiki/Graph)'.  
 
-## kgsteward YAML syntax
+## YAML syntax
 
 The entry point (top level keys) is [KGStewardConf](#kgstewardconf).
 
@@ -118,4 +118,4 @@ Top level YAML keys
 
 ---
 
-Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:54:28.
+Markdown generated with [jsonschema-markdown](https://github.com/elisiariocouto/jsonschema-markdown) 0.2.1 on 2025-01-07 11:57:08.
