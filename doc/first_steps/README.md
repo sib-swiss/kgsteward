@@ -50,7 +50,7 @@ alias kgsteward="uv run $KGSTEWARD_ROOT_DIR/kgsteward"
 
 4. ## Create and populate the repository. 
 
-The different stores are accessed through different YAML config file. The description of the dataset to be stored is hared by the different configs.
+The different stores are accessed through different YAML config file. The description of the dataset to be stored is shared by the different configs.
 
 <details>
 <summary>GraphDB</summary>
@@ -78,6 +78,22 @@ kgsteward fuseki.yaml -V # validate repository
 
 </details>
 
-Congratulations: you have populated a repository using kgsteward :-) 
+Congratulations: you have populated a repository using `kgsteward` :-) 
+
+5: ## Details
+
+The follwing files have been used
+
+* [dataset.yaml](dataset.yaml) describes the content of the repository, independantly from a particular store engine. This file was manually edited.
+
+* [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and include a links to [dataset.yaml](dataset.yaml). This file was manually edited. 
+
+* [graphdb.config.ttl](graphdb.yaml) describes the configuration from a GraphDB repository. This file was exported from the GraphDB user interface, it can be manually modifed to some extent. It permits to re-create the same configuration in another server instance.
+
+* [fuseki.yaml](fuseki.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually edited.
+
+* [rdf4j.yaml](rdf4j.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually created.
+
+* [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
 
 
