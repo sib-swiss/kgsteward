@@ -1,6 +1,15 @@
 # First steps with `kgsteward`
 
-The following first-steps pages are available:
+1. Clone kgsteward from GitHub to access the first-steps files. 
+   Create an environement variable that point to the first-steps dir:
+
+```sh
+cd [where you like to clone from github]
+git clone https://github.com/sib-swiss/kgsteward.git kgsteward
+export FIRST_STEPS_DIR=`pwd`/kgsteward/doc/first_steps
+```
+
+2. Install the triplestore of your choice. If you are new to RDF/SPARQL, you may starts with GraphDB, because of its rich documentation and convenient user interface.
 
 <details>
 <summary>GraphDB</summary>
@@ -18,10 +27,4 @@ brew install fuseki
 
 </details>
 
-* [GraphDB](README.graphdb.md)
-
-* [Fuseki](README.fuseki.md)
-
-
-If you are new to RDF to may prefer to starts with GraphDB, because of its rich documentation and convenient user interface.
 
