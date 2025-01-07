@@ -31,7 +31,6 @@ It is recommended that the value of this variable is passed trough an environmen
 By this way the password is not stored explicitely in the config file.
 Alternatively `?` can be used and the password will be asked interactively at run time.""",
     "context_base_IRI": """Base IRI to construct the graph context. 
-    Default value: http://example.org/context/
 """,
     "file_server_port": """Integer, `0` by default, i.e. the file server is turned off. 
 When set to a positive integer, say `8000`, local files will be exposed through a temporary 
