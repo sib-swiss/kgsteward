@@ -82,9 +82,9 @@ Congratulations: you have populated a repository using `kgsteward` :-)
 
 5. ## Details
 
-The following files have been used
+The following files have been used.
 
-* [dataset.yaml](dataset.yaml) describes the content of a repository, independantly from a particular store engine. This file was manually created. A diversity of syntax possiblities are shown.  
+* [dataset.yaml](dataset.yaml) describes the RDF data content of a repository, independantly from a particular store engine. This file was manually created. It illustrates the diversity of supported syntaxes.
 
 * [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and include a links to [dataset.yaml](dataset.yaml). This file was manually edited. 
 
@@ -96,4 +96,4 @@ The following files have been used
 
 * [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
 
-
+The full supported syntax of the above YAML files is documented [here](../yaml/kgsteward.schema.md)
