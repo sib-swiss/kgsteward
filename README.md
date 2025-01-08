@@ -30,7 +30,7 @@ uv run ./kgsteward
 
 ## Usage
 
-See the [documentation website](https://sib-swiss.github.io/kgsteward)
+See the [documentation](doc/README.md)
 
 ## Development
 
