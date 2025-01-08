@@ -1,4 +1,4 @@
-`<sup>back to [TOC](../README.md)</sup>`
+<sup>back to [TOC](../README.md)</sup>
 
 # First steps with `kgsteward`
 
