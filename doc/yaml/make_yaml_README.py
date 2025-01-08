@@ -10,7 +10,8 @@ with open( "kgsteward.schema.json", "w" ) as f:
 	f.write( json.dumps( main_model_schema, indent=2 ))
 
 with open( "kgsteward.schema.md", "w" ) as f:
-    f.write( """
+    f.write( """<sup>back to [TOC](../README.md)</sup>
+
 # YAML syntax of kgsteward config file (version 2)
 
 ## Preambule
@@ -43,6 +44,7 @@ The entry point (top level keys) is [KGStewardConf](#kgstewardconf).
 
 """ )
     txt = jsonschema_markdown.generate( main_model_schema, hide_empty_columns = True )
-    big_space = "&nbsp;" * 30
+    big_space = "&nbsp;" * 40
     txt = txt.replace( "| Description |",  "|" + big_space + "Description" + big_space + "|" ) # dirty patch to improve table layout
-    f.write( txt )
+    
+    f.write( txt + "\n\n<sup>back to [TOC](../README.md)</sup>" )
