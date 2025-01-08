@@ -43,30 +43,20 @@ By default, the user interface of Fuseki becomes available at http://localhost:3
 <summary>RDF4J through docker</summary>
 
 ```sh
-# brew install --cask docker # then  
-docker pull eclipse/rdf4j-workbench # FIXME: fix tag
+# brew install --cask docker # work on OSX
+docker pull eclipse/rdf4j-workbench:5.1.0 # you may try :latest tag
 
 export RDF4J_DIR=$HOME/scratch/rdf4j
 mkdir -p $RDF4J_DIR
-
-docker run -d \
-    -p 8080:8080 \
-    --add-host host.docker.internal:host-gateway\
-    -e JAVA_OPTS="-Xms1g -Xmx12g" \
-    -v $RDF4J_DIR:/var/rdf4j \
-    -v $RDF4J_DIR/logs:/usr/local/tomcat/logs \
-    eclipse/rdf4j-workbench:latest
-
 docker run -d \
     -p 8080:8080 \
     -e JAVA_OPTS="-Xms1g -Xmx12g" \
     -v $RDF4J_DIR:/var/rdf4j \
     -v $RDF4J_DIR/logs:/usr/local/tomcat/logs \
     eclipse/rdf4j-workbench:latest
-
 ```
 
-By default the user interface becomes avaialabe at (http://localhost:8080/rdf4j-workbench)[http://localhost:8080/rdf4j-workbench]
+The user interface becomes avaialabe at (http://localhost:8080/rdf4j-workbench)[http://localhost:8080/rdf4j-workbench]
 
 </details>
 

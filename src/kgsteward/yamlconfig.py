@@ -115,7 +115,7 @@ class GraphDBConf( BaseModel ):
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( default = "http://localhost:7200", title = "Server URL", description = describe( "location" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
-    file_server_port  : Optional[ int ] = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     prefixes          : Optional[ list[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
@@ -139,7 +139,7 @@ class DatasetConf( BaseModel ):
     name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a dataset reccord", description = describe( "name" ))
     context  : Optional[ str ]        = Field( None,  title = "Full IRI of a context/named graph", description = describe(  "context" ))
     parent   : Optional[ List[ str ]] = Field( None,  title = "Parent(s) of a dataset record", description = describe(  "parent" ))
-    frozen   : Optional[ bool ]       = Field( False, title = "Frozen dataset record", description = describe( "frozen") )
+    frozen   : Optional[ bool ]       = Field( default = False,  title = "Frozen dataset record", description = describe( "frozen") )
     system   : Optional[ List[ str ]] = Field( None,  title = "UNIX system command(s)", description = describe(  "system" ))
     file     : Optional[ list[ str ]] = Field( None,  title = "Load RDF from file(s)", description = describe(  "file" ))
     url      : Optional[ list[ str ]] = Field( None,  title = "Load RDF from URL(s)", description = describe(  "url" ))
@@ -152,8 +152,8 @@ class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
-    dataset           : list[ DatasetConf ] = Field( required=True, title = "Knowledge Graph content", description = describe( "dataset" ))
-    context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = "toto" )
+    dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
+    context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 

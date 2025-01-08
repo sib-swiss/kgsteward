@@ -5,7 +5,7 @@ from testcontainers.core.waiting_utils import wait_for_logs
 from . import run_cmd, env
 
 # https://hub.docker.com/r/eclipse/rdf4j-workbench
-TRIPLESTORE_IMAGE = 'eclipse/rdf4j-workbench:latest'
+TRIPLESTORE_IMAGE = 'eclipse/rdf4j-workbench:5.1.0'
 
 @pytest.fixture(scope="module")
 def triplestore():

@@ -37,10 +37,10 @@ Top level YAML keys
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| version | `string` | ✅ | `kgsteward_yaml_2` |  | This mandatory fixed value determines the admissible YAML syntax |
+| version | `const` | ✅ | `kgsteward_yaml_2` |  | This mandatory fixed value determines the admissible YAML syntax |
 | server | `object` | ✅ | [FusekiConf](#fusekiconf) and/or [GraphDBConf](#graphdbconf) and/or [RDF4JConf](#rdf4jconf) |  |  |
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf) |  | Mandatory key to specify the content of the knowledge graph in the triplestore |
-| context_base_IRI | `string` or `null` |  | string | `"http://example.org/context/"` | toto |
+| context_base_IRI | `string` or `null` |  | string | `"http://example.org/context/"` | Base IRI to construct the graph context. |
 | queries | `array` or `null` |  | string |  | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,  with a short timeout. The query result is not iteself checked.  Wildcard `*` can be used. |
 | validations | `array` or `null` |  | string |  | A list of paths to files contining SPARQL queries used to validate the repsository. Wildcard `*` can be used. By convention, a valid result should be empty, i.e. no row is returned.  Failed results should return rows permitting to diagnose the problems. |
 
@@ -77,7 +77,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| brand | `string` | ✅ | `fuseki` |  | String identifying the server brand. |
+| brand | `const` | ✅ | `fuseki` |  | String identifying the server brand. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) |  | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
 | location | `string` |  | string | `"http://localhost:3030"` | URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. |
 | file_server_port | `integer` or `null` |  | integer |  | Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
@@ -90,7 +90,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| brand | `string` | ✅ | `graphdb` |  | String identifying the server brand. |
+| brand | `const` | ✅ | `graphdb` |  | String identifying the server brand. |
 | server_config | `string` | ✅ | string |  | Filename with the triplestore configuration, possibly a turtle file.  `graphdb_config` is a deprecated synonym.  This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,  thus permitting to reproduce the repository configuration elsewhere.  This file is used by the `-I` and `-F` options.  Beware that the repository ID could be hard-coded in the config file and  should be maintained in sync with `repository`. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) |  | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
 | location | `string` |  | string | `"http://localhost:7200"` | URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. |
@@ -107,7 +107,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| brand | `string` | ✅ | `rdf4j` |  | String identifying the server brand. |
+| brand | `const` | ✅ | `rdf4j` |  | String identifying the server brand. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) |  | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
 | location | `string` |  | string | `"http://localhost:3030"` | URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. |
 | file_server_port | `integer` or `null` |  | integer |  | Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
