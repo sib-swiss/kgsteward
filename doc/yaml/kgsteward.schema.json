@@ -179,8 +179,7 @@
           "type": "string"
         },
         "location": {
-          "default": "http://localhost:3030",
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. Fuseki has location 'http://localhost:3030' by default",
           "title": "Server URL",
           "type": "string"
         },
@@ -206,6 +205,7 @@
       },
       "required": [
         "brand",
+        "location",
         "repository"
       ],
       "title": "FusekiConf",
@@ -221,8 +221,7 @@
           "type": "string"
         },
         "location": {
-          "default": "http://localhost:7200",
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. GraphDB has location 'http://localhost:7200' by default",
           "title": "Server URL",
           "type": "string"
         },
@@ -295,6 +294,7 @@
       },
       "required": [
         "brand",
+        "location",
         "server_config",
         "repository"
       ],
@@ -311,8 +311,7 @@
           "type": "string"
         },
         "location": {
-          "default": "http://localhost:3030",
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.",
+          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. RDF4J has location 'http://localhost:8080' by default",
           "title": "Server URL",
           "type": "string"
         },
@@ -338,6 +337,7 @@
       },
       "required": [
         "brand",
+        "location",
         "repository"
       ],
       "title": "RDF4JConf",
