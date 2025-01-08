@@ -7,5 +7,5 @@ server:
   file_server_port : 8002
 dataset: !include dataset.yaml
 validations:
-  - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/validate/*.rq
+  - sparql/validate/*.rq
 

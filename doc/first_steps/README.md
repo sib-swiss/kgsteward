@@ -39,10 +39,41 @@ By default, the user interface of Fuseki becomes available at http://localhost:3
 
 </details>
 
+<details>
+<summary>RDF4J through docker</summary>
+
+```sh
+# brew install --cask docker # then  
+docker pull eclipse/rdf4j-workbench # FIXME: fix tag
+
+export RDF4J_DIR=$HOME/scratch/rdf4j
+mkdir -p $RDF4J_DIR
+
+docker run -d \
+    -p 8080:8080 \
+    --add-host host.docker.internal:host-gateway\
+    -e JAVA_OPTS="-Xms1g -Xmx12g" \
+    -v $RDF4J_DIR:/var/rdf4j \
+    -v $RDF4J_DIR/logs:/usr/local/tomcat/logs \
+    eclipse/rdf4j-workbench:latest
+
+docker run -d \
+    -p 8080:8080 \
+    -e JAVA_OPTS="-Xms1g -Xmx12g" \
+    -v $RDF4J_DIR:/var/rdf4j \
+    -v $RDF4J_DIR/logs:/usr/local/tomcat/logs \
+    eclipse/rdf4j-workbench:latest
+
+```
+
+By default the user interface becomes avaialabe at (http://localhost:8080/rdf4j-workbench)[http://localhost:8080/rdf4j-workbench]
+
+</details>
+
 3. ## Install `kgsteward` 
 
    You can install `kgsteward` globally, following the [instructions](https://github.com/sib-swiss/kgsteward). 
-   Or alternatively, if you have `uv` installed, you may define an alias
+   Or alternatively, if you have `uv` installed, you may define an alias which will work as expected only from directory `$KGSTEWARD_ROOT_DIR`and below
 
 ```sh
 alias kgsteward="uv run $KGSTEWARD_ROOT_DIR/kgsteward"
@@ -78,11 +109,23 @@ kgsteward fuseki.yaml -V # validate repository
 
 </details>
 
+<details>
+<summary>RDF4J</summary>
+
+```sh
+cd $KGSTEWARD_ROOT_DIR/doc/first_steps
+kgsteward rdf4j.yaml -I # rewrite repository
+kgsteward rdf4j.yaml -C # populate repository
+kgsteward rdf4j.yaml -V # validate repository
+```
+
+</details>
+
 Congratulations: you have populated a repository using `kgsteward` :-) 
 
 5. ## Details
 
-The following iconfiguration files have been used:
+The following configuration files have been used:
 
 * [dataset.yaml](dataset.yaml) describes the RDF data content of a repository, independantly from a particular store engine. This file was manually created. It illustrates the diversity of supported syntaxes.
 
