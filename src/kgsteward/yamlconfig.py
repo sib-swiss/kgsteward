@@ -22,7 +22,7 @@ description = {
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
     "server_brand": """String identifying the server brand.""",
-    "location" :   """URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here.""" ,
+    "location" :   """URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand.""" ,
     "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
@@ -104,9 +104,9 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
     """,
 }
 
-description["location_graphdb"] = description["location"] + " GraphDB has location 'http://localhost:7200' by default"
-description["location_fuseki"]  = description["location"] + " Fuseki has location 'http://localhost:3030' by default"
-description["location_rdf4j"]   = description["location"] + " RDF4J has location 'http://localhost:8080' by default"
+description["location_graphdb"] = description["location"] + " GraphDB servers have location 'http://localhost:7200' by default"
+description["location_fuseki"]  = description["location"] + " Fuseki servers have location 'http://localhost:3030' by default"
+description["location_rdf4j"]   = description["location"] + " RDF4J servers have location 'http://localhost:8080' by default"
 
 def describe( term ):
     if term in description:

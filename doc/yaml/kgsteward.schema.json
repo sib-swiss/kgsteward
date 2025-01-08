@@ -179,7 +179,7 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. Fuseki has location 'http://localhost:3030' by default",
+          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. Fuseki servers have location 'http://localhost:3030' by default",
           "title": "Server URL",
           "type": "string"
         },
@@ -221,7 +221,7 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. GraphDB has location 'http://localhost:7200' by default",
+          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. GraphDB servers have location 'http://localhost:7200' by default",
           "title": "Server URL",
           "type": "string"
         },
@@ -311,7 +311,7 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and upadtes are specific to a server brand, and not explicitely encoded here. RDF4J has location 'http://localhost:8080' by default",
+          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. RDF4J servers have location 'http://localhost:8080' by default",
           "title": "Server URL",
           "type": "string"
         },
