@@ -29,8 +29,7 @@ description = {
 It is recommended that the value of this variable is passed trough an environment variable. 
 By this way the password is not stored explicitely in the config file.
 Alternatively `?` can be used and the password will be asked interactively at run time.""",
-    "context_base_IRI": """Base IRI to construct the graph context. 
-""",
+    "context_base_IRI": """Base IRI to construct the graph context. `http://example.org/context/` is a sensible choice by default.""",
     "file_server_port": """Integer, `0` by default, i.e. the file server is turned off. 
 When set to a positive integer, say `8000`, local files will be exposed through a temporary 
 HTTP server and loaded from it. Support for different RDF file types and their compressed 
@@ -157,7 +156,7 @@ class KGStewardConf( BaseModel ):
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
-    context_base_IRI  : Optional[ str ] = Field( "http://example.org/context/", description = describe( "context_base_IRI" ) )
+    context_base_IRI  : str = Field( "http://example.org/context/", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 

@@ -375,17 +375,10 @@
       "type": "array"
     },
     "context_base_IRI": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
       "default": "http://example.org/context/",
-      "description": "Base IRI to construct the graph context.",
-      "title": "Context Base Iri"
+      "description": "Base IRI to construct the graph context. `http://example.org/context/` is a sensible choice by default.",
+      "title": "Context Base Iri",
+      "type": "string"
     },
     "queries": {
       "anyOf": [
