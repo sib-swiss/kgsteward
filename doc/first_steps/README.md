@@ -1,5 +1,5 @@
 <sup>back to [TOC](../README.md)</sup>
-<p align="right">back to [TOC](../README.md)</p>
+<p align="right"><sup>back to [TOC](../README.md)<sup></p>
 # First steps with `kgsteward`
 
 1. ## Clone kgsteward from GitHub.
