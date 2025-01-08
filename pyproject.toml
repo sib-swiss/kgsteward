@@ -1,10 +1,10 @@
 [project]
 name = "kgsteward"
-version = "1.1.0"
+version = "2.0.0"
 authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
-description = "Knowledge Graph Steward - Command line tool to help manage RDF store"
+description = "Knowledge Graph Steward - Command line tool to manage content of RDF store"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -35,7 +35,7 @@ build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [
-  "jsonschema-markdown>=0.2.1",
+  "jsonschema-markdown>=0.3.18",
   "rdflib>=6.3.2",
   "pytest",
   "pytest-cov",
