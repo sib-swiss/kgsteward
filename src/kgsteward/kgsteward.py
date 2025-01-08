@@ -215,7 +215,6 @@ WHERE{
              ex:has_sha256 ?sha256 .
 }
 """ )
-    dump( r )
     if r is not None:
         try: 
             for rec in r.json()["results"]["bindings"] :
