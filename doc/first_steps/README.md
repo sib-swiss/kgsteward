@@ -1,3 +1,5 @@
+<sup>back to [TOC](../README.md)</sup>
+
 # First steps with `kgsteward`
 
 1. ## Clone kgsteward from GitHub.
@@ -135,3 +137,5 @@ The following configuration files have been used:
 * [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
 
 The full supported syntax of the above YAML files is documented [here](../yaml/kgsteward.schema.md)
+
+<sup>back to [TOC](../README.md)</sup>
