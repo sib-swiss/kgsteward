@@ -76,7 +76,7 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
     r = requests.request( **request_args )
     end_time = time.time()
     if r.status_code not in status_code :
-        dumper.dump( request_args )
+        # dumper.dump( request_args )
         print_warn( "Status code = " + str( r.status_code ))
         print_warn( r.text if not r.text is None else '' )
         raise RuntimeError( "HTTP request failed!" )
