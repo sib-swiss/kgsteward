@@ -35,14 +35,14 @@ Top level YAML keys
 
 ### Type: `object`
 
-| Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
-| -------- | ---- | -------- | --------------- | ------- | ----------- |
-| version | `const` | ✅ | `kgsteward_yaml_2` |  | This mandatory fixed value determines the admissible YAML syntax |
-| server | `object` | ✅ | [FusekiConf](#fusekiconf) and/or [GraphDBConf](#graphdbconf) and/or [RDF4JConf](#rdf4jconf) |  |  |
-| dataset | `array` | ✅ | [DatasetConf](#datasetconf) |  | Mandatory key to specify the content of the knowledge graph in the triplestore |
-| context_base_IRI | `string` |  | string | `"http://example.org/context/"` | Base IRI to construct the graph context. `http://example.org/context/` is a sensible choice by default. |
-| queries | `array` or `null` |  | string |  | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,  with a short timeout. The query result is not iteself checked.  Wildcard `*` can be used. |
-| validations | `array` or `null` |  | string |  | A list of paths to files contining SPARQL queries used to validate the repsository. Wildcard `*` can be used. By convention, a valid result should be empty, i.e. no row is returned.  Failed results should return rows permitting to diagnose the problems. |
+| Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+| -------- | ---- | -------- | --------------- | ----------- |
+| version | `const` | ✅ | `kgsteward_yaml_2` | This mandatory fixed value determines the admissible YAML syntax |
+| server | `object` | ✅ | [FusekiConf](#fusekiconf) and/or [GraphDBConf](#graphdbconf) and/or [RDF4JConf](#rdf4jconf) |  |
+| dataset | `array` | ✅ | [DatasetConf](#datasetconf) | Mandatory key to specify the content of the knowledge graph in the triplestore |
+| context_base_IRI | `string` | ✅ | string | Base IRI to construct the graph context. `http://example.org/context/` is a sensible choice by default. |
+| queries | `array` or `null` |  | string | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,  with a short timeout. The query result is not iteself checked.  Wildcard `*` can be used. |
+| validations | `array` or `null` |  | string | A list of paths to files contining SPARQL queries used to validate the repsository. Wildcard `*` can be used. By convention, a valid result should be empty, i.e. no row is returned.  Failed results should return rows permitting to diagnose the problems. |
 
 
 ---

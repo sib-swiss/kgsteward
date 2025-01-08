@@ -375,9 +375,8 @@
       "type": "array"
     },
     "context_base_IRI": {
-      "default": "http://example.org/context/",
       "description": "Base IRI to construct the graph context. `http://example.org/context/` is a sensible choice by default.",
-      "title": "Context Base Iri",
+      "title": "context base IRI",
       "type": "string"
     },
     "queries": {
@@ -416,7 +415,8 @@
   "required": [
     "version",
     "server",
-    "dataset"
+    "dataset",
+    "context_base_IRI"
   ],
   "title": "KGStewardConf",
   "type": "object",

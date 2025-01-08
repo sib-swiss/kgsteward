@@ -156,7 +156,7 @@ class KGStewardConf( BaseModel ):
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
-    context_base_IRI  : str = Field( "http://example.org/context/", description = describe( "context_base_IRI" ) )
+    context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
