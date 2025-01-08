@@ -42,7 +42,7 @@ In this respect, `kgsteward` utilises 'context', because of the too many usages 
 The entry point (top level keys) is [KGStewardConf](#kgstewardconf).
 
 """ )
-    txt = jsonschema_markdown.generate( main_model_schema )
+    txt = jsonschema_markdown.generate( main_model_schema, hide_empty_columns = True )
     big_space = "&nbsp;" * 30
     txt = txt.replace( "| Description |",  "|" + big_space + "Description" + big_space + "|" ) # dirty patch to improve table layout
     f.write( txt )
