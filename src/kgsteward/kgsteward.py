@@ -421,7 +421,7 @@ INSERT DATA {{
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         fs.expose( dir ) # cache already exposed directory
-                        try:
+                        try: # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                             path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
                             server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         except Exception as X: # second attemp from within a container (?)
