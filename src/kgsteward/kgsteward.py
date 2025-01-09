@@ -421,9 +421,9 @@ INSERT DATA {{
             if config["server"]["file_server_port"] > 0 :
                 fs = LocalFileServer( port = config["server"][ "file_server_port" ] )
                 for path in target["file"] :
-                    if not os.path.isfile( path ):
-                        stop_error( "File not found: " + path )
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                        if not os.path.isfile( dir + "/" + fn ):
+                            stop_error( "File not found: " + dir + "/" + fn )
                         fs.expose( dir ) # cache already exposed directory
                         if not is_running_in_a_container: 
                             try:
