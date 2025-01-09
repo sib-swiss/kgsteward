@@ -8,8 +8,8 @@ mkdir -p $FUSEKI_DIR
 cp $KGSTEWARD_ROOT_DIR/doc/first_steps/fuseki.config.ttl $FUSEKI_DIR
 
 export FUSEKI_USERNAME=admin               # update as required
-export FUSEKI_PASSWORD=pw123               # update as required 
-# --platform=linux/amd64 
+export FUSEKI_PASSWORD=pw123               # update as required
+# --platform=linux/amd64
 docker run \
 	-p 3030:3030 \
 	-e ADMIN_PASSWORD=$FUSEKI_PASSWORD \

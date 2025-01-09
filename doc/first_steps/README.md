@@ -3,9 +3,9 @@
 # First steps with `kgsteward`
 
 1. ## Clone kgsteward from GitHub.
-   
-   This is is to access the first-steps data and config files.
-   One create an environement variable `${KGSTEWARD_ROOT_DIR}` that point to its root directory.
+
+   This is to access the first-steps data and config files.
+   One create an environment variable `${KGSTEWARD_ROOT_DIR}` that points to its root directory.
 
 ```sh
 # change dir to where you like to clone kgsteward
@@ -13,7 +13,7 @@ git clone https://github.com/sib-swiss/kgsteward.git kgsteward
 export KGSTEWARD_ROOT_DIR=`pwd`/kgsteward
 ```
 
-2. ## Install a supported triplestore. 
+2. ## Install a supported triplestore.
 
 	If you are new to RDF/SPARQL, you may opt for GraphDB, because of its rich documentation and convenient user interface.
 
@@ -60,20 +60,20 @@ docker run -d \
     eclipse/rdf4j-workbench:5.1.0
 ```
 
-The user interface becomes avaialabe at [http://localhost:8080/rdf4j-workbench](http://localhost:8080/rdf4j-workbench)
+The user interface becomes available at [http://localhost:8080/rdf4j-workbench](http://localhost:8080/rdf4j-workbench)
 
 </details>
 
-3. ## Install `kgsteward` 
+3. ## Install `kgsteward`
 
-   You can install `kgsteward` globally, following the [instructions](https://github.com/sib-swiss/kgsteward). 
+   You can install `kgsteward` globally, following the [instructions](https://github.com/sib-swiss/kgsteward).
    Or alternatively, if you have `uv` installed, you may define an alias which will work as expected only from directory `$KGSTEWARD_ROOT_DIR`and below
 
 ```sh
 alias kgsteward="uv run $KGSTEWARD_ROOT_DIR/kgsteward"
 ```
 
-4. ## Create and populate the repository. 
+4. ## Create and populate the repository.
 
 The different stores are accessed through different YAML config file. The description of the dataset to be stored is shared by the different configs.
 
@@ -115,24 +115,24 @@ kgsteward rdf4j.yaml -V # validate repository
 
 </details>
 
-Congratulations: you have populated a repository using `kgsteward` :-) 
+Congratulations: you have populated a repository using `kgsteward` :-)
 
 5. ## Details
 
 The following configuration files have been used:
 
-* [dataset.yaml](dataset.yaml) describes the RDF data content of a repository, independantly from a particular store engine. This file was manually created. It illustrates the diversity of supported syntaxes.
+* [dataset.yaml](dataset.yaml) describes the RDF data content of a repository, independently of a particular store engine. This file was manually created. It illustrates the diversity of supported syntaxes.
 
-* [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and include a links to [dataset.yaml](dataset.yaml). This file was manually edited. 
+* [graphdb.yaml](graphdb.yaml) describes how to access GraphDB, and includes a link to [dataset.yaml](dataset.yaml). This file was manually edited.
 
-* [graphdb.config.ttl](graphdb.config.ttl) describes the configuration from a GraphDB repository. 
-  This file was obtained from the GraphDB user interface. 
-  It can be manually modifed to some extent. 
+* [graphdb.config.ttl](graphdb.config.ttl) describes the configuration from a GraphDB repository.
+  This file was obtained from the GraphDB user interface.
+  It can be manually modified to some extent.
   It permits to re-create the same GraphDB repository in another server instance.
 
-* [fuseki.yaml](fuseki.yaml) describes how to access Fuseki, and include a links to [dataset.yaml](dataset.yaml) . This file was manually edited.
+* [fuseki.yaml](fuseki.yaml) describes how to access Fuseki, and includes a link to [dataset.yaml](dataset.yaml). This file was manually edited.
 
-* [rdf4j.yaml](rdf4j.yaml) describes how to access RDF4J, and include a links to [dataset.yaml](dataset.yaml) . This file was manually created.
+* [rdf4j.yaml](rdf4j.yaml) describes how to access RDF4J, and includes a link to [dataset.yaml](dataset.yaml). This file was manually created.
 
 * [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
 
