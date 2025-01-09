@@ -60,7 +60,7 @@ docker run -d \
     eclipse/rdf4j-workbench:5.1.0
 ```
 
-The user interface becomes avaialabe at (http://localhost:8080/rdf4j-workbench)[http://localhost:8080/rdf4j-workbench]
+The user interface becomes avaialabe at [http://localhost:8080/rdf4j-workbench](http://localhost:8080/rdf4j-workbench)
 
 </details>
 
