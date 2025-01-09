@@ -379,7 +379,9 @@ def main():
     # Drop previous data, upload new data in their respective
     # dataset
     # --------------------------------------------------------- #
-
+    
+    is_running_in_a_container = False # initial guess
+    
     for target in config["dataset"] :
 
         name = target["name"]
@@ -419,12 +421,23 @@ INSERT DATA {{
             if config["server"]["file_server_port"] > 0 :
                 fs = LocalFileServer( port = config["server"][ "file_server_port" ] )
                 for path in target["file"] :
+                    if not os.path.isfile( path ):
+                        stop_error( "File not found: " + path )
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         fs.expose( dir ) # cache already exposed directory
-                        try: # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
-                            path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
-                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
-                        except Exception as X: # second attemp from within a container (?)
+                        if not is_running_in_a_container: 
+                            try:
+                                path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
+                                server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                            except Exception as e:
+                                msg = str( e )
+                                if msg == "HTTP request failed!":
+                                    is_running_in_a_container = True 
+                                    print_warn( "Maybe the server is running in a container => let's try again!" )
+                                else:
+                                    stop_error( msg)
+                        if is_running_in_a_container:
+                            # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                             path = "http://host.docker.internal:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
                             server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         filename = dir + "/" + fn
