@@ -4,11 +4,13 @@ version = "2.0.0"
 authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
 description = "Knowledge Graph Steward - Command line tool to manage content of RDF store"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Operating System :: OS Independent",
+  "Development Status :: 4 - Beta"
 ]
 dependencies = [
   "dumper",
@@ -29,8 +31,12 @@ dependencies = [
 "Source" = "https://github.com/sib-swiss/kgsteward"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+# there is an open issue with setuptools and uv
+# see discussion https://github.com/astral-sh/uv/issues/9513
+# requires = ["setuptools>=61.0"]
+# build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
@@ -46,6 +52,7 @@ dev = [
   "mdx-include >=1.4.1",
   "mkdocs-markdownextradata-plugin >=0.2.5",
   "mkdocs-open-in-new-tab",
+  "hatchling>=1.27.0",
 ]
 
 [project.scripts]
