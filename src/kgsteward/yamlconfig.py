@@ -21,7 +21,7 @@ description = {
     `${}`, `${}` and `${}`.
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
-    "server_brand": """String identifying the server brand.""",
+    "server_type": """String identifying the server brand.""",
     "location" :   """URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand.""" ,
     "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
@@ -101,6 +101,9 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
         This list will used to update the namespace definitions in GraphDB and RDF4J.
         Otherwise it is ignored
     """,
+    "direct_file_loader" : """File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. """,
+    "direct_url_loader"  : """URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. """,
+
 }
 
 description["location_graphdb"] = description["location"] + " GraphDB servers have location 'http://localhost:7200' by default"
@@ -115,7 +118,7 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
+    type              : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_type" ))
     location          : str = Field( title = "Server URL", description = describe( "location_graphdb" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
@@ -126,14 +129,14 @@ class GraphDBConf( BaseModel ):
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
+    type              : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_type" ))
     location          : str = Field( title = "Server URL", description = describe( "location_fuseki" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
+    type              : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_type" ))
     location          : str = Field( title = "Server URL", description = describe( "location_rdf4j" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
@@ -159,6 +162,25 @@ class KGStewardConf( BaseModel ):
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
+
+class DirectFileLoader( BaseModel ):
+    type : Literal[ "sparql_load" ] = Field( title = "direct file_loader", description = describe( "direct_file_loader" ) )
+
+class HttpServerFileLoader( BaseModel ):
+    type : Literal[ "http_server" ] = Field( title = "HTTP file server", description = "http_file_server" )
+    port : Optional[ int ] = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
+
+class ChunkedStoreFileLoader( BaseModel ):
+    type : Literal[ "chunked_store" ] = Field( title = "HTTP file server", description = "http_file_server" )
+    port : Optional[ int ] = Field( 1e8, title = "chunked_store", description = "chunked_store_file" )
+
+class DirectUrlLoader( BaseModel ):
+    type : Literal[ "load_url" ] = Field( title = "direct url loader", description = describe( "direct_url_loader" ))
+
+class CurlChunkedStoreUrlLoader( BaseModel ):
+    type : Literal[ "curl_chunked_store_url_loader" ] = Field( title = "direct url loader", description = "direct_url_loader" )
+    tmp_dir : Optional[ str ] = Field( "/tmp", title = "temporary directory", description = "temporary directory" )
+    port : Optional[ int ] = Field( 1e8, title = "chunked_store", description = "chunked_store_file")
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a three step process:

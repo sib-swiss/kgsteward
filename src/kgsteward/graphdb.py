@@ -23,6 +23,7 @@ import time
 
 from dumper import dump
 from .common import *
+import urllib.parse
 
 from .generic import GenericClient
 
@@ -132,6 +133,9 @@ class GraphDBClient( GenericClient ):
     ):
         super().load_from_file( file, context, { **self.headers, **headers }, echo )
 
+    def load_from_file_using_riot( self, file, context, echo = True ):
+        super().load_from_file_using_riot( file, context, headers = { **self.headers }, echo = echo )
+
     def sparql_query_to_tsv(
         self, 
         sparql, 
@@ -141,6 +145,15 @@ class GraphDBClient( GenericClient ):
     ):
         return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
     
+    def dump_context(
+        self,
+        context,
+        headers = { 'Accept': 'text/plain' }, 
+        status_code_ok = [ 200 ], 
+        echo = True
+    ):
+        return super().dump_context( context, { **self.headers, **headers }, status_code_ok, echo )
+     
     def get_contexts( self, echo = True ) :
         r = http_call({
             'method'  : 'GET',

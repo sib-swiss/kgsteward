@@ -112,7 +112,11 @@ def get_user_input():
     )
     parser.add_argument(
         '-x',
-        help   = "Dump query results in nt format"
+        help   = "Dump all query results in TSV format to dir <X>"
+    )
+    parser.add_argument(
+        '-y',
+        help   = "Dump all contexts in nt formatton dir <Y>" 
     )
 
     args = parser.parse_args()
@@ -306,33 +310,33 @@ def main():
         username = None
         password = None
 
-    if config["server"]["brand"] == "graphdb":
+    if config["server"]["type"] == "graphdb":
         server = GraphDBClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["brand"] == "rdf4j":
+    elif config["server"]["type"] == "rdf4j":
         server = RFD4JClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["brand"] == "fuseki":
+    elif config["server"]["type"] == "fuseki":
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-#    elif config["server"]["brand"] == "oxigraph":
+#    elif config["server"]["type"] == "oxigraph":
 #        server = OxigraphClient(
 #            replace_env_var( config["server"]["location"] )
 #        )
     else:
-        stop_error( "Unknown server brand: " + config["server"]["brand"] )
+        stop_error( "Unknown server type: " + config["server"]["type"] )
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
@@ -416,10 +420,9 @@ INSERT DATA {{
         <{context}> void:dataDump <{path}>
     }}
 }}""" )
-
         if "file" in target :
-            if config["server"]["file_server_port"] > 0 :
-                fs = LocalFileServer( port = config["server"][ "file_server_port" ] )
+            if config["server"]["file_loader"]["type"] == "http_server":
+                fs = LocalFileServer( port = config["server"]["file_loader"][ "port" ] )
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         if not os.path.isfile( dir + "/" + fn ):
@@ -427,7 +430,7 @@ INSERT DATA {{
                         fs.expose( dir ) # cache already exposed directory
                         if not is_running_in_a_container: 
                             try:
-                                path = "http://localhost:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
+                                path = "http://localhost:" + str( config["server"]["file_loader"][ "port" ] ) + "/" + fn
                                 server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                             except Exception as e:
                                 msg = str( e )
@@ -448,11 +451,16 @@ INSERT DATA {{
     }}
 }}""" )
                 fs.terminate()
-            else: # config["server"]["file_server_port"] == 0
+            else: # config["server"]["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
-                        server.load_from_file( filename, context )
+                        if config["server"]["file_loader"]["type"] == "sparql_load":
+                            server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>" )
+                        elif config["server"]["file_loader"]["type"] == "chunked_store_file":
+                            server.load_from_file_using_riot( filename, context )
+                        else:
+                            raise SystemError( "Unexpected file loader type: " + config["server"]["file_loader"]["type"] )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
@@ -652,6 +660,8 @@ INSERT DATA {{
         
 
     if args.x:
+        print_break()
+        print_task( "Dump all query results in TSV format" )
         if not os.path.isdir( args.x ):
             stop_error( "Not a directory: " + args.x )
         for path in config["queries"] :
@@ -668,6 +678,18 @@ INSERT DATA {{
                 with open( out_path, "w" ) as file:
                     file.write( "".join( s[ :1 ] ))
                     file.write( "".join( sorted( s[ 1: ])))
+        sys.exit( 0 )
+
+    if args.y:
+        print_break()
+        print_task( "Dump all contexts in nt format" )
+        if not os.path.isdir( args.y ):
+            stop_error( "Not a directory: " + args.y )
+        for item in config["dataset"] :
+            out_path =  args.y + "/" +  item["name"] + ".nt"
+            with open( out_path, "w" ) as file:
+                r = server.dump_context( item["context"] )
+                file.write( r.text )
         sys.exit( 0 )
 
     # --------------------------------------------------------- #
