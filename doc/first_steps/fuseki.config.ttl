@@ -29,7 +29,7 @@ PREFIX ja:      <http://jena.hpl.hp.com/2005/11/Assembler#>
     ] ;
     fuseki:endpoint [ 
         fuseki:operation fuseki:gsp-rw ; 
-        fuseki:name "data"
+        fuseki:name "store"
     ] ; 
     fuseki:endpoint [ 
         fuseki:operation fuseki:patch ;

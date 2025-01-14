@@ -421,8 +421,8 @@ INSERT DATA {{
     }}
 }}""" )
         if "file" in target :
-            if config["server"]["file_loader"]["type"] == "http_server":
-                fs = LocalFileServer( port = config["server"]["file_loader"][ "port" ] )
+            if config["file_loader"]["type"] == "http_server":
+                fs = LocalFileServer( port = config["file_loader"][ "port" ] )
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         if not os.path.isfile( dir + "/" + fn ):
@@ -430,7 +430,7 @@ INSERT DATA {{
                         fs.expose( dir ) # cache already exposed directory
                         if not is_running_in_a_container: 
                             try:
-                                path = "http://localhost:" + str( config["server"]["file_loader"][ "port" ] ) + "/" + fn
+                                path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
                                 server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                             except Exception as e:
                                 msg = str( e )
@@ -451,16 +451,16 @@ INSERT DATA {{
     }}
 }}""" )
                 fs.terminate()
-            else: # config["server"]["file_loader"]["type"] != "http_server"
+            else: # config["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
-                        if config["server"]["file_loader"]["type"] == "sparql_load":
+                        if config["file_loader"]["type"] == "sparql_load":
                             server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>" )
-                        elif config["server"]["file_loader"]["type"] == "chunked_store_file":
+                        elif config["file_loader"]["type"] == "store_chunks":
                             server.load_from_file_using_riot( filename, context )
                         else:
-                            raise SystemError( "Unexpected file loader type: " + config["server"]["file_loader"]["type"] )
+                            raise SystemError( "Unexpected file loader type: " + config["file_loader"]["type"] )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{

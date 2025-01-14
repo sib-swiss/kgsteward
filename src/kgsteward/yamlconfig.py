@@ -154,15 +154,6 @@ class DatasetConf( BaseModel ):
     update   : Optional[ list[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
     zenodo   : Optional[ list[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
 
-class KGStewardConf( BaseModel ):
-    model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
-    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
-    dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
-    context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
-    queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
-    validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
-
 class DirectFileLoader( BaseModel ):
     type : Literal[ "sparql_load" ] = Field( title = "direct file_loader", description = describe( "direct_file_loader" ) )
 
@@ -171,16 +162,27 @@ class HttpServerFileLoader( BaseModel ):
     port : Optional[ int ] = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
 
 class ChunkedStoreFileLoader( BaseModel ):
-    type : Literal[ "chunked_store" ] = Field( title = "HTTP file server", description = "http_file_server" )
-    port : Optional[ int ] = Field( 1e8, title = "chunked_store", description = "chunked_store_file" )
+    type : Literal[ "store_chunks" ] = Field( title = "HTTP file server", description = "http_file_server" )
+    size : Optional[ int ] = Field( 100_000_000, title = "chunked_store", description = "chunked_store_file" )
 
 class DirectUrlLoader( BaseModel ):
-    type : Literal[ "load_url" ] = Field( title = "direct url loader", description = describe( "direct_url_loader" ))
+    type : Literal[ "sparql_load" ] = Field( title = "direct url loader", description = describe( "direct_url_loader" ))
 
 class CurlChunkedStoreUrlLoader( BaseModel ):
     type : Literal[ "curl_chunked_store_url_loader" ] = Field( title = "direct url loader", description = "direct_url_loader" )
     tmp_dir : Optional[ str ] = Field( "/tmp", title = "temporary directory", description = "temporary directory" )
     port : Optional[ int ] = Field( 1e8, title = "chunked_store", description = "chunked_store_file")
+
+class KGStewardConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
+    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
+    file_loader       : Union[ DirectFileLoader, HttpServerFileLoader, ChunkedStoreFileLoader ]
+    url_loader        : Union[ DirectUrlLoader ]
+    dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
+    context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
+    queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
+    validations       : Optional[ list[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a three step process:

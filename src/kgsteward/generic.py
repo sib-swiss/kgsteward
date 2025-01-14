@@ -2,6 +2,7 @@
 # that might work on a real triplestore (maybe?)
 
 import subprocess
+import urllib
 
 # How to dump a context from the command line:
 # curl -G --data-urlencode "graph=http://example.org/context/ReconX_schema" http://localhost:7200/repositories/ReconXKG2/rdf-graphs/service
@@ -121,7 +122,7 @@ class GenericClient():
         http_call(
             {
                 'method'  : 'POST',
-                'url'     : self.endpoint_store + "?graph=" + context,
+                'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
                 'headers' : {
                     **headers,
                     'Content-Type' : 'text/plain',
@@ -133,7 +134,6 @@ class GenericClient():
             echo
     )
         
-    
     def load_from_file_using_riot( self, file, context, headers = {}, echo = True ):
         """ use graph store protocol and riot """
         if echo:
