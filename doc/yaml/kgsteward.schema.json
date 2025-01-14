@@ -1,5 +1,33 @@
 {
   "$defs": {
+    "ChunkedStoreFileLoader": {
+      "properties": {
+        "type": {
+          "const": "store_chunks",
+          "description": "http_file_server",
+          "title": "HTTP file server",
+          "type": "string"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100000000,
+          "description": "chunked_store_file",
+          "title": "chunked_store"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ChunkedStoreFileLoader",
+      "type": "object"
+    },
     "DatasetConf": {
       "properties": {
         "name": {
@@ -169,10 +197,40 @@
       "title": "DatasetConf",
       "type": "object"
     },
+    "DirectFileLoader": {
+      "properties": {
+        "type": {
+          "const": "sparql_load",
+          "description": "File are loaded using the SPARQL update statement: \"LOAD <file://<file-path> INTO...\". This strategy is likely to failed for large files, or worst silently truncate them.",
+          "title": "direct file_loader",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "DirectFileLoader",
+      "type": "object"
+    },
+    "DirectUrlLoader": {
+      "properties": {
+        "type": {
+          "const": "sparql_load",
+          "description": "URL are loaded using the SPARQL update statement: \"LOAD <url> INTO...\". This strategy could fail for large files, or worst silently truncate them.",
+          "title": "direct url loader",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "DirectUrlLoader",
+      "type": "object"
+    },
     "FusekiConf": {
       "additionalProperties": true,
       "properties": {
-        "brand": {
+        "type": {
           "const": "fuseki",
           "description": "String identifying the server brand.",
           "title": "Fuseki brand",
@@ -204,7 +262,7 @@
         }
       },
       "required": [
-        "brand",
+        "type",
         "location",
         "repository"
       ],
@@ -214,7 +272,7 @@
     "GraphDBConf": {
       "additionalProperties": true,
       "properties": {
-        "brand": {
+        "type": {
           "const": "graphdb",
           "description": "String identifying the server brand.",
           "title": "GraphDB brand",
@@ -293,7 +351,7 @@
         }
       },
       "required": [
-        "brand",
+        "type",
         "location",
         "server_config",
         "repository"
@@ -301,10 +359,38 @@
       "title": "GraphDBConf",
       "type": "object"
     },
+    "HttpServerFileLoader": {
+      "properties": {
+        "type": {
+          "const": "http_server",
+          "description": "http_file_server",
+          "title": "HTTP file server",
+          "type": "string"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 8000,
+          "description": "Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
+          "title": "file_server_port"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "HttpServerFileLoader",
+      "type": "object"
+    },
     "RDF4JConf": {
       "additionalProperties": true,
       "properties": {
-        "brand": {
+        "type": {
           "const": "rdf4j",
           "description": "String identifying the server brand.",
           "title": "RDF4J brand",
@@ -336,7 +422,7 @@
         }
       },
       "required": [
-        "brand",
+        "type",
         "location",
         "repository"
       ],
@@ -365,6 +451,23 @@
         }
       ],
       "title": "Server"
+    },
+    "file_loader": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DirectFileLoader"
+        },
+        {
+          "$ref": "#/$defs/HttpServerFileLoader"
+        },
+        {
+          "$ref": "#/$defs/ChunkedStoreFileLoader"
+        }
+      ],
+      "title": "File Loader"
+    },
+    "url_loader": {
+      "$ref": "#/$defs/DirectUrlLoader"
     },
     "dataset": {
       "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
@@ -415,6 +518,8 @@
   "required": [
     "version",
     "server",
+    "file_loader",
+    "url_loader",
     "dataset",
     "context_base_IRI"
   ],
