@@ -7,7 +7,7 @@ A command line tool to manage the content of RDF store (GraphDB, Fuseki, RDF4J..
 ## Installation
 
 kgsteward is available from [PyPI](https://pypi.org/project/kgsteward/).
-It depends on hopefully standard Python packages.
+It depends on rather standard Python packages.
 Its installation should be straightforward.
 
 The recommended option is to install `kgsteward` with [`uv`](https://docs.astral.sh/uv/)
@@ -16,7 +16,13 @@ The recommended option is to install `kgsteward` with [`uv`](https://docs.astral
 uv tool install kgsteward
 ```
 
-or with `pip3`:
+and to ugrade it to the latest version with
+
+```shell
+uv tool upgrade kgsteward
+```
+
+or alternatively, it can be intalled with `pip3`:
 
 ```shell
 pip3 install kgsteward
