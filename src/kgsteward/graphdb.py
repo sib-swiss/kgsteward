@@ -168,19 +168,16 @@ class GraphDBClient( GenericClient ):
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )
         if 'headers' in request_args :
-            request_args['headers']['Authorization' ] = self.authorization
+            request_args['headers'] ={ **self.headers, **request_args['headers'] }
         else :
-            request_args['headers'] = { 'Authorization' : self.authorization }
+            request_args['headers'] = self.headers
         return http_call( request_args, status_code_ok, echo )
 
     def validate_sparql_query( self, sparql, echo = False ) :
         r = http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : {
-                'Accept'        : 'text/tab-separated-values',
-                'Authorization' : self.authorization
-            },
+            'headers' : { **self.headers, 'Accept': 'text/tab-separated-values' },
             'params'  : {
                 'query'   : sparql,
                 "infer"   : True,
@@ -213,7 +210,7 @@ class GraphDBClient( GenericClient ):
         r = http_call({
             'method'  : 'PUT',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/namespaces/" + short,
-            'headers' : self.headers.copy().update({ 'Accept', 'text/plain' }),
+            'headers' : { **self.headers, 'Accept': 'text/plain' },
             'data'    : long
         }, [204], echo )
 
