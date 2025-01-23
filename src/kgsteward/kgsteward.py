@@ -443,7 +443,7 @@ INSERT DATA {{
                                     stop_error( msg)
                         if is_running_in_a_container:
                             # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
-                            path = "http://host.docker.internal:" + str( config["server"][ "file_server_port" ] ) + "/" + fn
+                            path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
                             server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
                         filename = dir + "/" + fn
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
