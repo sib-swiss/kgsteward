@@ -281,6 +281,10 @@ WHERE {{
 def main():
     """Main function of the kgsteward workflow."""
 
+    # --------------------------------------------------------- #
+    # Read command line options
+    # --------------------------------------------------------- #
+
     args = get_user_input()
 
     # --------------------------------------------------------- #
@@ -294,11 +298,6 @@ def main():
         name2context[ item["name"] ] = item["context"]
         context2name[ item["context"] ] = item["name"]
 
-    # if not "location" in config :
-    #    config["location"] = input( "Enter location : " )
-    #if "username" in config and not "password" in config :
-    #    config["password"] = getpass.getpass( prompt = "Enter password : " )
-
     # --------------------------------------------------------- #
     # Initalise connection with the right triplestore
     # --------------------------------------------------------- #
@@ -310,33 +309,36 @@ def main():
         username = None
         password = None
 
-    if config["server"]["type"] == "graphdb":
+    if config["server"]["brand"] == "graphdb":
         server = GraphDBClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["type"] == "rdf4j":
+    elif config["server"]["brand"] == "rdf4j":
         server = RFD4JClient(
             replace_env_var( config["server"]["location"] ),
             username,
             password,
             replace_env_var( config["server"]["repository"] )
         )
-    elif config["server"]["type"] == "fuseki":
+    elif config["server"]["brand"] == "fuseki":
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
-            username,
-            password,
-            replace_env_var( config["server"]["repository"] )
-        )
+            replace_env_var( config["server"]["repository"] ),
+            replace_env_var( replace_env_var( config["server"]["server_config"] ))
+#            replace_env_var( config["server"]["location"] ),
+#            username,
+#            replace_env_var( config["server"]["repository"] )
+#            password,
+       )
 #    elif config["server"]["type"] == "oxigraph":
 #        server = OxigraphClient(
 #            replace_env_var( config["server"]["location"] )
 #        )
     else:
-        stop_error( "Unknown server type: " + config["server"]["type"] )
+        stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
@@ -421,7 +423,7 @@ INSERT DATA {{
     }}
 }}""" )
         if "file" in target :
-            if config["file_loader"]["type"] == "http_server":
+            if config["file_loader"]["method"] == "http_server":
                 fs = LocalFileServer( port = config["file_loader"][ "port" ] )
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
@@ -455,12 +457,12 @@ INSERT DATA {{
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
-                        if config["file_loader"]["type"] == "sparql_load":
+                        if config["file_loader"]["method"] == "sparql_load":
                             server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>" )
-                        elif config["file_loader"]["type"] == "store_chunks":
+                        elif config["file_loader"]["method"] == "store_chunks":
                             server.load_from_file_using_riot( filename, context )
                         else:
-                            raise SystemError( "Unexpected file loader type: " + config["file_loader"]["type"] )
+                            raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
@@ -495,7 +497,8 @@ INSERT DATA {{
                 # if replace is not None:
                 for key in sorted( replace.keys()):
                     sparql = sparql.replace( key, replace[ key ])
-                server.sparql_update( sparql )
+                for s in split_sparql_update( sparql ): # split on ";" to execute one statement at a time
+                    server.sparql_update( s )
 
         update_dataset_info( server, config, name )
 

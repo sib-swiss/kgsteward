@@ -137,6 +137,29 @@ def guess_mime_type( filename ):
     else:
         stop_error( "cannot guess RDF mime-type from filename: " + filename )
 
+capture_block  = re.compile( r"(.+);\s*(LOAD|CLEAR|DROP|CREATE|ADD|MOVE|COPY|WITH|DELETE|INSERT)(.+)$", re.IGNORECASE | re.MULTILINE | re.DOTALL )
+capture_prefix = re.compile( r"(PREFIX\s+\S+\s+\S+)\s*", re.IGNORECASE | re.MULTILINE | re.DOTALL )
+
+def split_sparql_update( sparql ):
+    statement = []
+    prefix    = []
+    m = capture_prefix.search( sparql )
+    while m:
+        prefix.append( m[1] )
+        sparql = sparql.replace( m[1], '' )
+        m = capture_prefix.search( sparql )        
+    m = capture_block.search( sparql )
+    while m:
+        statement.append( m[2] + m[3] )
+        sparql = m[1] 
+        m = capture_block.search( sparql )
+    statement.append( sparql )
+    for i in range( len( statement )):
+        statement[i] = re.sub( r"^\n+", '', statement[i] )
+        statement[i] = re.sub( r"\n+$", '', statement[i] )
+        statement[i] = "\n".join( prefix ) + "\n" + statement[i]
+    return reversed( statement )
+
 def print_break():
     print( '# ----------------------------------------------------------------------------')
 

@@ -1,28 +1,57 @@
 from dumper import dump
 import re
+import rdflib
+
 from .common import *
 from .generic import GenericClient
 
 # FIXME: implement curl -XPOST http://localhost:3030/$/compact/TEST?deleteOld=true
 # FIXME: test env variable JVM_ARGS
+
 class FusekiClient( GenericClient ):
 
-    def __init__( self, fuseki_url, username, password, repository_id ):
-        self.fuseki_url = fuseki_url
-        self.repository_id = repository_id
-        super().__init__(  
-            fuseki_url + "/" + repository_id + "/query", 
-            fuseki_url + "/" + repository_id + "/update",
-            fuseki_url + "/" + repository_id + "/store"
-        )
+    def __init__( self, location, repository, config_file, username = None, password = None  ):
+        g = rdflib.Graph()
+        try:
+            g.parse( config_file )
+        except:
+            stop_error( "Cannot parse file: " + config_file )
+        query = """PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX fuseki: <http://jena.apache.org/fuseki#>
+SELECT ?query ?update ?store
+WHERE{
+    [] rdf:type fuseki:Service ;
+    fuseki:name '""" + repository + """' ;
+    fuseki:endpoint [ 
+        fuseki:operation fuseki:query ;
+        fuseki:name ?query
+    ] ;
+    fuseki:endpoint [
+        fuseki:operation fuseki:update ;
+        fuseki:name ?update
+    ] ;
+    fuseki:endpoint [ 
+        fuseki:operation fuseki:gsp-rw ; 
+        fuseki:name ?store
+    ]
+}"""
+        qres = g.query( query )
+        for row in qres:
+            dump( row )
+            super().__init__(  
+                location + "/" + repository + "/" + row.query, 
+                location + "/" + repository + "/" + row.update,
+                location + "/" + repository + "/" + row.store
+            )
+
         print_task( "contacting server" )
         try:
             r = http_call({
                 'method'  : 'GET',
-                'url'     : self.fuseki_url + "/$/ping"
+                'url'     : location + "/$/ping"
             },[ 200 ] )
         except:
-            stop_error( "Cannot contact fuseki at location: " + self.fuseki_url ) 
+            stop_error( "Cannot contact fuseki at location: " + location ) 
         if username is not None :
             try:
                 r = http_call({
@@ -33,6 +62,9 @@ class FusekiClient( GenericClient ):
                 self.cookies = requests.utils.dict_from_cookiejar( r.cookies )
             except:
                 stop_error( "Authentication to fuseki server failed: + self.graphdb_url" )
+        print( self.endpoint_query )
+        print( self.endpoint_update )
+        print( self.endpoint_store )
 
     def rewrite_repository( self, server_config_filename ) :
         self.sparql_update( "DROP ALL")
