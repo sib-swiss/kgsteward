@@ -60,7 +60,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| type | `const` | ✅ | `store_chunks` |  | http_file_server |
+| method | `const` | ✅ | `store_chunks` |  | http_file_server |
 | size | `integer` or `null` |  | integer | `100000000` | chunked_store_file |
 
 ## DatasetConf
@@ -91,7 +91,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| type | `const` | ✅ | `sparql_load` | File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. |
+| method | `const` | ✅ | `sparql_load` | File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. |
 
 ## DirectUrlLoader
 
@@ -101,7 +101,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| type | `const` | ✅ | `sparql_load` | URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. |
+| method | `const` | ✅ | `sparql_load` | URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. |
 
 ## FusekiConf
 
@@ -111,7 +111,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| type | `const` | ✅ | `fuseki` | String identifying the server brand. |
+| brand | `const` | ✅ | `fuseki` | String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' |
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. Fuseki servers have location 'http://localhost:3030' by default |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
 | file_server_port | `integer` or `null` |  | integer | Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
@@ -124,7 +124,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| type | `const` | ✅ | `graphdb` | String identifying the server brand. |
+| brand | `const` | ✅ | `graphdb` | String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' |
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. GraphDB servers have location 'http://localhost:7200' by default |
 | server_config | `string` | ✅ | string | Filename with the triplestore configuration, possibly a turtle file.  `graphdb_config` is a deprecated synonym.  This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,  thus permitting to reproduce the repository configuration elsewhere.  This file is used by the `-I` and `-F` options.  Beware that the repository ID could be hard-coded in the config file and  should be maintained in sync with `repository`. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
@@ -141,7 +141,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| type | `const` | ✅ | `http_server` |  | http_file_server |
+| method | `const` | ✅ | `http_server` |  | http_file_server |
 | port | `integer` or `null` |  | integer | `8000` | Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
 
 ## RDF4JConf
@@ -152,7 +152,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| type | `const` | ✅ | `rdf4j` | String identifying the server brand. |
+| brand | `const` | ✅ | `rdf4j` | String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' |
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. RDF4J servers have location 'http://localhost:8080' by default |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore. |
 | file_server_port | `integer` or `null` |  | integer | Integer, `0` by default, i.e. the file server is turned off.  When set to a positive integer, say `8000`, local files will be exposed through a temporary  HTTP server and loaded from it. Support for different RDF file types and their compressed  version depend on the tripelstore. The benefit is the that RDF data from `file` are processed  with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,  file-size limits are suppressed and compressed formats are supported.  Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details).  This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |

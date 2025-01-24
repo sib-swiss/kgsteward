@@ -2,7 +2,7 @@
   "$defs": {
     "ChunkedStoreFileLoader": {
       "properties": {
-        "type": {
+        "method": {
           "const": "store_chunks",
           "description": "http_file_server",
           "title": "HTTP file server",
@@ -23,7 +23,7 @@
         }
       },
       "required": [
-        "type"
+        "method"
       ],
       "title": "ChunkedStoreFileLoader",
       "type": "object"
@@ -199,7 +199,7 @@
     },
     "DirectFileLoader": {
       "properties": {
-        "type": {
+        "method": {
           "const": "sparql_load",
           "description": "File are loaded using the SPARQL update statement: \"LOAD <file://<file-path> INTO...\". This strategy is likely to failed for large files, or worst silently truncate them.",
           "title": "direct file_loader",
@@ -207,14 +207,14 @@
         }
       },
       "required": [
-        "type"
+        "method"
       ],
       "title": "DirectFileLoader",
       "type": "object"
     },
     "DirectUrlLoader": {
       "properties": {
-        "type": {
+        "method": {
           "const": "sparql_load",
           "description": "URL are loaded using the SPARQL update statement: \"LOAD <url> INTO...\". This strategy could fail for large files, or worst silently truncate them.",
           "title": "direct url loader",
@@ -222,7 +222,7 @@
         }
       },
       "required": [
-        "type"
+        "method"
       ],
       "title": "DirectUrlLoader",
       "type": "object"
@@ -230,9 +230,9 @@
     "FusekiConf": {
       "additionalProperties": true,
       "properties": {
-        "type": {
+        "brand": {
           "const": "fuseki",
-          "description": "String identifying the server brand.",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
           "title": "Fuseki brand",
           "type": "string"
         },
@@ -262,7 +262,7 @@
         }
       },
       "required": [
-        "type",
+        "brand",
         "location",
         "repository"
       ],
@@ -272,9 +272,9 @@
     "GraphDBConf": {
       "additionalProperties": true,
       "properties": {
-        "type": {
+        "brand": {
           "const": "graphdb",
-          "description": "String identifying the server brand.",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
           "title": "GraphDB brand",
           "type": "string"
         },
@@ -351,7 +351,7 @@
         }
       },
       "required": [
-        "type",
+        "brand",
         "location",
         "server_config",
         "repository"
@@ -361,7 +361,7 @@
     },
     "HttpServerFileLoader": {
       "properties": {
-        "type": {
+        "method": {
           "const": "http_server",
           "description": "http_file_server",
           "title": "HTTP file server",
@@ -382,7 +382,7 @@
         }
       },
       "required": [
-        "type"
+        "method"
       ],
       "title": "HttpServerFileLoader",
       "type": "object"
@@ -390,9 +390,9 @@
     "RDF4JConf": {
       "additionalProperties": true,
       "properties": {
-        "type": {
+        "brand": {
           "const": "rdf4j",
-          "description": "String identifying the server brand.",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
           "title": "RDF4J brand",
           "type": "string"
         },
@@ -422,7 +422,7 @@
         }
       },
       "required": [
-        "type",
+        "brand",
         "location",
         "repository"
       ],
