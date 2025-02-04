@@ -1,6 +1,7 @@
 from dumper import dump
 import re
 import rdflib
+import urllib
 
 from .common import *
 from .generic import GenericClient
