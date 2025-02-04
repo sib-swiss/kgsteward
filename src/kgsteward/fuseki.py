@@ -43,7 +43,8 @@ WHERE{
                 location + "/" + repository + "/" + row.update,
                 location + "/" + repository + "/" + row.store
             )
-
+        self.repository = repository 
+        self.location = location
         print_task( "contacting server" )
         try:
             r = http_call({
@@ -81,7 +82,14 @@ WHERE{
 #            'params'  : { 'query': sparql },
 #        }, status_code_ok, echo )
 #        return r
-    
+
+    def drop_context( self, context ): # FIXME: might be faster than DROP GRAPH <context>
+        http_call({
+            'method'  : 'DELETE',
+            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+            # 'headers' : { **self.headers, **headers }
+        }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
+
     def sparql_query( 
         self, 
         sparql, 
@@ -109,6 +117,12 @@ WHERE{
     ):
         return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
         
+    def fuseki_compress_tdb2( self ):
+        r = http_call({
+            'method'  : 'POST',
+            'url'     : self.location + "/$/compact/" + self.repository + "?deleteOld=true"
+        }, [ 200 ] )
+
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         print_warn( "Not yet implemented: FusekiClient.graphdb_call()" )
 

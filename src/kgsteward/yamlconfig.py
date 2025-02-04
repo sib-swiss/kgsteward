@@ -161,24 +161,24 @@ class HttpServerFileLoader( BaseModel ):
     method : Literal[ "http_server" ] = Field( title = "HTTP file server", description = "http_file_server" )
     port : Optional[ int ] = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
 
-class ChunkedStoreFileLoader( BaseModel ):
-    method : Literal[ "store_chunks" ] = Field( title = "HTTP file server", description = "http_file_server" )
-    size : Optional[ int ] = Field( 100_000_000, title = "chunked_store", description = "chunked_store_file" )
+class RiotStoreFileLoader( BaseModel ):
+    method : Literal[ "riot_store" ] = Field( title = "riot/store file loader", description = "http_file_server" )
+    size : Optional[ int ] = Field( 100_000_000, title = "chunk size", description = "chunk size" )
 
 class DirectUrlLoader( BaseModel ):
     method : Literal[ "sparql_load" ] = Field( title = "direct url loader", description = describe( "direct_url_loader" ))
 
-class CurlChunkedStoreUrlLoader( BaseModel ):
-    method : Literal[ "curl_chunked_store_url_loader" ] = Field( title = "direct url loader", description = "direct_url_loader" )
+class CurlRiotStoreUrlLoader( BaseModel ):
+    method : Literal[ "curl_riot_store" ] = Field( title = "curl/riot/store URL loader", description = "curl/riot/store URL loader" )
     tmp_dir : Optional[ str ] = Field( "/tmp", title = "temporary directory", description = "temporary directory" )
-    port : Optional[ int ] = Field( 1e8, title = "chunked_store", description = "chunked_store_file")
+    size : Optional[ int ] = Field( 100_000_000, title = "chunk stize", description = "chunk size" )
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
-    file_loader       : Union[ DirectFileLoader, HttpServerFileLoader, ChunkedStoreFileLoader ]
-    url_loader        : Union[ DirectUrlLoader ]
+    file_loader       : Union[ DirectFileLoader, HttpServerFileLoader, RiotStoreFileLoader ]
+    url_loader        : Union[ DirectUrlLoader, CurlRiotStoreUrlLoader ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))

@@ -7,6 +7,9 @@ import re
 import hashlib
 import glob
 import requests  # https://docs.python-requests.org/en/master/user/quickstart/
+import subprocess
+import urllib
+
 import rdflib
 import getpass
 from   dumper    import dump # get ready to help debugging
@@ -118,7 +121,11 @@ def get_user_input():
         '-y',
         help   = "Dump all contexts in nt formatton dir <Y>" 
     )
-
+    parser.add_argument(
+        '--fuseki_compress',
+        action = 'store_true',
+        help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
+    )
     args = parser.parse_args()
 
     # Further processing of command line arguments
@@ -256,9 +263,6 @@ INSERT {{
     GRAPH <{context}> {{
         <{context}> a void:Dataset ;
             void:triples               ?c   ;
-            #void:distinctSubjects      ?cs  ;
-            #void:properties            ?cp  ;
-            #void:distinctObjects       ?co  ;
             dct:modified               ?now ;
             ex:has_sha256              "{sha256}" .
     }}
@@ -267,9 +271,6 @@ WHERE {{
     GRAPH <{context}> {{
         SELECT
             ( COUNT( * ) AS ?c )
-            #( COUNT( DISTINCT( ?s )) AS ?cs )
-            #( COUNT( DISTINCT( ?p )) AS ?cp )
-            #( COUNT( DISTINCT( ?o )) AS ?co )
             ( NOW() AS ?now )
         WHERE {{
             ?s ?p ?o
@@ -327,12 +328,16 @@ def main():
         server = FusekiClient(
             replace_env_var( config["server"]["location"] ),
             replace_env_var( config["server"]["repository"] ),
-            replace_env_var( replace_env_var( config["server"]["server_config"] ))
+            replace_env_var( config["server"]["server_config"] )
+        )
+        if args.fuseki_compress:
+            print_break()
+            print_task( "Start TDB2 compression (it may delay execution of next statements)" )
+            server.fuseki_compress_tdb2()
 #            replace_env_var( config["server"]["location"] ),
 #            username,
 #            replace_env_var( config["server"]["repository"] )
 #            password,
-       )
 #    elif config["server"]["type"] == "oxigraph":
 #        server = OxigraphClient(
 #            replace_env_var( config["server"]["location"] )
@@ -397,12 +402,12 @@ def main():
         print_break()
         print_task( "Update dataset record: " + name )
         context = name2context[ name ]
+        server.drop_context( context )
+
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         os.environ["kgsteward_dataset_name"]    = name
         os.environ["kgsteward_dataset_context"] = context
         replace = {}
-
-        server.sparql_update( f"DROP SILENT GRAPH <{context}>" )
 
         if "system" in target :
             for cmd in target["system"] :
@@ -415,8 +420,15 @@ def main():
         if "url" in target :
             for urlx in target["url"] :
                 path = replace_env_var( urlx )
-                server.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
-                server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                if config["url_loader"]["method"] == "curl_riot_store":
+                    filename = config["url_loader"]["tmp_dir"] + "/" + path.split('/')[-1]
+                    cmd = [ "curl", path, "-o", filename ]
+                    print( colored( " ".join( cmd ), "cyan" ))
+                    subprocess.run( cmd )
+                    server.load_from_file_using_riot( filename, context )
+                else: # sparql_load
+                    server.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
+                    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
@@ -459,7 +471,7 @@ INSERT DATA {{
                         filename = dir + "/" + fn
                         if config["file_loader"]["method"] == "sparql_load":
                             server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>" )
-                        elif config["file_loader"]["method"] == "store_chunks":
+                        elif config["file_loader"]["method"] == "riot_store":
                             server.load_from_file_using_riot( filename, context )
                         else:
                             raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
@@ -492,6 +504,7 @@ INSERT DATA {{
 
         if "update" in target :
             for filename in target["update"]:
+                report( "read", filename )
                 with open( replace_env_var( filename )) as f:
                     sparql = f.read()
                 # if replace is not None:

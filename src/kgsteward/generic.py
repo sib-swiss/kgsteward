@@ -12,7 +12,7 @@ from .common import *
 
 class GenericClient():
 
-    def __init__( self, endpoint_query, endpoint_update, endpoint_store ) :
+    def __init__( self, endpoint_query, endpoint_update, endpoint_store ):
         self.endpoint_query  = endpoint_query
         self.endpoint_update = endpoint_update
         self.endpoint_store  = endpoint_store
@@ -32,6 +32,9 @@ class GenericClient():
             if "g" in rec:
                 contexts.add( rec["g"]["value"] )
         return contexts
+
+    def drop_context( self, context ):
+        self.sparql_update( f"DROP GRAPH <{context}>" )
 
     def sparql_query( self, 
         sparql,
@@ -106,7 +109,7 @@ class GenericClient():
             http_call(
                 {
                     'method'  : 'POST',
-                    'url'     : self.endpoint_store + "?graph=" + context,
+                    'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
                     'headers' : {
                         **headers,
                         'Content-Type' : guess_mime_type( file )
@@ -125,7 +128,7 @@ class GenericClient():
                 'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
                 'headers' : {
                     **headers,
-                    'Content-Type' : 'text/plain',
+                    'Content-Type' : 'text/plain', # FIXME: verify encoding as UTF-8
                 },
                 'cookies' : self.cookies,
                 'data'    : data
@@ -138,7 +141,9 @@ class GenericClient():
         """ use graph store protocol and riot """
         if echo:
             report( 'load file', file )
-        p = subprocess.Popen( [ 'riot', file ], stdout = subprocess.PIPE, text=True ) # riot returns nt format by default
+        cmd = [ 'riot', file ]
+        print( colored( " ".join( cmd ), "cyan" ))
+        p = subprocess.Popen( cmd, stdout = subprocess.PIPE, text=True ) # riot returns nt format by default
         buf = []
         size = 0
         count = 0
