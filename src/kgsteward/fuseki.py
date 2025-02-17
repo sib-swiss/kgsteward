@@ -70,19 +70,14 @@ WHERE{
 
     def rewrite_repository( self, server_config_filename ) :
         self.sparql_update( "DROP ALL")
+        http_call({
+            'method'  : 'DELETE',
+            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+            # 'headers' : { **self.headers, **headers }
+        }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
 
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );
-
-#    def sparql_query( self, sparql, accept='application/json', status_code_ok = [ 200 ], echo = True ) :
-#        if echo :
-#            print( sparql, flush=True )
-#        r = http_call({
-#            'method'  : 'GET',
-#            'url'     : "http://localhost:3030/#/dataset/first_step/query",
-#            'params'  : { 'query': sparql },
-#        }, status_code_ok, echo )
-#        return r
 
     def drop_context( self, context ): # FIXME: might be faster than DROP GRAPH <context>
         http_call({
@@ -91,14 +86,30 @@ WHERE{
             # 'headers' : { **self.headers, **headers }
         }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
 
-    def sparql_query( 
-        self, 
-        sparql, 
-        headers = { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True 
+    def sparql_query( self, 
+        sparql,
+        headers = { 
+            'Accept' : 'application/json', 
+            'Content-Type': 'application/x-www-form-urlencoded' },
+        status_code_ok = [ 200 ],
+        timeout = None, 
+        echo = True
     ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        if timeout:
+            headers["timeout"] = timeout
+        r = http_call(
+            {
+                'method'  : 'POST',  # allows for big query
+                'url'     : self.endpoint_query,
+                'headers' : headers,
+                'params'  : { 'query' : sparql },
+                'cookies' : self.cookies
+            },
+            status_code_ok,
+        )
+        return r
 
     def sparql_update( 
         self, 
