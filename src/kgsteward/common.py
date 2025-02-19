@@ -161,9 +161,9 @@ def split_sparql_update( sparql ): # FIXME: handle comments
     return reversed( statement )
 
 def sparql_result_to_table( r ):
-    """Reformat SPARQL results (JSON) into tables.
-       Standardize as much as possible data representation.
-       Not optimized for speed, currently"""
+    """Reformat SPARQL results as JSON into a table.
+       Standardize data representation as much as possible, to counteract server fantasy.
+       Not optimized for speed, however"""
     try:
         j = r.json()
         tbl = []
@@ -175,7 +175,7 @@ def sparql_result_to_table( r ):
                     row.append( "" )
                 elif rec[h]["type"] == 'uri':
                     row.append( "<" + rec[h]["value"] + ">" )
-                else: # FIXME: standardize data representation
+                else: # FIXME: standardize data representation here
                     row.append( rec[h]["value"] )
             tbl.append( row )
         return header, tbl

@@ -687,13 +687,14 @@ INSERT DATA {{
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = server.sparql_query_to_tsv( sparql, echo = True )
-                s = r.text.splitlines( keepends = True )
+                r = server.sparql_query( sparql, echo = True )
+                header, rows = sparql_result_to_table( r )
                 out_path =  args.x + "/" + name + ".tsv"
                 report( "write file", out_path )
-                with open( out_path, "w" ) as file:
-                    file.write( "".join( s[ :1 ] ))
-                    file.write( "".join( sorted( s[ 1: ])))
+                with open( out_path, "w", encoding="utf-8" ) as f:
+                    f.write( "\t".join( header ) + "\n" )
+                    for row in rows:
+                        f.write( "\t".join( map( str, row )) + "\n" )
         sys.exit( 0 )
 
     if args.y:

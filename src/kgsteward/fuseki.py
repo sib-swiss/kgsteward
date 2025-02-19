@@ -40,7 +40,7 @@ WHERE{
         for row in qres:
             dump( row )
             super().__init__(  
-                location + "/" + repository + "/" + "sparql", # row.query, 
+                location + "/" + repository + "/" + row.query, 
                 location + "/" + repository + "/" + row.update,
                 location + "/" + repository + "/" + row.store
             )
@@ -70,11 +70,12 @@ WHERE{
 
     def rewrite_repository( self, server_config_filename ) :
         self.sparql_update( "DROP ALL")
-        http_call({
-            'method'  : 'DELETE',
-            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-            # 'headers' : { **self.headers, **headers }
-        }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
+# FIXME: this is n'importe quoi!
+#        http_call({
+#            'method'  : 'DELETE',
+#            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+#            # 'headers' : { **self.headers, **headers }
+#        }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
 
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );
