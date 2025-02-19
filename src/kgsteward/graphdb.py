@@ -135,15 +135,6 @@ class GraphDBClient( GenericClient ):
 
     def load_from_file_using_riot( self, file, context, echo = True ):
         super().load_from_file_using_riot( file, context, headers = { **self.headers }, echo = echo )
-
-    def sparql_query_to_tsv(
-        self, 
-        sparql, 
-        headers = { 'Accept': 'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
     
     def dump_context(
         self,

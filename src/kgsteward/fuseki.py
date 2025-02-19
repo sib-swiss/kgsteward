@@ -120,15 +120,6 @@ WHERE{
         echo = True
     ):
         return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
-
-    def sparql_query_to_tsv(
-        self, 
-        sparql, 
-        headers = { 'Accept': 'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
         
     def fuseki_compress_tdb2( self ):
         r = http_call({

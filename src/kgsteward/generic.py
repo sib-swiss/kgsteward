@@ -56,15 +56,6 @@ class GenericClient():
             status_code_ok,
         )
         return r
-
-    def sparql_query_to_tsv(
-        self, 
-        sparql, 
-        headers = { 'Accept' :'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [200], 
-        echo = True 
-    ):
-        return self.sparql_query( sparql, headers, status_code_ok, echo )
      
     def sparql_update( 
         self, 

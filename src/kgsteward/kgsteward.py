@@ -553,12 +553,14 @@ INSERT DATA {{
                 report( 'query file', filename )
                 # print( '----------------------------------------------------------')
                 with open( filename ) as f: sparql = f.read()
-                r = server.sparql_query_to_tsv( sparql, echo = False )
-                if r.text.count( "\n" ) == 1 :
+                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = False ))
+                if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
-                    print( colored( sparql, "green" ))
-                    print( colored( re.sub( "\n+$","", re.sub( "^[^\n]+\n", "",r.text )), "red" ))
+                    print_strip(sparql, color = "green" )
+                    print( colored( "\t".join( header ), "red" ))
+                    for row in rows:
+                        print( colored( "\t".join( map( str, row )), "red" ))
                     report( "Result", "Failed ;-(" )
                     exit_code = 1
         print( '----------------------------------------------------------')
