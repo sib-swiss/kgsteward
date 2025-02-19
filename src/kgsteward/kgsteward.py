@@ -693,8 +693,12 @@ INSERT DATA {{
                 report( "write file", out_path )
                 with open( out_path, "w", encoding="utf-8" ) as f:
                     f.write( "\t".join( header ) + "\n" )
-                    for row in rows:
-                        f.write( "\t".join( map( str, row )) + "\n" )
+                    if re.search( r"SEARCH\s+BY", sparql, re.IGNORECASE ):
+                        for row in rows:
+                            f.write( "\t".join( map( str, row )) + "\n" )
+                    else:
+                        for row in sorted( rows ):
+                            f.write( "\t".join( map( str, row )) + "\n" )
         sys.exit( 0 )
 
     if args.y:
