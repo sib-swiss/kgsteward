@@ -40,7 +40,7 @@ WHERE{
         for row in qres:
             dump( row )
             super().__init__(  
-                location + "/" + repository + "/" + row.query, 
+                location + "/" + repository + "/" + "sparql", # row.query, 
                 location + "/" + repository + "/" + row.update,
                 location + "/" + repository + "/" + row.store
             )
@@ -98,7 +98,7 @@ WHERE{
         if echo :
             print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
         if timeout:
-            headers["timeout"] = timeout
+            headers["timeout"] = timeout # FIXME: this seems not to work
         r = http_call(
             {
                 'method'  : 'POST',  # allows for big query

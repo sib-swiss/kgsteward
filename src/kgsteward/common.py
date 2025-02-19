@@ -160,6 +160,30 @@ def split_sparql_update( sparql ): # FIXME: handle comments
         statement[i] = "\n".join( prefix ) + "\n" + statement[i]
     return reversed( statement )
 
+def sparql_result_to_table( r ):
+    """Reformat SPARQL results (JSON) into tables.
+       Standardize as much as possible data representation.
+       Not optimized for speed, currently"""
+    try:
+        j = r.json()
+        tbl = []
+        header = j["head"]["vars"]
+        for rec in j["results"]["bindings"] :
+            row = []
+            for h in header:
+                if h not in rec:
+                    row.append( "" )
+                elif rec[h]["type"] == 'uri':
+                    row.append( "<" + rec[h]["value"] + ">" )
+                else: # FIXME: standardize data representation
+                    row.append( rec[h]["value"] )
+            tbl.append( row )
+        return header, tbl
+    except Exception as e :
+        dumper.dump( j )
+        dumper.dump( e )
+        stop_error( "Parsing went wrong!" )
+
 def print_break():
     print( '# ----------------------------------------------------------------------------')
 
