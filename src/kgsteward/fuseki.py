@@ -93,13 +93,13 @@ WHERE{
             'Accept' : 'application/json', 
             'Content-Type': 'application/x-www-form-urlencoded' },
         status_code_ok = [ 200 ],
+        echo = True,
         timeout = None, 
-        echo = True
     ):
         if echo :
             print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
-        if timeout:
-            headers["timeout"] = timeout # FIXME: this seems not to work
+        if timeout is not None:
+            headers["timeout"] = str( timeout )
         r = http_call(
             {
                 'method'  : 'POST',  # allows for big query
@@ -130,35 +130,35 @@ WHERE{
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         print_warn( "Not yet implemented: FusekiClient.graphdb_call()" )
 
-    def validate_sparql_query( self, sparql, echo = False ):
-        print_warn( "Not yet implemented: FusekiClient.validate_sparql_query ()" )
-        r = http_call({
-            'method'  : 'GET',
-            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : {
-                'Accept'        : 'text/tab-separated-values',
-                'Authorization' : self.authorization
-            },
-            'params'  : {
-                'query'   : sparql,
-                "infer"   : True,
-                "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?
-            }
-        }, [ 503, 500, 400, 200 ], echo )
-        if r.status_code == 503 :
-            time.sleep( 1 )
-            print( "\t" + "query timed out" )
-        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-            time.sleep( 1 )
-            print( "\t" + "unknown error, maybe timeout" )
-        elif r.status_code == 400 :
-            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
-        else : #  r.status_code == 200 :
-            n = r.text.count( "\n" )
-            if n == 0 :
-                print( "\t" + "!!! empty results !!!" )
-            else :
-                print( "\t" + str( n ) + " lines returned" )
+#    def validate_sparql_query( self, sparql, echo = False ):
+#        print_warn( "Not yet implemented: FusekiClient.validate_sparql_query ()" )
+#        r = http_call({
+#            'method'  : 'GET',
+#            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
+#                'Accept'        : 'text/tab-separated-values',
+#            'headers' : {
+#                'Authorization' : self.authorization
+#            },
+#            'params'  : {
+#                'query'   : sparql,
+#                "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?
+#                "infer"   : True,
+#            }
+#        }, [ 503, 500, 400, 200 ], echo )
+#        if r.status_code == 503 :
+#            time.sleep( 1 )
+#            print( "\t" + "query timed out" )
+#        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+#            print( "\t" + "unknown error, maybe timeout" )
+#            time.sleep( 1 )
+#        elif r.status_code == 400 :
+#            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
+#        else : #  r.status_code == 200 :
+#            n = r.text.count( "\n" )
+#            if n == 0 :
+#                print( "\t" + "!!! empty results !!!" )
+#            else :
+#                print( "\t" + str( n ) + " lines returned" )
 
     def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ):
         if re.search( r"\.ttl$", url ):
