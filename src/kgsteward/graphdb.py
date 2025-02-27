@@ -30,6 +30,7 @@ from .generic import GenericClient
 class GraphDBClient( GenericClient ):
 
     def __init__( self, graphdb_url, username, password, repository_id ):
+        # TODO: ping server first and produce a dcent error message!
         super().__init__(  
             graphdb_url + "/repositories/" + repository_id, 
             graphdb_url + "/repositories/" + repository_id + "/statements",
@@ -115,6 +116,36 @@ class GraphDBClient( GenericClient ):
     ):
         return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
 
+    def sparql_query( self,
+        sparql,
+#        headers = {
+#            'Accept' : 'application/json', 
+#            'Content-Type': 'application/x-www-form-urlencoded',
+#        },
+        status_code_ok = [ 200 ], 
+        echo = True,
+        timeout = None
+    ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        headers = {
+            'Accept' : 'application/json', 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        }
+        params = { 'query' : sparql }
+        if timeout is not None :
+            params["timeout"] = str( timeout )
+        r = http_call(
+            {
+                'method'  : 'POST',  # allows for big query
+                'url'     : self.endpoint_query,
+                'headers' : { **self.headers, **headers },
+                'params'  : params,
+            },
+            status_code_ok
+        )
+        return r
+
     def sparql_update( 
         self, 
         sparql, 
@@ -164,31 +195,31 @@ class GraphDBClient( GenericClient ):
             request_args['headers'] = self.headers
         return http_call( request_args, status_code_ok, echo )
 
-    def validate_sparql_query( self, sparql, echo = False ) :
-        r = http_call({
-            'method'  : 'POST',
-            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-            'headers' : { **self.headers, 'Accept': 'text/tab-separated-values' },
-            'params'  : {
-                'query'   : sparql,
-                "infer"   : True,
-                "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?
-            }
-        }, [ 503, 500, 400, 200 ], echo )
-        if r.status_code == 503 :
-            time.sleep( 1 )
-            report( "status", "query timed out" )
-        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-            time.sleep( 1 )
-            report( "status", "unknown error, maybe timeout" )
-        elif r.status_code == 400 :
-            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
-        else : #  r.status_code == 200 :
-            n = r.text.count( "\n" )
-            if n == 0 :
-                report( "status" + "!!! empty results !!!" )
-            else :
-                report( "status", str( n ) + " lines returned" )
+#    def validate_sparql_query( self, sparql, echo = False, timeout = 60 ) :
+#        r = http_call({
+#            'method'  : 'POST',
+#            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
+#            'headers' : { **self.headers, 'Accept': 'text/tab-separated-values' },
+#            'params'  : {
+#                'query'   : sparql,
+#                "infer"   : True,
+#                "timeout" : timeout       # an HTTP "problem" was observed with a timout of 1 s ?!?
+#            }
+#        }, [ 503, 500, 400, 200 ], echo )
+#        if r.status_code == 503 :
+#            time.sleep( 1 )
+#            report( "status", "query timed out" )
+#        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+#            time.sleep( 1 )
+#            report( "status", "unknown error, maybe timeout" )
+#        elif r.status_code == 400 :
+#            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
+#        else : #  r.status_code == 200 :
+#            n = r.text.count( "\n" )
+#            if n == 0 :
+#                report( "status" + "!!! empty results !!!" )
+#            else :
+#                report( "status", str( n ) + " lines returned" )
 
     def rewrite_prefixes( self, echo = True ):
         r = http_call({

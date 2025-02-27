@@ -126,6 +126,17 @@ def get_user_input():
         action = 'store_true',
         help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
     )
+    parser.add_argument(
+        '--graphdb_upload_query'
+        ,
+        action = 'store_true',
+        help = "Implies option -Q"
+    )
+    parser.add_argument(
+        '--timeout',
+        default = 60,
+        help    = 'Timeout in second, for option -Q and -x (60 by default). Value below 10 are not recommended with GraphDB.'
+    )
     args = parser.parse_args()
 
     # Further processing of command line arguments
@@ -573,7 +584,8 @@ INSERT DATA {{
     if args.Q:
         r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
         for item in r.json() :
-            print( f"DELETE: {item['name']}" ) # GraphDB builtin queries cannot be deleted
+            print_break()
+            report( "remove", item['name'] ) # GraphDB builtin queries cannot be deleted
             server.graphdb_call({
                 'url'    : '/rest/sparql/saved-queries',
                 'method' : 'DELETE',
@@ -582,11 +594,12 @@ INSERT DATA {{
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
+                print_break()
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                print( "TEST:   " + name)
-                server.validate_sparql_query( sparql, echo=False)
-                print( "LOAD:   " + name)
+                report( "validate", filename )
+                server.validate_sparql_query( sparql, echo=False, timeout=args.timeout ) 
+                report( "load", filename )
                 server.graphdb_call({
                     'url'    : '/rest/sparql/saved-queries',
                     'method'  : 'POST',
@@ -621,7 +634,7 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                server.validate_sparql_query( "\n".join( select ), echo=False)
+                server.validate_sparql_query( "\n".join( select ), echo=False, timeout=args.timeout )
                 EX     = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
                 RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
                 RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )

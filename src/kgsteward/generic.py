@@ -38,24 +38,25 @@ class GenericClient():
 
     def sparql_query( self, 
         sparql,
-        headers = { 
-            'Accept' : 'application/json', 
-            'Content-Type': 'application/x-www-form-urlencoded' },
         status_code_ok = [ 200 ], 
-        echo = True ):
-        if echo :
-            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
-        r = http_call(
-            {
-                'method'  : 'POST',  # allows for big query
-                'url'     : self.endpoint_query,
-                'headers' : headers,
-                'params'  : { 'query' : sparql },
-                'cookies' : self.cookies
-            },
-            status_code_ok,
-        )
-        return r
+        echo = True,
+        timeout = None 
+    ):
+#        if echo :
+#            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+#        r = http_call(
+#            {
+#                'method'  : 'POST',  # allows for big query
+#                'url'     : self.endpoint_query,
+#                'headers' : headers,
+#                'params'  : { 'query' : sparql },
+#                'cookies' : self.cookies
+#            },
+#            status_code_ok,
+#            echo=True
+#        )
+        raise Exception( "Abstract method called!")
+#       return r
      
     def sparql_update( 
         self, 
@@ -91,6 +92,28 @@ class GenericClient():
             'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
             'headers' : { **self.headers, **headers }
         }, status_code_ok, echo )
+    
+    def validate_sparql_query( self, sparql, echo = False, timeout = None ):
+        """ verify that at least the query returns at least one row of data, or timeout """
+        r = self.sparql_query( sparql, status_code_ok = [ 503, 500, 400, 200 ], echo = False, timeout = timeout )
+        if r.status_code == 503 : # GraphDB
+            time.sleep( 1 )
+            print_warn( "query timed out" )
+        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+            time.sleep( 1 )
+            print_warn( "unknown error, maybe timeout" )
+        elif r.status_code == 400 :
+            print( colored( sparql, "green" ))
+            stop_error( "Possible SPARQL syntax error!" )
+        elif r.status_code == 200 :
+            h, v = sparql_result_to_table( r )
+            if len( v ) == 0 :
+                print_warn( "empty result" )
+            else :
+                report( "#row", str( len( v )))
+        else :
+            print( colored( sparql, "green" ))
+            stop_error( "Unexpected status code: " + str( r.status_code ))
 
     def load_from_file( self, file, context, headers = {}, echo = True ):
         """ use graph store protocol """
