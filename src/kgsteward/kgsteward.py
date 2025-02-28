@@ -611,12 +611,30 @@ INSERT DATA {{
                 }, [ 201 ] )
 
     if args.r:
-        if not os.path.isdir( args.r ):
-            stop_error( "Not a directory: " + args.r )
+#        if not os.path.isdir( args.r ):
+#            stop_error( "Directory not found: " + args.r )
         counter = 0
         prefix = {}
         catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
         catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
+        g = Graph()
+        EX     = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
+        RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
+        RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
+        SCHEMA = Namespace( "https://schema.org/" )
+        SH     = Namespace( "http://www.w3.org/ns/shacl#" )
+        SPEX   = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
+        XSD    = Namespace( "http://www.w3.org/2001/XMLSchema#" )
+        OWL    = Namespace( "http://www.w3.org/2002/07/owl#" )
+        g.bind( "rdf",  RDF )
+        g.bind( "rdfs", RDFS )
+        g.bind( "ex",     EX )
+        g.bind( "rdfs",   RDFS )
+        g.bind( "schema", SCHEMA )
+        g.bind( "sh",     SH )
+        g.bind( "spex",   SPEX )
+        g.bind( "xsd",    XSD )
+        g.bind( "owl",  OWL )
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
@@ -634,19 +652,7 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                server.validate_sparql_query( "\n".join( select ), echo=False, timeout=args.timeout )
-                EX     = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
-                RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
-                RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
-                SCHEMA = Namespace( "https://schema.org/" )
-                SH     = Namespace( "http://www.w3.org/ns/shacl#" )
-                SPEX   = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
-                g = Graph()
-                g.bind( "ex",     EX )
-                g.bind( "rdfs",   RDFS )
-                g.bind( "schema", SCHEMA )
-                g.bind( "sh",     SH )
-                g.bind( "spex",   SPEX )
+                # server.validate_sparql_query( "\n".join( select ), echo=False, timeout=args.timeout ) 
                 iri = EX["query_" + str( counter )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
@@ -654,42 +660,31 @@ INSERT DATA {{
                 g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
                 g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
-                g.serialize(
-                    format="turtle",
-                    destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
-                )
+#                g.serialize(
+#                    format="turtle",
+#                    destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
+#                )
         if "prefixes" in config:
+            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDF.type,     OWL.ontology ))
+            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDFS.comment, Literal( "toto" )))
+            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), OWL.imports,  URIRef( 'http://www.w3.org/ns/shacl#' )))
             for filename in config["prefixes"] :
                 report( "parse file", filename )
                 file = open( replace_env_var( filename ))
                 for line in file:
                     match = catch_key_value_ttl.search( line )
-                if match:
-                    prefix[match.group( 1 )] = match.group( 2 )
-        SH     = Namespace( "http://www.w3.org/ns/shacl#" )
-        XSD    = Namespace( "http://www.w3.org/2001/XMLSchema#" )
-        RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
-        RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
-        OWL    = Namespace( "http://www.w3.org/2002/07/owl#" )
-        g = Graph()
-        g.bind( "sh",   SH )
-        g.bind( "rdf",  RDF )
-        g.bind( "rdfs", RDFS )
-        g.bind( "owl",  OWL )
-        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDF.type,     OWL.ontology ))
-        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDFS.comment, Literal( "toto" )))
-        g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), OWL.imports,  URIRef( 'http://www.w3.org/ns/shacl#' )))
+                    if match:
+                        prefix[ match.group( 1 ) ] = match.group( 2 )
         for key in prefix:
             g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), SH.declare, URIRef( 'http://example.org/prefixes/prefix_' + key )))
             g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.prefix,    Literal( key )))
             g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
         g.serialize(
             format="turtle",
-            destination = args.r + "/prefixes.ttl"
+            destination = args.r
         )
         sys.exit( 0 )
         
-
     if args.x:
         print_break()
         print_task( "Dump all query results in TSV format" )
