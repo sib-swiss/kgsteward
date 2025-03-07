@@ -16,8 +16,6 @@ class GenericClient():
         self.endpoint_query  = endpoint_query
         self.endpoint_update = endpoint_update
         self.endpoint_store  = endpoint_store
-        self.headers         = {}
-        self.cookies         = {}
 
     def get_endpoint_query( self ):
         return self.endpoint_query
@@ -25,86 +23,36 @@ class GenericClient():
     def get_endpoint_update( self ):
         return self.endpoint_update
     
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ): 
+        """ Run a sparql query and return the response with the data in JSON format. """
+        raise Exception( "Abstract method called: sparql_query()" )
+     
+    def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ):
+        """ Run a sparql update, returns nothing """
+        raise Exception( "Abstract method called: sparql_update()" )
+    
     def get_contexts( self, echo = True ):
-        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
-        contexts = set()
-        for rec in r.json()["results"]["bindings"]:
-            if "g" in rec:
-                contexts.add( rec["g"]["value"] )
-        return contexts
+        """ Run the actual list of contexts """
+        raise Exception( "Abstract method called: get_contexts()" )
 
     def drop_context( self, context ):
-        self.sparql_update( f"DROP GRAPH <{context}>" )
+        """ Drop a context """
+        raise Exception( "Abstract method called: drop_context()" )
+        # self.sparql_update( f"DROP GRAPH <{context}>" )
+    
+    def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
+        """ Dump a context in nt format """
+        raise Exception( "Abstract method called: dump_context()" )
 
-    def sparql_query( self, 
-        sparql,
-        status_code_ok = [ 200 ], 
-        echo = True,
-        timeout = None 
-    ):
-#        if echo :
-#            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
-#        r = http_call(
-#            {
-#                'method'  : 'POST',  # allows for big query
-#                'url'     : self.endpoint_query,
-#                'headers' : headers,
-#                'params'  : { 'query' : sparql },
-#                'cookies' : self.cookies
-#            },
-#            status_code_ok,
-#            echo=True
-#        )
-        raise Exception( "Abstract method called!")
-#       return r
-     
-    def sparql_update( 
-        self, 
-        sparql,
-        headers        = { 'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [ 204 ],
-        echo           = True
-    ):
-        if echo :
-            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
-        http_call(
-            {
-                'method'  : 'POST',
-                'url'     : self.endpoint_update,
-                'headers' : headers,
-                'cookies' : self.cookies,
-                'params'  : { 'update': sparql },
-                'cookies' : self.cookies
-            }, 
-            status_code_ok,
-            echo
-        )
-    
-    def dump_context(
-        self,
-        context,
-        headers = { 'Accept': 'text/plain' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return http_call({
-            'method'  : 'GET',
-            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-            'headers' : { **self.headers, **headers }
-        }, status_code_ok, echo )
-    
     def validate_sparql_query( self, sparql, echo = False, timeout = None ):
         """ verify that at least the query returns at least one row of data, or timeout """
-        r = self.sparql_query( sparql, status_code_ok = [ 503, 500, 400, 200 ], echo = False, timeout = timeout )
-        if r.status_code == 503 : # GraphDB
-            time.sleep( 1 )
-            print_warn( "query timed out" )
-        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-            time.sleep( 1 )
-            print_warn( "unknown error, maybe timeout" )
-        elif r.status_code == 400 :
-            print( colored( sparql, "green" ))
-            stop_error( "Possible SPARQL syntax error!" )
+        r = self.sparql_query( sparql, echo = False, timeout = timeout )
+        if r is None:
+            if timeout is not None:
+                time.sleep( 1 ) # print_warn( "Query timed out" ) already printed
+            else:
+                 print( colored( sparql, "green" ))
+                 stop_error( "Unknown error!" ) # 
         elif r.status_code == 200 :
             h, v = sparql_result_to_table( r )
             if len( v ) == 0 :

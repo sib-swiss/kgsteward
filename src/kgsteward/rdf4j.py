@@ -56,23 +56,52 @@ class RFD4JClient( GenericClient ):
             'data'    : open( rdf4j_config_filename , 'rb' )
         }, [ 204, 409 ] ) # 204: created; 409 repository already exists (and don't care)
 
-    def sparql_query( 
-        self, 
-        sparql, 
-        headers = { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True 
-    ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        headers = {
+            'Accept' : 'application/json', 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        }
+        params = { 'query' : sparql }
+        if timeout is not None :
+            params["timeout"] = timeout
+            status_code_ok.append( 503 )
+            status_code_ok.append( 500 ) # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause 
+                                         # FIXME: verify if rdf4j behave the same
+        r = http_call(
+            {
+                'method'  : 'POST',  # allows for big query string
+                'url'     : self.endpoint_query,
+                'headers' : { **self.headers, **headers },
+                'params'  : params,
+            },
+            status_code_ok
+        )
+        if timeout is not None:
+            if r.status_code == 503 :
+                time.sleep( 1 )
+                print_warn( "query timed out" )
+                return None
+            elif r.status_code == 500 : 
+                time.sleep( 1 )
+                print_warn( "unknown error, maybe timeout" )
+                return None
+        return r
 
-    def sparql_update( 
-        self, 
-        sparql, 
-        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [ 204 ],
-        echo = True
-    ):
-        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
+    def sparql_update( self, sparql,status_code_ok = [ 204 ], echo = True ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        http_call(
+            {
+                'method'  : 'POST',
+                'url'     : self.endpoint_update,
+                'headers' : self.headers,
+                'params'  : { 'update': sparql },
+            }, 
+            status_code_ok,
+            echo
+        )
 
     def load_from_file( 
         self,

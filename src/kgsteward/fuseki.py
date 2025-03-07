@@ -45,7 +45,8 @@ WHERE{
                 location + "/" + repository + "/" + row.store
             )
         self.repository = repository 
-        self.location = location
+        self.location   = location
+        self.cookies    = None
         print_task( "contacting server" )
         try:
             r = http_call({
@@ -80,51 +81,111 @@ WHERE{
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );
 
+
+    def sparql_query( self, 
+        sparql,
+        status_code_ok = [ 200 ], 
+        echo           = True,
+        timeout        = None
+    ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        headers = {
+            'Accept' : 'application/json', 
+            'Content-Type': 'application/x-www-form-urlencoded' 
+        }
+        params = { 'query' : sparql }
+        if timeout is not None:
+            if not 503 in status_code_ok: # returned by "normal" GraphDB timeout
+                status_code_ok.append( 503 ) 
+            if not 500 in status_code_ok: # returned by "service" GraphDB timeout
+                status_code_ok.append( 500 )
+            params["timeout"] = timeout
+        r = http_call(
+            {
+                'method'  : 'POST',  # allows for big query string
+                'url'     : self.endpoint_query,
+                'headers' : headers,
+                'params'  : params,
+                'cookies' : self.cookies
+            },
+            status_code_ok,
+        )
+        if timeout is not None:
+            if r.status_code == 503 :
+                time.sleep( 1 )
+                print_warn( "query timed out" )
+                return None
+            elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+                time.sleep( 1 )
+                print_warn( "status", "unknown error, possibly timeout" )
+                return None
+
+        return r
+
+#    def sparql_update( 
+#        self, 
+#        sparql, 
+#        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
+#        status_code_ok = [ 200 ],  # on success fuseki return 200, not 204 !!!
+#        echo = True
+#    ):
+#        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
+    
+    def sparql_update( 
+        self, 
+        sparql,
+        status_code_ok = [ 200 ],
+        echo           = True
+    ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        http_call(
+            {
+                'method'  : 'POST',
+                'url'     : self.endpoint_update,
+                'headers' : { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                'cookies' : self.cookies,
+                'params'  : { 'update': sparql },
+            }, 
+            status_code_ok,
+            echo
+        )
+    def get_contexts( self, echo = True ):
+        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
+        contexts = set()
+        for rec in r.json()["results"]["bindings"]:
+            if "g" in rec:
+                contexts.add( rec["g"]["value"] )
+        return contexts
+
     def drop_context( self, context ): # FIXME: might be faster than DROP GRAPH <context>
         http_call({
             'method'  : 'DELETE',
             'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
             # 'headers' : { **self.headers, **headers }
+            'cookies' : self.cookies,
         }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
 
-    def sparql_query( self, 
-        sparql,
-        headers = { 
-            'Accept' : 'application/json', 
-            'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [ 200 ],
-        echo = True,
-        timeout = None, 
-    ):
-        if echo :
-            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
-        if timeout is not None:
-            headers["timeout"] = str( timeout )
-        r = http_call(
-            {
-                'method'  : 'POST',  # allows for big query
-                'url'     : self.endpoint_query,
-                'headers' : headers,
-                'params'  : { 'query' : sparql },
-                'cookies' : self.cookies
-            },
-            status_code_ok,
-        )
-        return r
-
-    def sparql_update( 
-        self, 
-        sparql, 
-        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [ 200 ],  # on success fuseki return 200, not 204 !!!
+    def dump_context(
+        self,
+        context,
+        headers = { 'Accept': 'text/plain' }, 
+        status_code_ok = [ 200 ], 
         echo = True
     ):
-        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
-        
+        return http_call({
+            'method'  : 'GET',
+            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+            'headers' : headers,
+            'cookies' : self.cookies,
+        }, status_code_ok, echo )
+
     def fuseki_compress_tdb2( self ):
         r = http_call({
             'method'  : 'POST',
-            'url'     : self.location + "/$/compact/" + self.repository + "?deleteOld=true"
+            'url'     : self.location + "/$/compact/" + self.repository + "?deleteOld=true",
+            'cookies' : self.cookies,
         }, [ 200 ] )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :

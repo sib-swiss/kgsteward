@@ -31,8 +31,8 @@ class GraphDBClient( GenericClient ):
 
     def __init__( self, graphdb_url, username, password, repository_id ):
         # TODO: ping server first and produce a dcent error message!
-        super().__init__(  
-            graphdb_url + "/repositories/" + repository_id, 
+        super().__init__( 
+            graphdb_url + "/repositories/" + repository_id,
             graphdb_url + "/repositories/" + repository_id + "/statements",
             graphdb_url + "/repositories/" + repository_id + "/rdf-graphs/service"
         )
@@ -107,25 +107,7 @@ class GraphDBClient( GenericClient ):
             }
         })
 
-    def sparql_query( 
-        self, 
-        sparql, 
-        headers = { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True 
-    ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
-
-    def sparql_query( self,
-        sparql,
-#        headers = {
-#            'Accept' : 'application/json', 
-#            'Content-Type': 'application/x-www-form-urlencoded',
-#        },
-        status_code_ok = [ 200 ], 
-        echo = True,
-        timeout = None
-    ):
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
         if echo :
             print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
         headers = {
@@ -134,26 +116,42 @@ class GraphDBClient( GenericClient ):
         }
         params = { 'query' : sparql }
         if timeout is not None :
-            params["timeout"] = str( timeout )
+            params["timeout"] = timeout
+            status_code_ok.append( 503 )
+            status_code_ok.append( 500 ) # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
         r = http_call(
             {
-                'method'  : 'POST',  # allows for big query
+                'method'  : 'POST',  # allows for big query string
                 'url'     : self.endpoint_query,
                 'headers' : { **self.headers, **headers },
                 'params'  : params,
             },
             status_code_ok
         )
+        if timeout is not None:
+            if r.status_code == 503 :
+                time.sleep( 1 )
+                print_warn( "query timed out" )
+                return None
+            elif r.status_code == 500 : 
+                time.sleep( 1 )
+                print_warn( "unknown error, maybe timeout" )
+                return None
         return r
-
-    def sparql_update( 
-        self, 
-        sparql, 
-        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
-        status_code_ok = [ 204 ],
-        echo = True
-    ):
-        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
+    
+    def sparql_update( self, sparql,status_code_ok = [ 204 ], echo = True ):
+        if echo :
+            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        http_call(
+            {
+                'method'  : 'POST',
+                'url'     : self.endpoint_update,
+                'headers' : self.headers,
+                'params'  : { 'update': sparql },
+            }, 
+            status_code_ok,
+            echo
+        )
 
     def load_from_file( 
         self,
@@ -166,16 +164,7 @@ class GraphDBClient( GenericClient ):
 
     def load_from_file_using_riot( self, file, context, echo = True ):
         super().load_from_file_using_riot( file, context, headers = { **self.headers }, echo = echo )
-    
-    def dump_context(
-        self,
-        context,
-        headers = { 'Accept': 'text/plain' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return super().dump_context( context, { **self.headers, **headers }, status_code_ok, echo )
-     
+       
     def get_contexts( self, echo = True ) :
         r = http_call({
             'method'  : 'GET',
@@ -186,6 +175,26 @@ class GraphDBClient( GenericClient ):
         for rec in r.json()["results"]["bindings"] : 
             contexts.add( rec["contextID"]["value"] )
         return contexts
+
+    def drop_context( self, context ):
+        self.sparql_update( f"DROP GRAPH <{context}>" )
+
+    def dump_context(
+        self,
+        context,
+        headers = { 'Accept': 'text/plain' }, 
+        status_code_ok = [ 200 ], 
+        echo = True
+    ):
+        return super().dump_context( context, { **self.headers, **headers }, status_code_ok, echo )
+    
+    def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
+        headers = { 'Accept': 'text/plain' }, 
+        return http_call({
+            'method'  : 'GET',
+            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+            'headers' : { **self.headers, **headers }
+        }, status_code_ok, echo )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )

@@ -127,15 +127,14 @@ def get_user_input():
         help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
     )
     parser.add_argument(
-        '--graphdb_upload_query'
-        ,
+        '--graphdb_upload_query',
         action = 'store_true',
         help = "Implies option -Q"
     )
     parser.add_argument(
         '--timeout',
         default = 60,
-        help    = 'Timeout in second, for option -Q and -x (60 by default). Value below 10 are not recommended with GraphDB.'
+        help    = 'Timeout in seconds, for option -Q and -x, 60 s by default. Value below 10 are not recommended for GraphDB as they cause unknown error.'
     )
     args = parser.parse_args()
 
@@ -582,29 +581,33 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.Q:
-        r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
-        for item in r.json() :
-            print_break()
-            report( "remove", item['name'] ) # GraphDB builtin queries cannot be deleted
-            server.graphdb_call({
-                'url'    : '/rest/sparql/saved-queries',
-                'method' : 'DELETE',
-                'params' : { 'name': item['name']}
-            })
+        if args.graphdb_upload_query:
+            r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
+            for item in r.json() :
+                print_break()
+                report( "remove", item['name'] ) # GraphDB builtin queries cannot be deleted
+                server.graphdb_call({
+                    'url'    : '/rest/sparql/saved-queries',
+                    'method' : 'DELETE',
+                    'params' : { 'name': item['name']}
+                })
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
                 print_break()
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
                 report( "validate", filename )
-                server.validate_sparql_query( sparql, echo=False, timeout=args.timeout ) 
+                server.validate_sparql_query( sparql, echo=False, timeout=args.timeout )
+                if not args.graphdb_upload_query:
+                    continue
                 report( "load", filename )
                 server.graphdb_call({
                     'url'    : '/rest/sparql/saved-queries',
                     'method'  : 'POST',
                     'headers' : {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json', 
                         'Accept-Encoding': 'identity'
                     },
                     'json'    : { 'name': name, 'body': sparql, "shared": "true" }
@@ -652,10 +655,11 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                # server.validate_sparql_query( "\n".join( select ), echo=False, timeout=args.timeout ) 
+                # server.validate_sparql_query( "\n".join( select ), echo=False, timeoutx=args.timeout ) 
                 iri = EX["query_" + str( counter )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
+                g.add(( iri, RDFS.label,    Literal( name.replace( "_", " "))))
                 g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
                 g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
@@ -693,22 +697,24 @@ INSERT DATA {{
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
+                print_break()
                 report( "read file", filename )
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = server.sparql_query( sparql, echo = True )
-                header, rows = sparql_result_to_table( r )
-                out_path =  args.x + "/" + name + ".tsv"
-                report( "write file", out_path )
-                with open( out_path, "w", encoding="utf-8" ) as f:
-                    f.write( "\t".join( header ) + "\n" )
-                    if re.search( r"SEARCH\s+BY", sparql, re.IGNORECASE ):
-                        for row in rows:
-                            f.write( "\t".join( map( str, row )) + "\n" )
-                    else:
-                        for row in sorted( rows ):
-                            f.write( "\t".join( map( str, row )) + "\n" )
+                r = server.sparql_query( sparql, echo = False, timeout = args.timeout )
+                if r is not None: # no timeout, i.e. the data are here
+                    header, rows = sparql_result_to_table( r )
+                    out_path =  args.x + "/" + name + ".tsv"
+                    report( "write file", out_path )
+                    with open( out_path, "w", encoding="utf-8" ) as f:
+                        f.write( "\t".join( header ) + "\n" )
+                        if re.search( r"SEARCH\s+BY", sparql, re.IGNORECASE ):
+                            for row in rows:
+                                f.write( "\t".join( map( str, row )) + "\n" )
+                        else:
+                            for row in sorted( rows ):
+                                f.write( "\t".join( map( str, row )) + "\n" )
         sys.exit( 0 )
 
     if args.y:
