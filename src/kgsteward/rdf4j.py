@@ -111,15 +111,6 @@ class RFD4JClient( GenericClient ):
         echo = True 
     ):
         super().load_from_file( file, context, { **self.headers, **headers }, echo )
-
-    def sparql_query_to_tsv(
-        self, 
-        sparql, 
-        headers = { 'Accept': 'text/tab-separated-values', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return super().sparql_query( sparql, { **self.headers, **headers }, status_code_ok, echo )
     
     def get_contexts( self, echo = True ) :
         r = http_call({
@@ -131,6 +122,9 @@ class RFD4JClient( GenericClient ):
         for rec in r.json()["results"]["bindings"] : 
             contexts.add( rec["contextID"]["value"] )
         return contexts
+
+    def drop_context( self, context ):
+        self.sparql_update( f"DROP GRAPH <{context}>" )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.server_url + str( request_args['url'] )

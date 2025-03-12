@@ -1,6 +1,6 @@
 version: kgsteward_yaml_2
 server:
-  type         : graphdb
+  brand         : graphdb
   location      : http://localhost:7200
   server_config : graphdb.config.ttl
   username      : ${GRAPHDB_USERNAME}
@@ -8,9 +8,9 @@ server:
   repository    : first_steps
 context_base_IRI: http://example.org/context/
 file_loader:
-  type: sparql_load
+  method: sparql_load
 url_loader:
-  type: sparql_load
+  method: sparql_load
 dataset: !include dataset.yaml
 validations: 
   - sparql/validate/*.rq

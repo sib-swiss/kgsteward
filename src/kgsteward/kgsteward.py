@@ -115,11 +115,11 @@ def get_user_input():
     )
     parser.add_argument(
         '-x',
-        help   = "Dump all query results in TSV format to dir <X>"
+        help   = "Dump all query results in TSV format to dir <X>. The results are somehow amended to facilitate cross-server comparison."
     )
     parser.add_argument(
         '-y',
-        help   = "Dump all contexts in nt formatton dir <Y>" 
+        help   = "Dump all contexts in nt formatton dir <Y>. Possibly useful for debugging." 
     )
     parser.add_argument(
         '--fuseki_compress',

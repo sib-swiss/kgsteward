@@ -169,7 +169,7 @@ class GraphDBClient( GenericClient ):
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/contexts",
-            'headers' : { **self.headers, 'Accept': 'application/json' },
+            'headers' : { **self.headers, 'Accept': 'application/json' }
         }, [ 200 ], echo )
         contexts = set()
         for rec in r.json()["results"]["bindings"] : 
@@ -179,21 +179,11 @@ class GraphDBClient( GenericClient ):
     def drop_context( self, context ):
         self.sparql_update( f"DROP GRAPH <{context}>" )
 
-    def dump_context(
-        self,
-        context,
-        headers = { 'Accept': 'text/plain' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return super().dump_context( context, { **self.headers, **headers }, status_code_ok, echo )
-    
     def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
-        headers = { 'Accept': 'text/plain' }, 
         return http_call({
             'method'  : 'GET',
             'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-            'headers' : { **self.headers, **headers }
+            'headers' : { **self.headers, 'Accept': 'text/plain'}
         }, status_code_ok, echo )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
@@ -203,32 +193,6 @@ class GraphDBClient( GenericClient ):
         else :
             request_args['headers'] = self.headers
         return http_call( request_args, status_code_ok, echo )
-
-#    def validate_sparql_query( self, sparql, echo = False, timeout = 60 ) :
-#        r = http_call({
-#            'method'  : 'POST',
-#            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-#            'headers' : { **self.headers, 'Accept': 'text/tab-separated-values' },
-#            'params'  : {
-#                'query'   : sparql,
-#                "infer"   : True,
-#                "timeout" : timeout       # an HTTP "problem" was observed with a timout of 1 s ?!?
-#            }
-#        }, [ 503, 500, 400, 200 ], echo )
-#        if r.status_code == 503 :
-#            time.sleep( 1 )
-#            report( "status", "query timed out" )
-#        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-#            time.sleep( 1 )
-#            report( "status", "unknown error, maybe timeout" )
-#        elif r.status_code == 400 :
-#            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
-#        else : #  r.status_code == 200 :
-#            n = r.text.count( "\n" )
-#            if n == 0 :
-#                report( "status" + "!!! empty results !!!" )
-#            else :
-#                report( "status", str( n ) + " lines returned" )
 
     def rewrite_prefixes( self, echo = True ):
         r = http_call({

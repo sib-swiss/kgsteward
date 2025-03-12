@@ -38,7 +38,6 @@ class GenericClient():
     def drop_context( self, context ):
         """ Drop a context """
         raise Exception( "Abstract method called: drop_context()" )
-        # self.sparql_update( f"DROP GRAPH <{context}>" )
     
     def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
         """ Dump a context in nt format """
@@ -84,18 +83,18 @@ class GenericClient():
             )
  
     def _flush_buf( self, context, data, headers = {}, echo = True ):
-        http_call(
-            {
-                'method'  : 'POST',
-                'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-                'headers' : {
-                    **headers,
-                    'Content-Type' : 'text/plain', # FIXME: verify encoding as UTF-8
-                },
-                'cookies' : self.cookies,
-                'data'    : data
+        args = {
+            'method'  : 'POST',
+            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+            'headers' : {
+                **headers,
+                'Content-Type' : 'text/plain', # FIXME: verify encoding as UTF-8
             },
-            [ 200, 201, 204 ], # fuseki 200, GraphDB 204
+            'data'    : data
+        }
+        if hasattr( self, "cookies" ):
+            args['cookies'] = self.cookies
+        http_call( args, [ 200, 201, 204 ], # fuseki 200, GraphDB 204
             echo
     )
         
