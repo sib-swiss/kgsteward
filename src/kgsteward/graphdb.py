@@ -85,11 +85,11 @@ class GraphDBClient( GenericClient ):
         })
 
     def free_access( self ) :
-        http_call({
-            'method'  : 'GET',
-            'url'     : self.graphdb_url + "/rest/class-hierarchy?doReload=true&graphURI=",
-            'headers' : { **self.headers, "X-GraphDB-Repository": self.repository_id },
-        })
+        # http_call({
+        #     'method'  : 'GET',
+        #     'url'     : self.graphdb_url + "/rest/class-hierarchy?doReload=true&graphURI=",
+        #     'headers' : { **self.headers, "X-GraphDB-Repository": self.repository_id },
+        # })
         http_call({
             'method'  : 'POST',
             'url'     : self.graphdb_url + "/rest/security/free-access",
@@ -165,7 +165,7 @@ class GraphDBClient( GenericClient ):
     def load_from_file_using_riot( self, file, context, echo = True ):
         super().load_from_file_using_riot( file, context, headers = { **self.headers }, echo = echo )
        
-    def get_contexts( self, echo = True ) :
+    def list_context( self, echo = True ) :
         r = http_call({
             'method'  : 'GET',
             'url'     : self.graphdb_url + "/repositories/" + self.repository_id + "/contexts",
@@ -176,15 +176,8 @@ class GraphDBClient( GenericClient ):
             contexts.add( rec["contextID"]["value"] )
         return contexts
 
-    def drop_context( self, context ):
-        self.sparql_update( f"DROP GRAPH <{context}>" )
-
-    def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
-        return http_call({
-            'method'  : 'GET',
-            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-            'headers' : { **self.headers, 'Accept': 'text/plain'}
-        }, status_code_ok, echo )
+    def drop_context( self, context, echo = True ):
+        self.sparql_update( f"DROP GRAPH <{context}>", echo = echo )
 
     def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
         request_args['url'] = self.graphdb_url + str( request_args['url'] )

@@ -16,7 +16,13 @@ class GenericClient():
         self.endpoint_query  = endpoint_query
         self.endpoint_update = endpoint_update
         self.endpoint_store  = endpoint_store
+        self.cookies         = None
+        self.headers         = None
 
+    def rewrite_repository( self, arg ):
+        """ Create an empty repository or empty an existing one """
+        raise Exception( "Abstract method called: rewrite_repository()" )
+    
     def get_endpoint_query( self ):
         return self.endpoint_query
 
@@ -31,17 +37,24 @@ class GenericClient():
         """ Run a sparql update, returns nothing """
         raise Exception( "Abstract method called: sparql_update()" )
     
-    def get_contexts( self, echo = True ):
+    def list_context( self, echo = True ):
         """ Run the actual list of contexts """
-        raise Exception( "Abstract method called: get_contexts()" )
+        raise Exception( "Abstract method called: list_context()" )
 
     def drop_context( self, context ):
         """ Drop a context """
         raise Exception( "Abstract method called: drop_context()" )
     
-    def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
-        """ Dump a context in nt format """
-        raise Exception( "Abstract method called: dump_context()" )
+    def dump_context( self, context, echo = True ):
+        r = self.sparql_query( f"""
+SELECT ?s ?p ?o 
+WHERE{{ 
+    GRAPH <{context}> {{ 
+        ?s ?p ?o 
+    }}
+}}"""
+)
+        return sparql_result_to_table( r )
 
     def validate_sparql_query( self, sparql, echo = False, timeout = None ):
         """ verify that at least the query returns at least one row of data, or timeout """

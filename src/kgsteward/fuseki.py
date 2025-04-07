@@ -46,7 +46,6 @@ WHERE{
             )
         self.repository = repository 
         self.location   = location
-        self.cookies    = None
         print_task( "contacting server" )
         try:
             r = http_call({
@@ -81,13 +80,7 @@ WHERE{
     def free_access( self ) :
         print_warn( "Not yet implemented: FusekiClient.free_access()" );
 
-
-    def sparql_query( self, 
-        sparql,
-        status_code_ok = [ 200 ], 
-        echo           = True,
-        timeout        = None
-    ):
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
         if echo :
             print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
         headers = {
@@ -122,22 +115,8 @@ WHERE{
                 return None
 
         return r
-
-#    def sparql_update( 
-#        self, 
-#        sparql, 
-#        headers = { 'Content-Type': 'application/x-www-form-urlencoded' },
-#        status_code_ok = [ 200 ],  # on success fuseki return 200, not 204 !!!
-#        echo = True
-#    ):
-#        return super().sparql_update( sparql, { **self.headers, **headers }, status_code_ok, echo )
     
-    def sparql_update( 
-        self, 
-        sparql,
-        status_code_ok = [ 200 ],
-        echo           = True
-    ):
+    def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
         if echo :
             print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
         http_call(
@@ -151,7 +130,8 @@ WHERE{
             status_code_ok,
             echo
         )
-    def get_contexts( self, echo = True ):
+
+    def list_context( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
         contexts = set()
         for rec in r.json()["results"]["bindings"]:
@@ -159,7 +139,7 @@ WHERE{
                 contexts.add( rec["g"]["value"] )
         return contexts
 
-    def drop_context( self, context ): # FIXME: might be faster than DROP GRAPH <context>
+    def drop_context( self, context, echo = True ): # FIXME: might be faster than DROP GRAPH <context>, echo is ignored
         http_call({
             'method'  : 'DELETE',
             'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
@@ -167,19 +147,13 @@ WHERE{
             'cookies' : self.cookies,
         }, [ 204, 404 ] ) # 204: deletion succeful, 404: graph did not exist
 
-    def dump_context(
-        self,
-        context,
-        headers = { 'Accept': 'text/plain' }, 
-        status_code_ok = [ 200 ], 
-        echo = True
-    ):
-        return http_call({
-            'method'  : 'GET',
-            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
-            'headers' : headers,
-            'cookies' : self.cookies,
-        }, status_code_ok, echo )
+#    def dump_context( self, context, status_code_ok = [ 200 ], echo = True ):
+#        return http_call({
+#            'method'  : 'GET',
+#            'url'     : self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context ),
+#            'cookies' : self.cookies,
+##            'headers' : { 'Accept': 'text/plain' },
+#        }, status_code_ok, echo )
 
     def fuseki_compress_tdb2( self ):
         r = http_call({
@@ -188,40 +162,7 @@ WHERE{
             'cookies' : self.cookies,
         }, [ 200 ] )
 
-    def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
-        print_warn( "Not yet implemented: FusekiClient.graphdb_call()" )
-
-#    def validate_sparql_query( self, sparql, echo = False ):
-#        print_warn( "Not yet implemented: FusekiClient.validate_sparql_query ()" )
-#        r = http_call({
-#            'method'  : 'GET',
-#            'url'     : self.graphdb_url + "/repositories/" + self.repository_id,
-#                'Accept'        : 'text/tab-separated-values',
-#            'headers' : {
-#                'Authorization' : self.authorization
-#            },
-#            'params'  : {
-#                'query'   : sparql,
-#                "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?
-#                "infer"   : True,
-#            }
-#        }, [ 503, 500, 400, 200 ], echo )
-#        if r.status_code == 503 :
-#            time.sleep( 1 )
-#            print( "\t" + "query timed out" )
-#        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-#            print( "\t" + "unknown error, maybe timeout" )
-#            time.sleep( 1 )
-#        elif r.status_code == 400 :
-#            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
-#        else : #  r.status_code == 200 :
-#            n = r.text.count( "\n" )
-#            if n == 0 :
-#                print( "\t" + "!!! empty results !!!" )
-#            else :
-#                print( "\t" + str( n ) + " lines returned" )
-
-    def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ):
+    def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ): # FIXME: this code is never called
         if re.search( r"\.ttl$", url ):
             self.sparql_update( f"LOAD SILENT <{url}> INTO GRAPH <{context}>", echo = echo )
         elif re.search( r"\.(gz|bz2|xz)$", url  ):

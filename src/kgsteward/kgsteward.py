@@ -20,20 +20,13 @@ from .common     import *
 from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
-from .rdf4j      import RFD4JClient     # in preparation
+from .rdf4j      import RFD4JClient
 # from .oxigraph   import OxigraphClient  # in preparation
 # from .virtuoso   import VirtuosoClient  # in preparation
 from .fileserver import LocalFileServer
 
 name2context = {} # global helper dict
 context2name = {} # same
-
-# ---------------------------------------------------------#
-# The RDF source dataset configuration
-#
-# Nota Bene: some resources are splitted into several files
-# because there exists a limit of 200 MB per file in GraphDB
-# ---------------------------------------------------------#
 
 # ---------------------------------------------------------#
 # Command-line options
@@ -97,11 +90,6 @@ def get_user_input():
         help   = 'Validate the repository content.'
     )
     parser.add_argument(
-        '-P',
-        action = 'store_true',
-        help   = "Reset all prefixes"
-    )
-    parser.add_argument(
         '-Q',
         action = 'store_true',
         help   = "Clean, test and reload all SPARQL queries. This is a GraphDB "
@@ -110,31 +98,49 @@ def get_user_input():
                  "It may fail on SPARQL syntax error!"
     )
     parser.add_argument(
-        '-r',
-        help   = "Save prefix and queries into supplied dir"
-    )
-    parser.add_argument(
         '-x',
-        help   = "Dump all query results in TSV format to dir <X>. The results are somehow amended to facilitate cross-server comparison."
+        help   = "Dump all query results in TSV format to dir <X>. "
+                 "Sorting of results is enforced, irrespective of SPARQL queries. "
+                 "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
+                 "Using this service is useful for debugging, but not recommended to routinely retrieve data. " 
+                 "It is possibly slow and memory hungry." 
     )
     parser.add_argument(
         '-y',
-        help   = "Dump all contexts in nt formatton dir <Y>. Possibly useful for debugging." 
+        help   = "Dump all context data in TSV format to dir <Y>. "                 
+                 "Sorting of results is enforced, irrespective of SPARQL queries. "
+                 "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
+                 "Using this service is useful for debugging, but not recommended to routinely retrieve data. "
+                 "It is possibly slow and memory hungry." 
     )
     parser.add_argument(
-        '--fuseki_compress',
+        '-v',
+        help    = 'Verbose mode: print out SPARQL queries being executed.'
+    )
+    parser.add_argument(
+        '--fuseki_compress_tbd2',
         action = 'store_true',
         help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
     )
     parser.add_argument(
-        '--graphdb_upload_query',
+        '--graphdb_upload_queries',
         action = 'store_true',
-        help = "Implies option -Q"
+        help = "Rewrite and upload queries in the GraphDB menu"
     )
     parser.add_argument(
-        '--timeout',
-        default = 60,
-        help    = 'Timeout in seconds, for option -Q and -x, 60 s by default. Value below 10 are not recommended for GraphDB as they cause unknown error.'
+        '--graphdb_upload_prefixes', '--rdf4j_upload_prefixes',
+        action = 'store_true',
+        help = "Rewrite and reload all prefix definitions"
+    )
+    parser.add_argument(
+        '--graphdb_free_access',
+        action = 'store_true',
+        help = "Allow read-only, public free-access to a repository in GraphDB. "
+    )
+    parser.add_argument(
+        '--sib_swiss_editor',
+        help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
+               "Note that the content of this file is not uploaded automatically to the store. "
     )
     args = parser.parse_args()
 
@@ -170,7 +176,7 @@ def get_sha256( config, name ) :
             path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
             if re.search( r"https?:", path ) : # do not run HEAD on ftp server FIXME: implement something better
-               info = get_head_info( path ) # as a side effect: verify is the server is responding
+               info = get_head_info( path )    # as a side effect: verify is the server is responding
                sha256.update( info.encode('utf-8') )
     if "stamp" in target :
         for link in target["stamp"] :
@@ -191,7 +197,7 @@ def get_sha256( config, name ) :
                 with open( replace_env_var( dir + "/" + filename ), "rb") as f :
                     for chunk in iter( lambda: f.read(4096), b"") :
                         sha256.update( chunk )
-    if "zenodo" in target :
+    if "zenodo" in target : # FIXME: remove this!
         for id in target["zenodo"]:
             r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
             if not r.status_code == 200 :
@@ -211,7 +217,7 @@ def get_sha256( config, name ) :
             sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
-def update_config( server, config ) :
+def update_config( server, config, echo = True ) :
     """ Compute current status information about the records in repository.
         Take dependency into account."""
     print_break()
@@ -235,7 +241,7 @@ WHERE{
              dct:modified  ?y      ;
              ex:has_sha256 ?sha256 .
 }
-""" )
+""", echo = echo )
     if r is not None:
         try: 
             for rec in r.json()["results"]["bindings"] :
@@ -261,7 +267,7 @@ WHERE{
                     item["status"] = "PROPAGATE"
     return config
 
-def update_dataset_info( server, config, name ) :
+def update_dataset_info( server, config, name, echo = True ) :
     print_break()
     context = name2context[ name ]
     sha256 = get_sha256( config, name )
@@ -287,7 +293,7 @@ WHERE {{
         }}
     }}
 }}
-""")
+""", echo = echo )
 
 def main():
     """Main function of the kgsteward workflow."""
@@ -340,10 +346,6 @@ def main():
             replace_env_var( config["server"]["repository"] ),
             replace_env_var( config["server"]["server_config"] )
         )
-        if args.fuseki_compress:
-            print_break()
-            print_task( "Start TDB2 compression (it may delay execution of next statements)" )
-            server.fuseki_compress_tdb2()
 #            replace_env_var( config["server"]["location"] ),
 #            username,
 #            replace_env_var( config["server"]["repository"] )
@@ -371,6 +373,14 @@ def main():
         else:
              server.rewrite_repository()
 
+    if args.fuseki_compress_tbd2: # FIXME: check that index type is really TDB2 (and not TDB)
+        if config["server"]["brand"] == "fuseki": 
+            print_break()
+            print_task( "Launch TDB2 compression in the. It may delay execution of next statements" )
+            server.fuseki_compress_tdb2()
+        else:
+            print_warn( "Option --fuseki_compress_tbd2 not supported for server brand: " + config["server"]["brand"] )
+
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
     # --------------------------------------------------------- #
@@ -390,7 +400,7 @@ def main():
             else :
                 raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( server, config ) # may takes a while
+        config = update_config( server, config, echo = args.v ) # may takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -412,7 +422,7 @@ def main():
         print_break()
         print_task( "Update dataset record: " + name )
         context = name2context[ name ]
-        server.drop_context( context )
+        server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         os.environ["kgsteward_dataset_name"]    = name
@@ -428,22 +438,22 @@ def main():
                     raise stop_error( 'System cmd failed: ' + cmd2 )
 
         if "url" in target :
-            for urlx in target["url"] :
-                path = replace_env_var( urlx )
+            for u in target["url"] :
+                path = replace_env_var( u )
                 if config["url_loader"]["method"] == "curl_riot_store":
                     filename = config["url_loader"]["tmp_dir"] + "/" + path.split('/')[-1]
                     cmd = [ "curl", path, "-o", filename ]
                     print( colored( " ".join( cmd ), "cyan" ))
                     subprocess.run( cmd )
-                    server.load_from_file_using_riot( filename, context )
-                else: # sparql_load
-                    server.sparql_update( f"LOAD SILENT <{path}> INTO GRAPH <{context}>" )
+                    server.load_from_file_using_riot( filename, context, echo = args.v )
+                else: # direct sparql_load
+                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
     }}
-}}""" )
+}}""", echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
                 fs = LocalFileServer( port = config["file_loader"][ "port" ] )
@@ -455,7 +465,7 @@ INSERT DATA {{
                         if not is_running_in_a_container: 
                             try:
                                 path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
-                                server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                                server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                             except Exception as e:
                                 msg = str( e )
                                 if msg == "HTTP request failed!":
@@ -466,23 +476,23 @@ INSERT DATA {{
                         if is_running_in_a_container:
                             # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                             path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
-                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                         filename = dir + "/" + fn
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
     }}
-}}""" )
+}}""", echo = args.v )
                 fs.terminate()
             else: # config["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
                         if config["file_loader"]["method"] == "sparql_load":
-                            server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>" )
+                            server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>", echo = args.v )
                         elif config["file_loader"]["method"] == "riot_store":
-                            server.load_from_file_using_riot( filename, context )
+                            server.load_from_file_using_riot( filename, context, echo = args.v )
                         else:
                             raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -490,7 +500,7 @@ INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
     }}
-}}""" )
+}}""", echo = args.v)
 
         if "zenodo" in target :
             for id in target["zenodo"]:
@@ -500,13 +510,13 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"]:
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>" )
+                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
     }}
-}}""" )
+}}""", echo = args.v )
 
         if "replace" in target:
             for key in target["replace"]:
@@ -520,26 +530,31 @@ INSERT DATA {{
                 # if replace is not None:
                 for key in sorted( replace.keys()):
                     sparql = sparql.replace( key, replace[ key ])
-                for s in split_sparql_update( sparql ): # split on ";" to execute one statement at a time
-                    server.sparql_update( s )
+                for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
+                    server.sparql_update( s, echo = args.v )
 
-        update_dataset_info( server, config, name )
+        update_dataset_info( server, config, name, echo = args.v )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
     # --------------------------------------------------------- #
 
-    if args.P and "prefixes" in config:
-        print_task( "rewrite prefixes" )
-        server.rewrite_prefixes()
-        catch_key_value = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>" )
-        for filename in config["prefixes"] :
-            report( "parse file", filename )
-            file = open( replace_env_var( filename ))
-            for line in file:
-                match = catch_key_value.search( line )
-                if match:
-                    server.set_prefix( match.group( 1 ), match.group( 2 ))
+    if args.graphdb_upload_prefixes:
+        if not config["server"]["brand"] == "graphdb":
+            print_warn( "Option --graphdb_upload_prefixes not supported for server brand: " + config["server"]["brand"] )
+        else:
+            if "prefixes" in config:
+                print_task( "rewrite prefixes" )
+                server.rewrite_prefixes()
+                catch_key_value = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>" )
+                for filename in config["prefixes"] :
+                    report( "parse file", filename )
+                    file = open( replace_env_var( filename ))
+                    for line in file:
+                        match = catch_key_value.search( line )
+                        if match:
+                            server.set_prefix( match.group( 1 ), match.group( 2 ))
+            
 
     # --------------------------------------------------------- #
     # Force update dataset info
@@ -563,7 +578,7 @@ INSERT DATA {{
                 report( 'query file', filename )
                 # print( '----------------------------------------------------------')
                 with open( filename ) as f: sparql = f.read()
-                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = False ))
+                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = args.v ))
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
@@ -581,7 +596,22 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.Q:
-        if args.graphdb_upload_query:
+        if "queries" not in config:
+            stop_error( "There are no 'queries' key in config! ")
+        for path in config["queries"] :
+            filenames = sorted( glob.glob( replace_env_var( path )))
+            for filename in filenames :
+                print_break()
+                with open( filename ) as f: sparql = f.read()
+                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
+                report( "validate", filename )
+                server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
+
+    if args.graphdb_upload_queries:
+        if not config["server"]["brand"] == "graphdb":
+            print_warn( "Option --graphdb_uupload_queries not supported for server brand: " + config["server"]["brand"] )
+        else:
             r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
             for item in r.json() :
                 print_break()
@@ -591,53 +621,55 @@ INSERT DATA {{
                     'method' : 'DELETE',
                     'params' : { 'name': item['name']}
                 })
-        for path in config["queries"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
-                print_break()
-                with open( filename ) as f: sparql = f.read()
-                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
-                report( "validate", filename )
-                server.validate_sparql_query( sparql, echo=False, timeout=args.timeout )
-                if not args.graphdb_upload_query:
-                    continue
-                report( "load", filename )
-                server.graphdb_call({
-                    'url'    : '/rest/sparql/saved-queries',
-                    'method'  : 'POST',
-                    'headers' : {
-                        'Content-Type': 'application/json', 
-                        'Accept-Encoding': 'identity'
-                    },
-                    'json'    : { 'name': name, 'body': sparql, "shared": "true" }
-                }, [ 201 ] )
+            for path in config["queries"] :
+                filenames = sorted( glob.glob( replace_env_var( path )))
+                for filename in filenames :
+                    print_break()
+                    with open( filename ) as f: sparql = f.read()
+                    name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                    sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
+#                    report( "validate", filename )
+#                    server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
+#                    if not args.graphdb_upload_query:
+#                        continue
+                    report( "load", filename )
+                    server.graphdb_call({
+                        'url'    : '/rest/sparql/saved-queries',
+                        'method'  : 'POST',
+                        'headers' : {
+                            'Content-Type': 'application/json', 
+                            'Accept-Encoding': 'identity'
+                        },
+                        'json'    : { 'name': name, 'body': sparql, "shared": "true" }
+                    }, [ 201 ] )
 
-    if args.r:
-#        if not os.path.isdir( args.r ):
-#            stop_error( "Directory not found: " + args.r )
-        counter = 0
-        prefix = {}
+    if args.sib_swiss_editor:
+        counter = 0 # to keep track of the original input order 
+        prefix = {} # to create a non-redundant list
         catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
         catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
         g = Graph()
-        EX     = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
-        RDF    = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
-        RDFS   = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
-        SCHEMA = Namespace( "https://schema.org/" )
-        SH     = Namespace( "http://www.w3.org/ns/shacl#" )
-        SPEX   = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
-        XSD    = Namespace( "http://www.w3.org/2001/XMLSchema#" )
-        OWL    = Namespace( "http://www.w3.org/2002/07/owl#" )
-        g.bind( "rdf",  RDF )
-        g.bind( "rdfs", RDFS )
-        g.bind( "ex",     EX )
+        SPARQLQUERY   = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
+        prefixes_iri  = URIRef(    server.get_endpoint_query() + "/.well-known/prefixes" )
+        PREFIX        = Namespace( server.get_endpoint_query() + "/.well-known/prefix/" )
+        RDF           = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
+        RDFS          = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
+        SCHEMA        = Namespace( "https://schema.org/" )
+        SH            = Namespace( "http://www.w3.org/ns/shacl#" )
+        SPEX          = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
+        XSD           = Namespace( "http://www.w3.org/2001/XMLSchema#" )
+        OWL           = Namespace( "http://www.w3.org/2002/07/owl#" )
+        g.bind( "rdf",    RDF )
+        g.bind( "rdfs",   RDFS )
         g.bind( "rdfs",   RDFS )
         g.bind( "schema", SCHEMA )
         g.bind( "sh",     SH )
         g.bind( "spex",   SPEX )
         g.bind( "xsd",    XSD )
-        g.bind( "owl",  OWL )
+        g.bind( "owl",    OWL )
+        g.bind( "sparql_query_" + config["server"]["repository"], SPARQLQUERY )
+        g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
+
         for path in config["queries"] :
             filenames = sorted( glob.glob( replace_env_var( path )))
             for filename in filenames :
@@ -655,23 +687,16 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                # server.validate_sparql_query( "\n".join( select ), echo=False, timeoutx=args.timeout ) 
-                iri = EX["query_" + str( counter )]
+                # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
+                iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
                 g.add(( iri, RDFS.label,    Literal( name.replace( "_", " "))))
                 g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
-                g.add(( iri, SH.prefixes,   URIRef("http://example.org/prefixes/sparql_examples_prefixes")))
+                g.add(( iri, SH.prefixes,   prefixes_iri ))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
                 g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
-#                g.serialize(
-#                    format="turtle",
-#                    destination = args.r + "/query" + str( counter ).rjust( 4, "0" ) + ".ttl"
-#                )
         if "prefixes" in config:
-            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDF.type,     OWL.ontology ))
-            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), RDFS.comment, Literal( "toto" )))
-            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), OWL.imports,  URIRef( 'http://www.w3.org/ns/shacl#' )))
             for filename in config["prefixes"] :
                 report( "parse file", filename )
                 file = open( replace_env_var( filename ))
@@ -680,16 +705,18 @@ INSERT DATA {{
                     if match:
                         prefix[ match.group( 1 ) ] = match.group( 2 )
         for key in prefix:
-            g.add(( URIRef('http://example.org/prefixes/sparql_examples_prefixes' ), SH.declare, URIRef( 'http://example.org/prefixes/prefix_' + key )))
-            g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.prefix,    Literal( key )))
-            g.add(( URIRef( 'http://example.org/prefixes/prefix_' + key ), SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
+            g.add(( prefixes_iri,    SH.declare,   PREFIX[ key ]))
+            g.add(( PREFIX[ key ], SH.prefix,    Literal( key )))
+            g.add(( PREFIX[ key ], SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
         g.serialize(
             format="turtle",
-            destination = args.r
+            destination = args.sib_swiss_editor
         )
         sys.exit( 0 )
         
     if args.x:
+        if "queries" not in config:
+            stop_error( "There are no 'queries' key in config! ")
         print_break()
         print_task( "Dump all query results in TSV format" )
         if not os.path.isdir( args.x ):
@@ -702,32 +729,29 @@ INSERT DATA {{
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = server.sparql_query( sparql, echo = False, timeout = args.timeout )
+                r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
                 if r is not None: # no timeout, i.e. the data are here
                     header, rows = sparql_result_to_table( r )
                     out_path =  args.x + "/" + name + ".tsv"
                     report( "write file", out_path )
                     with open( out_path, "w", encoding="utf-8" ) as f:
                         f.write( "\t".join( header ) + "\n" )
-                        if re.search( r"SEARCH\s+BY", sparql, re.IGNORECASE ):
-                            for row in rows:
-                                f.write( "\t".join( map( str, row )) + "\n" )
-                        else:
-                            for row in sorted( rows ):
-                                f.write( "\t".join( map( str, row )) + "\n" )
-        sys.exit( 0 )
+                        for row in sorted( rows ):
+                            f.write( "\t".join( map( str, row )) + "\n" )
 
     if args.y:
         print_break()
-        print_task( "Dump all contexts in nt format" )
+        print_task( "Dump all contexts in TSV format" )
         if not os.path.isdir( args.y ):
             stop_error( "Not a directory: " + args.y )
-        for item in config["dataset"] :
-            out_path =  args.y + "/" +  item["name"] + ".nt"
-            with open( out_path, "w" ) as file:
-                r = server.dump_context( item["context"] )
-                file.write( r.text )
-        sys.exit( 0 )
+        for item in config["dataset"]:
+            print_break()
+            header, rows = server.dump_context( item["context"], echo = args.v )
+            out_path =  args.y + "/" +  item["name"] + ".tsv"
+            report( "write file", out_path )
+            with open( out_path, "w", encoding="utf-8"  ) as f:
+                for row in sorted( rows ):
+                    f.write( "\t".join( map( str, row )) + "\n" )
 
     # --------------------------------------------------------- #
     # Turn free access ON
@@ -743,7 +767,7 @@ INSERT DATA {{
 
     config = update_config( server, config )
 
-    contexts = server.get_contexts()
+    contexts = server.list_context()
     print_break()
     print_task( "Show current status" )
     print( colored("                            name        #triple        last modified    status", "blue" ))

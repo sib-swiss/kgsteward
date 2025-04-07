@@ -112,7 +112,7 @@ class RFD4JClient( GenericClient ):
     ):
         super().load_from_file( file, context, { **self.headers, **headers }, echo )
     
-    def get_contexts( self, echo = True ) :
+    def list_context( self, echo = True ) :
         r = http_call({
             'method'  : 'GET',
             'url'     : self.server_url + "/repositories/" + self.repository + "/contexts",
@@ -123,45 +123,8 @@ class RFD4JClient( GenericClient ):
             contexts.add( rec["contextID"]["value"] )
         return contexts
 
-    def drop_context( self, context ):
-        self.sparql_update( f"DROP GRAPH <{context}>" )
-
-    def graphdb_call( self, request_args, status_code_ok = [ 200 ], echo = True ) :
-        request_args['url'] = self.server_url + str( request_args['url'] )
-        if 'headers' in request_args :
-            request_args['headers']['Authorization' ] = self.authorization
-        else :
-            request_args['headers'] = { 'Authorization' : self.authorization }
-        return http_call( request_args, status_code_ok, echo )
-
-    def validate_sparql_query( self, sparql, echo = False ) :
-        r = http_call({
-            'method'  : 'POST',
-            'url'     : self.server_url + "/repositories/" + self.repository,
-            'headers' : {
-                'Accept'        : 'text/tab-separated-values'
-                # 'Authorization' : self.authorization
-            },
-            'params'  : {
-                'query'   : sparql,
-                "infer"   : True,
-                "timeout" : 5       # 5 seems to solve a HTTP "problem" observed with a timout of 1 s ?!?
-            }
-        }, [ 503, 500, 400, 200 ], echo )
-        if r.status_code == 503 :
-            time.sleep( 1 )
-            report( "status", "query timed out" )
-        elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-            time.sleep( 1 )
-            report( "status", "unknown error, maybe timeout" )
-        elif r.status_code == 400 :
-            raise RuntimeError( "Suspected SPARQL syntax error:\n" + sparql )
-        else : #  r.status_code == 200 :
-            n = r.text.count( "\n" )
-            if n == 0 :
-                report( "status" + "!!! empty results !!!" )
-            else :
-                report( "status", str( n ) + " lines returned" )
+    def drop_context( self, context, echo = True ):
+        self.sparql_update( f"DROP GRAPH <{context}>", echo = echo )
 
     def rewrite_prefixes( self, echo = True ):
         return

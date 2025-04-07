@@ -106,9 +106,9 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
 
 }
 
-description["location_graphdb"] = description["location"] + " GraphDB servers have location 'http://localhost:7200' by default"
-description["location_fuseki"]  = description["location"] + " Fuseki servers have location 'http://localhost:3030' by default"
-description["location_rdf4j"]   = description["location"] + " RDF4J servers have location 'http://localhost:8080' by default"
+description["location_graphdb"] = description["location"] + " GraphDB has location 'http://localhost:7200' by default"
+description["location_fuseki"]  = description["location"] + " Fuseki has location 'http://localhost:3030' by default"
+description["location_rdf4j"]   = description["location"] + " RDF4J has location 'http://localhost:8080' by default"
 
 def describe( term ):
     if term in description:
