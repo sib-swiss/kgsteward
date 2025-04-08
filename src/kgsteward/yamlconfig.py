@@ -118,7 +118,7 @@ def describe( term ):
 
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand              : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
+    brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_graphdb" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
@@ -129,14 +129,14 @@ class GraphDBConf( BaseModel ):
 
 class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand              : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
+    brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_fuseki" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand              : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
+    brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_rdf4j" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
@@ -176,7 +176,7 @@ class CurlRiotStoreUrlLoader( BaseModel ):
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
-    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ]
+    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ] = Field( discriminator = 'brand' )
     file_loader       : Union[ DirectFileLoader, HttpServerFileLoader, RiotStoreFileLoader ]
     url_loader        : Union[ DirectUrlLoader, CurlRiotStoreUrlLoader ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))

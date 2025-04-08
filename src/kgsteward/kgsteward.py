@@ -106,6 +106,7 @@ def get_user_input():
     )
     parser.add_argument(
         '-q',
+        action = 'store_true',
         help    = 'Quiet mode: do not print out SPARQL queries being executed.'
     )
     parser.add_argument(
@@ -565,21 +566,22 @@ INSERT DATA {{
     # Run all validation tests
     # --------------------------------------------------------- #
 
-    if not args.q :
+    if args.V:
         print_break()
         print_task( "Run assert queries to validate repository content " )
         exit_code = 0
         for path in config["validations"] :
             for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                 filename = dir + "/" + fn
+                print_break()
                 report( 'query file', filename )
-                # print( '----------------------------------------------------------')
                 with open( filename ) as f: sparql = f.read()
                 header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = not args.q ))
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
-                    print_strip(sparql, color = "green" )
+                    if args.q:
+                        print_strip( sparql, color = "green" )
                     print( colored( "\t".join( header ), "red" ))
                     for row in rows:
                         print( colored( "\t".join( map( str, row )), "red" ))

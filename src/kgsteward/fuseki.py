@@ -82,7 +82,7 @@ WHERE{
 
     def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
         if echo :
-            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+            print_strip( sparql.replace( "\t", "    " ), color = "green" )
         headers = {
             'Accept' : 'application/json', 
             'Content-Type': 'application/x-www-form-urlencoded' 
@@ -117,8 +117,8 @@ WHERE{
         return r
     
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        if echo :
-            print( colored( sparql.replace( "\t", "    " ), "green" ), flush = True )
+        if echo:
+            print_strip( sparql.replace( "\t", "    " ), color = "green" )
         http_call(
             {
                 'method'  : 'POST',
