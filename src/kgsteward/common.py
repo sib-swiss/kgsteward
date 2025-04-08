@@ -80,7 +80,8 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
         print_warn( "Status code = " + str( r.status_code ))
         print_warn( r.text if not r.text is None else '' )
         stop_error( "HTTP request failed!" )
-    report( "elapsed time", ( "%.3f" % ( end_time - start_time )))
+    if echo :
+        report( "elapsed time", ( "%.3f" % ( end_time - start_time )))
     return r
 
 def get_head_info( url, echo = True ):

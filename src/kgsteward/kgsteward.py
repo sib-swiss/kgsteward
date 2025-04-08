@@ -105,9 +105,9 @@ def get_user_input():
                  "It is possibly slow and memory hungry." 
     )
     parser.add_argument(
-        '-q',
+        '-v',
         action = 'store_true',
-        help    = 'Quiet mode: do not print out SPARQL queries being executed.'
+        help    = 'Verbose mode: print out SPARQL queries being executed. Super useful for debugging SPARQL code.'
     )
     parser.add_argument(
         '--timeout',
@@ -158,7 +158,7 @@ def get_target( config, name ):
             return rec
     raise RuntimeError( "Target name not found: " + name )
 
-def get_sha256( config, name ) :
+def get_sha256( config, name, echo = True ) :
     """ Compute checksums of dataset record """
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
@@ -174,14 +174,14 @@ def get_sha256( config, name ) :
             path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
             if re.search( r"https?:", path ) : # do not run HEAD on ftp server FIXME: implement something better
-               info = get_head_info( path )    # as a side effect: verify is the server is responding
+               info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
                sha256.update( info.encode('utf-8') )
     if "stamp" in target :
         for link in target["stamp"] :
             path = replace_env_var( link )
             sha256.update( path.encode('utf-8') )
             if( path.startswith( "http" )):
-                info = get_head_info( path ) # as a side effect: verify is the server is responding
+                info = get_head_info( path, echo = echo  ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
                 filenames = sorted( glob.glob( replace_env_var( path )))
@@ -251,7 +251,7 @@ WHERE{
                 item["count"]      = rec["x"]["value"]
                 item["date"]       = rec["t"]["value"]
                 item["sha256_old"] = str( rec["sha256"]["value"] )
-                item["sha256_new"] = get_sha256( config, name )
+                item["sha256_new"] = get_sha256( config, name, echo = echo )
                 if item["sha256_old"] == item["sha256_new"]:
                     item["status"] = "ok"
                 elif not item["status"] == "FROZEN":
@@ -268,7 +268,7 @@ WHERE{
 def update_dataset_info( server, config, name, echo = True ) :
     print_break()
     context = name2context[ name ]
-    sha256 = get_sha256( config, name )
+    sha256 = get_sha256( config, name, echo = echo )
     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 PREFIX dct:  <http://purl.org/dc/terms/>
 PREFIX ex:   <http://example.org/>
@@ -398,7 +398,7 @@ def main():
             else :
                 raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( server, config, echo = not args.q ) # may takes a while
+        config = update_config( server, config, echo = args.v ) # may takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -420,7 +420,7 @@ def main():
         print_break()
         print_task( "Update dataset record: " + name )
         context = name2context[ name ]
-        server.drop_context( context, echo = not args.q )
+        server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
         os.environ["kgsteward_dataset_name"]    = name
@@ -443,15 +443,15 @@ def main():
                     cmd = [ "curl", path, "-o", filename ]
                     print( colored( " ".join( cmd ), "cyan" ))
                     subprocess.run( cmd )
-                    server.load_from_file_using_riot( filename, context, echo = not args.q )
+                    server.load_from_file_using_riot( filename, context, echo = args.v )
                 else: # direct sparql_load
-                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = not args.q )
+                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
     }}
-}}""", echo = not args.q )
+}}""", echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
                 fs = LocalFileServer( port = config["file_loader"][ "port" ] )
@@ -463,7 +463,7 @@ INSERT DATA {{
                         if not is_running_in_a_container: 
                             try:
                                 path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
-                                server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = not args.q )
+                                server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                             except Exception as e:
                                 msg = str( e )
                                 if msg == "HTTP request failed!":
@@ -474,23 +474,23 @@ INSERT DATA {{
                         if is_running_in_a_container:
                             # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                             path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
-                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = not args.q )
+                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                         filename = dir + "/" + fn
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
     }}
-}}""", echo = not args.q )
+}}""", echo = args.v )
                 fs.terminate()
             else: # config["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
                         if config["file_loader"]["method"] == "sparql_load":
-                            server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>", echo = not args.q )
+                            server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>", echo = args.v )
                         elif config["file_loader"]["method"] == "riot_store":
-                            server.load_from_file_using_riot( filename, context, echo = not args.q )
+                            server.load_from_file_using_riot( filename, context, echo = args.v )
                         else:
                             raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
                         server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -498,7 +498,7 @@ INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
     }}
-}}""", echo = not args.q)
+}}""", echo = args.v)
 
         if "zenodo" in target :
             for id in target["zenodo"]:
@@ -508,13 +508,13 @@ INSERT DATA {{
                 info = r.json()
                 for record in info["files"]:
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
-                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = not args.q )
+                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
     }}
-}}""", echo = not args.q )
+}}""", echo = args.v )
 
         if "replace" in target:
             for key in target["replace"]:
@@ -529,9 +529,9 @@ INSERT DATA {{
                 for key in sorted( replace.keys()):
                     sparql = sparql.replace( key, replace[ key ])
                 for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
-                    server.sparql_update( s, echo = not args.q )
+                    server.sparql_update( s, echo = args.v )
 
-        update_dataset_info( server, config, name, echo = not args.q )
+        update_dataset_info( server, config, name, echo = args.v )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -576,7 +576,7 @@ INSERT DATA {{
                 print_break()
                 report( 'query file', filename )
                 with open( filename ) as f: sparql = f.read()
-                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = not args.q ))
+                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = args.v ))
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
@@ -605,7 +605,7 @@ INSERT DATA {{
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
                 report( "validate", filename )
-                server.validate_sparql_query( sparql, echo = not args.q, timeout=args.timeout )
+                server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 
     if args.graphdb_upload_queries:
         if not config["server"]["brand"] == "graphdb":
@@ -628,7 +628,7 @@ INSERT DATA {{
                     name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                     sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
 #                    report( "validate", filename )
-#                    server.validate_sparql_query( sparql, echo = not args.q, timeout=args.timeout )
+#                    server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 #                    if not args.graphdb_upload_query:
 #                        continue
                     report( "load", filename )
@@ -686,7 +686,7 @@ INSERT DATA {{
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
-                # server.validate_sparql_query( "\n".join( select ), echo=not args.q, timeout=args.timeout )
+                # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
                 iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
@@ -728,7 +728,7 @@ INSERT DATA {{
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     sparql = file.read()
-                r = server.sparql_query( sparql, echo = not args.q, timeout = args.timeout )
+                r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
                 if r is not None: # no timeout, i.e. the data are here
                     header, rows = sparql_result_to_table( r )
                     out_path =  args.x + "/" + name + ".tsv"
@@ -745,7 +745,7 @@ INSERT DATA {{
             stop_error( "Not a directory: " + args.y )
         for item in config["dataset"]:
             print_break()
-            header, rows = server.dump_context( item["context"], echo = not args.q )
+            header, rows = server.dump_context( item["context"], echo = args.v )
             out_path =  args.y + "/" +  item["name"] + ".tsv"
             report( "write file", out_path )
             with open( out_path, "w", encoding="utf-8"  ) as f:
@@ -767,7 +767,7 @@ INSERT DATA {{
     # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
 
-    config = update_config( server, config )
+    config = update_config( server, config, echo = args.v )
 
     contexts = server.list_context()
     print_break()
