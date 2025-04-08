@@ -36,26 +36,25 @@ def get_user_input():
     """Generate argparse CLI and return user input."""
 
     parser = argparse.ArgumentParser(
-        description = "A command line tool to manage the content of RDF store. "
-            "This script rely on a YAML config file (version 2). "
-            "Source code and documentation are available from https://github.com/sib-swiss/kgsteward"
+        description = "A command line tool to manage the content of a RDF store, as specified in a YAML configuration file. "
+                      "Documentations, including supported YAML syntax and the source are available from https://github.com/sib-swiss/kgsteward."
     )
     parser.add_argument(
         'yamlfile',
         nargs = 1,
-        help  = "Mandatory configuration file in YAML format"
+        help  = "Mandatory configuration file in YAML format. "
+                "Supported syntax: https://github.com/sib-swiss/kgsteward/blob/main/doc/yaml/kgsteward.schema.md"
     )
     parser.add_argument(
         '-F',
         action = 'store_true',
         help   = "Force rebuild the core of the RDF database. "
-                 "Implies -I -D -L options."
+                 "Sames as -I -D combined options."
     )
     parser.add_argument(
         '-I',
         action = 'store_true',
-        help   = "Create the repository or force recreate the repository, "
-                 "i.e. erase everything"
+        help   = "Create the repository or force rewrite the repository, i.e. erase all existing RDF data."
     )
     parser.add_argument(
         '-D',
@@ -71,51 +70,49 @@ def get_user_input():
     parser.add_argument(
         '-C',
         action = 'store_true',
-        help   = "Load missing/incomplete dataset to complete the repository."
-    )
-    parser.add_argument(
-        '-L',
-        action = 'store_true',
-        help   = "Provide public free-access to the repository, which is "
-            "strictly read-only."
+        help   = "Load missing/incomplete/outdated dataset to complete the repository."
     )
     parser.add_argument(
         '-U',
         action = 'store_true',
-        help   = 'Force update internal checksum without updating the data.'
+        help   = 'Force update internal checksum without updating the data. '
     )
     parser.add_argument(
         '-V',
         action = 'store_true',
-        help   = 'Validate the repository content.'
+        help   = "Validate the repository content, by running SPARQL queries that supposed to return the problems. "
+                 "It might be combined with --timeout."
     )
     parser.add_argument(
         '-Q',
         action = 'store_true',
-        help   = "Clean, test and reload all SPARQL queries. This is a GraphDB "
-                 "specific option. Note that the queries are global to a web "
-                 "site, i.e. they are not attached to a specific repository. "
-                 "It may fail on SPARQL syntax error!"
+        help   = "Run all SPARQL queries. It might be combined with --timeout."
     )
     parser.add_argument(
         '-x',
         help   = "Dump all query results in TSV format to dir <X>. "
-                 "Sorting of results is enforced, irrespective of SPARQL queries. "
+                 "Sorting of results is enforced, irrespective of the SPARQL queries. "
                  "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
-                 "Using this service is useful for debugging, but not recommended to routinely retrieve data. " 
+                 "Using this service is useful for debugging, but not meant to retrieve data. " 
                  "It is possibly slow and memory hungry." 
     )
     parser.add_argument(
         '-y',
         help   = "Dump all context data in TSV format to dir <Y>. "                 
-                 "Sorting of results is enforced, irrespective of SPARQL queries. "
+                 "Sorting of results is enforced, irrespective of the SPARQL queries. "
                  "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
-                 "Using this service is useful for debugging, but not recommended to routinely retrieve data. "
+                 "Using this service is useful for debugging, but not meant to retrieve data. " 
                  "It is possibly slow and memory hungry." 
     )
     parser.add_argument(
-        '-v',
-        help    = 'Verbose mode: print out SPARQL queries being executed.'
+        '-q',
+        help    = 'Quiet mode: do not print out SPARQL queries being executed.'
+    )
+    parser.add_argument(
+        '--timeout',
+        type = int,
+        help   = "Timeout delay in seconds. There is no timeout by default. "
+                 "Values lower than 15 are not recommended with GraphDB." 
     )
     parser.add_argument(
         '--fuseki_compress_tbd2',
@@ -125,7 +122,8 @@ def get_user_input():
     parser.add_argument(
         '--graphdb_upload_queries',
         action = 'store_true',
-        help = "Rewrite and upload queries in the GraphDB menu"
+        help = "Rewrite and upload queries in the GraphDB menu. "
+               "The queries are global to a GraphDB instance, i.e. they are not attached to a specific repository. "
     )
     parser.add_argument(
         '--graphdb_upload_prefixes', '--rdf4j_upload_prefixes',
@@ -140,7 +138,7 @@ def get_user_input():
     parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
-               "Note that the content of this file is not uploaded automatically to the store. "
+               "Note that the <SIB_SWISS_EDITOR> file is not uploaded diirectly to the store. "
     )
     args = parser.parse_args()
 
@@ -148,9 +146,9 @@ def get_user_input():
     if args.F :
         args.I = True
         args.D = True
-        args.L = True
 
     return args
+
 
 def get_target( config, name ):
     """ An inefficient helper function """
@@ -159,9 +157,8 @@ def get_target( config, name ):
             return rec
     raise RuntimeError( "Target name not found: " + name )
 
-# Compute checksums of dataset record
-#
 def get_sha256( config, name ) :
+    """ Compute checksums of dataset record """
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
@@ -610,7 +607,7 @@ INSERT DATA {{
 
     if args.graphdb_upload_queries:
         if not config["server"]["brand"] == "graphdb":
-            print_warn( "Option --graphdb_uupload_queries not supported for server brand: " + config["server"]["brand"] )
+            print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
         else:
             r = server.graphdb_call({ 'url' : '/rest/sparql/saved-queries', 'method' : 'GET' })
             for item in r.json() :
@@ -757,8 +754,11 @@ INSERT DATA {{
     # Turn free access ON
     # --------------------------------------------------------- #
 
-    if args.L :
-        server.free_access()
+    if args.graphdb_free_access :
+        if not config["server"]["brand"] == "graphdb":
+            print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
+        else:
+            server.free_access()
 
     # --------------------------------------------------------- #
     # Print final repository status
