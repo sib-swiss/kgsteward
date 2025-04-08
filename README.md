@@ -65,13 +65,4 @@ Start documentation website in development:
 uv run mkdocs serve
 ```
 
-## Maturity level
-
-__`kgsteward`__ as a client for GraphDB was developped over several years to gather and manage experimental data from chemistry (LC-MS/MS) and biology (bio-activities), together with reference chemical structures derived from public database (LOTUS, Wikidata). This was published in [A Sample-Centric and Knowledge-Driven Computational Framework for Natural Products Drug Discovery](https://doi.org/10.1021/acscentsci.3c00800). Two other complex research projects which RDF data are managed by __`kgsteward`__ are currently ongoing. 
-
-__`kgsteward`__ as a client for Fuseki and RDF4J is currently under developpement.
-
-
-
-
 
