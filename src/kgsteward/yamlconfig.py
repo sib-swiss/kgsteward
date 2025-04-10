@@ -199,7 +199,7 @@ def parse_yaml_conf( path : str ):
     except Exception as e:
         stop_error( "Something goes wrong with YAML parsing: " + repr( e ))
     if "version" not in data:
-        stop_error( "Key 'version' not found! you should upgrade YAML syntax to a recent one!" ) 
+        stop_error( 'Key "version" not found in YAML file: ' + path ) 
     try:
         config = KGStewardConf( **data ).model_dump( exclude_none = True )
     except ValidationError as e:
