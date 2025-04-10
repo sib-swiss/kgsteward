@@ -107,7 +107,8 @@ def get_user_input():
     parser.add_argument(
         '-v',
         action = 'store_true',
-        help    = 'Verbose mode: print out SPARQL queries being executed. Super useful for debugging SPARQL code.'
+        help    = "Verbose mode: print out SPARQL queries being executed. "
+                  "Super useful for debugging SPARQL update (after string replacement)."
     )
     parser.add_argument(
         '--timeout',
@@ -118,7 +119,8 @@ def get_user_input():
     parser.add_argument(
         '--fuseki_compress_tbd2',
         action = 'store_true',
-        help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
+        help = "Compress fuseki TDB2 indexes, otherwise do nothing. This is executed at first. "
+               "Beware of the advantage and disadvantage of TDB vs TDB2 indexes in fuseki."
     )
     parser.add_argument(
         '--graphdb_upload_queries',
@@ -129,7 +131,8 @@ def get_user_input():
     parser.add_argument(
         '--graphdb_upload_prefixes', '--rdf4j_upload_prefixes',
         action = 'store_true',
-        help = "Rewrite and reload all prefix definitions"
+        help = "Rewrite and reload all prefix definitions. "
+               "The prefixes are global to a GraphDB/RDF4J instance, i.e. they are not attached to a specific repository. "
     )
     parser.add_argument(
         '--graphdb_free_access',
@@ -139,7 +142,7 @@ def get_user_input():
     parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
-               "Note that the <SIB_SWISS_EDITOR> file is not uploaded diirectly to the store. "
+               "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
     )
     args = parser.parse_args()
 
@@ -575,11 +578,15 @@ INSERT DATA {{
                 print_break()
                 report( 'query file', filename )
                 with open( filename ) as f: sparql = f.read()
-                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = args.v ))
+                r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
+                if args.timeout is not None and r is None: # likely timeout
+                    report( "Result", "Unknown" )
+                    continue
+                header, rows = sparql_result_to_table( r )
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
-                    if args.q:
+                    if args.v:
                         print_strip( sparql, color = "green" )
                     print( colored( "\t".join( header ), "red" ))
                     for row in rows:
