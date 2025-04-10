@@ -150,7 +150,6 @@ def get_user_input():
 
     return args
 
-
 def get_target( config, name ):
     """ An inefficient helper function """
     for rec in config["dataset"] :
