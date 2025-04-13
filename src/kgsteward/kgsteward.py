@@ -586,7 +586,7 @@ INSERT DATA {{
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
-                    if args.v:
+                    if not args.v:
                         print_strip( sparql, color = "green" )
                     print( colored( "\t".join( header ), "red" ))
                     for row in rows:
