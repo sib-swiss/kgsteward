@@ -263,7 +263,7 @@ WHERE{
     for item in config["dataset"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
-                if name2item[parent]["status"] == "UPDATE" :
+                if name2item[parent]["status"] in { "EMPTY", "UPDATE", "PROPAGATE" }:
                     item["status"] = "PROPAGATE"
     return config
 
