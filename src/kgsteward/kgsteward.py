@@ -570,7 +570,7 @@ INSERT DATA {{
 
     if args.V:
         print_break()
-        print_task( "Run assert queries to validate repository content " )
+        print_task( "Run SPARQL queries to validate repository content." )
         exit_code = 0
         for path in config["validations"] :
             for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
@@ -681,14 +681,14 @@ INSERT DATA {{
                 report( "parse file", filename )
                 counter = counter + 1
                 comment = []
-                select  = []
+                select  = [] # i.e. the SPARQL query itself
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     for line in file:
                         if re.match( "^#", line ):
                             comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                         else:
-                            select.append( line.rstrip() )
+                            select.append( line.rstrip().replace( "\t", "    "))
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
@@ -696,11 +696,11 @@ INSERT DATA {{
                 iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                g.add(( iri, RDFS.label,    Literal( name.replace( "_", " "))))
-                g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
+                # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
+                g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
                 g.add(( iri, SH.prefixes,   prefixes_iri ))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
-                g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
+                # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
         if "prefixes" in config:
             for filename in config["prefixes"] :
                 report( "parse file", filename )
