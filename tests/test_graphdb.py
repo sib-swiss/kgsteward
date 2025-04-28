@@ -8,7 +8,7 @@ from . import run_cmd, env
 # NOTE: in case issue in rootless docker: https://github.com/testcontainers/testcontainers-python/issues/537
 # TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/run/user/$(id -u)/docker.sock uv run pytest -s
 
-TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.1-se'
+TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.5'
 
 env["GRAPHDB_USERNAME"] = "admin"
 env["GRAPHDB_PASSWORD"] = "root"
@@ -45,4 +45,4 @@ def test_cli_graphdb(triplestore):
     print(res_validate.stdout)
     assert res_validate.returncode == 0
 
-    sys.exit( 0 ) 
+    sys.exit( 0 )
