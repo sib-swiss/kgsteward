@@ -107,7 +107,8 @@ def get_user_input():
     parser.add_argument(
         '-v',
         action = 'store_true',
-        help    = 'Verbose mode: print out SPARQL queries being executed. Super useful for debugging SPARQL code.'
+        help    = "Verbose mode: print out SPARQL queries being executed. "
+                  "Super useful for debugging SPARQL update (after string replacement)."
     )
     parser.add_argument(
         '--timeout',
@@ -118,7 +119,8 @@ def get_user_input():
     parser.add_argument(
         '--fuseki_compress_tbd2',
         action = 'store_true',
-        help = "Compress fuseki TDB2 databases, otherwise do nothing. This is executed at first."
+        help = "Compress fuseki TDB2 indexes, otherwise do nothing. This is executed at first. "
+               "Beware of the advantage and disadvantage of TDB vs TDB2 indexes in fuseki."
     )
     parser.add_argument(
         '--graphdb_upload_queries',
@@ -129,7 +131,8 @@ def get_user_input():
     parser.add_argument(
         '--graphdb_upload_prefixes', '--rdf4j_upload_prefixes',
         action = 'store_true',
-        help = "Rewrite and reload all prefix definitions"
+        help = "Rewrite and reload all prefix definitions. "
+               "The prefixes are global to a GraphDB/RDF4J instance, i.e. they are not attached to a specific repository. "
     )
     parser.add_argument(
         '--graphdb_free_access',
@@ -139,7 +142,7 @@ def get_user_input():
     parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
-               "Note that the <SIB_SWISS_EDITOR> file is not uploaded diirectly to the store. "
+               "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
     )
     args = parser.parse_args()
 
@@ -149,7 +152,6 @@ def get_user_input():
         args.D = True
 
     return args
-
 
 def get_target( config, name ):
     """ An inefficient helper function """
@@ -261,7 +263,7 @@ WHERE{
     for item in config["dataset"] :
         if item["status"] == "ok" and "parent" in item :
             for parent in item["parent"] :
-                if name2item[parent]["status"] == "UPDATE" :
+                if name2item[parent]["status"] in { "EMPTY", "UPDATE", "PROPAGATE" }:
                     item["status"] = "PROPAGATE"
     return config
 
@@ -568,7 +570,7 @@ INSERT DATA {{
 
     if args.V:
         print_break()
-        print_task( "Run assert queries to validate repository content " )
+        print_task( "Run SPARQL queries to validate repository content." )
         exit_code = 0
         for path in config["validations"] :
             for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
@@ -576,11 +578,15 @@ INSERT DATA {{
                 print_break()
                 report( 'query file', filename )
                 with open( filename ) as f: sparql = f.read()
-                header, rows = sparql_result_to_table( server.sparql_query( sparql, echo = args.v ))
+                r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
+                if args.timeout is not None and r is None: # likely timeout
+                    report( "Result", "Unknown" )
+                    continue
+                header, rows = sparql_result_to_table( r )
                 if len( rows ) == 0 :
                     report( "Result", "Pass ;-)" )
                 else:
-                    if args.q:
+                    if not args.v:
                         print_strip( sparql, color = "green" )
                     print( colored( "\t".join( header ), "red" ))
                     for row in rows:
@@ -675,14 +681,14 @@ INSERT DATA {{
                 report( "parse file", filename )
                 counter = counter + 1
                 comment = []
-                select  = []
+                select  = [] # i.e. the SPARQL query itself
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
                 with open( filename ) as file:
                     for line in file:
                         if re.match( "^#", line ):
                             comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                         else:
-                            select.append( line.rstrip() )
+                            select.append( line.rstrip().replace( "\t", "    "))
                             match = catch_key_value_rq.search( line )
                             if match:
                                 prefix[match.group( 1 )] = match.group( 2 )
@@ -690,11 +696,11 @@ INSERT DATA {{
                 iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                g.add(( iri, RDFS.label,    Literal( name.replace( "_", " "))))
-                g.add(( iri, RDFS.comment,  Literal( "\n".join( comment ))))
+                # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
+                g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
                 g.add(( iri, SH.prefixes,   prefixes_iri ))
                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
-                g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query())))
+                # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
         if "prefixes" in config:
             for filename in config["prefixes"] :
                 report( "parse file", filename )
