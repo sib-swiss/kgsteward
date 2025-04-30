@@ -139,7 +139,7 @@ class GraphDBClient( GenericClient ):
                 return None
         return r
     
-    def sparql_update( self, sparql,status_code_ok = [ 204 ], echo = True ):
+    def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ):
         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         http_call(
