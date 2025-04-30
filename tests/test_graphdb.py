@@ -32,7 +32,7 @@ def triplestore():
     yield base_url
 
 
-def test_cli_graphdb(triplestore):
+def test_cli_graphdb( triplestore ):
     res_init = run_cmd(["kgsteward", "doc/first_steps/graphdb.yaml", "-I"], env)
     print(res_init.stdout)
     assert res_init.returncode == 0
