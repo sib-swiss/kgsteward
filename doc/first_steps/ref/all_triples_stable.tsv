@@ -27,14 +27,9 @@ s	p	o
 <http://example.org#exampleCars>	<http://xmlns.com/foaf/0.1/made>	<http://example.org#CoolRedCar>
 <http://example.org#exampleCars>	<http://xmlns.com/foaf/0.1/name>	Example Cars & Co.
 <http://example.org/context/foaf_data>	<http://example.org/has_sha256>	83463c190d082ad8e63e7892394ed0cad50547c81d8ee6fc6a630feec90b0956
-<http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#dataDump>	<file:///Users/mpagni/github.com/kgsteward/doc/first_steps/data/Alice.ttl>
-<http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#dataDump>	<file:///Users/mpagni/github.com/kgsteward/doc/first_steps/data/Bob.ttl>
-<http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#dataDump>	<file:///Users/mpagni/github.com/kgsteward/doc/first_steps/data/company.ttl>
-<http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#dataDump>	<file:///Users/mpagni/github.com/kgsteward/doc/first_steps/data/product.ttl>
 <http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#triples>	40
 <http://example.org/context/foaf_data>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<http://rdfs.org/ns/void#Dataset>
 <http://example.org/context/foaf_ontology>	<http://example.org/has_sha256>	da648d7bc6f28b06c497112dbc866d9d620bffe479b6c328bb2a7a4b5c1c4508
-<http://example.org/context/foaf_ontology>	<http://rdfs.org/ns/void#dataDump>	<http://xmlns.com/foaf/spec/20140114.rdf>
 <http://example.org/context/foaf_ontology>	<http://rdfs.org/ns/void#triples>	621
 <http://example.org/context/foaf_ontology>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<http://rdfs.org/ns/void#Dataset>
 <http://example.org/context/update_data>	<http://example.org/has_sha256>	2e25f9691fc342413867e76208fbbbe4cd10ce67aa8cb1f1fe9fcb02b7deb79a

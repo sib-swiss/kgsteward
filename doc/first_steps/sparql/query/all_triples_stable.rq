@@ -1,0 +1,8 @@
+SELECT *
+WHERE{
+	?s ?p ?o
+    FILTER( ?p NOT IN ( # dates and local file paths are not reproducible => remove for testing 
+        <http://rdfs.org/ns/void#dataDump> ,
+        <http://purl.org/dc/terms/modified>
+    ))
+}
