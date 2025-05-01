@@ -8,13 +8,12 @@ from . import run_cmd, env
 # NOTE: in case issue in rootless docker: https://github.com/testcontainers/testcontainers-python/issues/537
 # TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/run/user/$(id -u)/docker.sock uv run pytest -s
 
-TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.5'
+TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.5' # latest 10 release with no license
 
 env["GRAPHDB_USERNAME"] = "admin"
 env["GRAPHDB_PASSWORD"] = "root"
 
 @pytest.fixture( scope="module" )
-
 def triplestore():
     """Start GraphDB container as a fixture."""
     container = DockerContainer(TRIPLESTORE_IMAGE)
@@ -32,24 +31,28 @@ def triplestore():
     yield base_url
 
 cmd_base = [
-    "kgsteward doc/first_steps/graphdb.yaml -I -v",
-    "kgsteward doc/first_steps/graphdb.yaml -C -v",
-    "kgsteward doc/first_steps/graphdb.yaml -V -v",
+    "kgsteward doc/first_steps/graphdb.yaml -I -v", # Initialize repository
+    "kgsteward doc/first_steps/graphdb.yaml -C -v", # Complete (populate) repository
+    "kgsteward doc/first_steps/graphdb.yaml -V -v", # Validate repository
+    "kgsteward doc/first_steps/graphdb.yaml -Q -v", # validate Queries 
     "mkdir -p tmp/first_steps",
     "rm -f tmp/first_steps/*.tsv",
-    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps -v",
+    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps -v", # Serialize query results for testing
     "diff -r doc/first_steps/ref tmp/first_steps"
 ]
 
-def run_cmd_base():
-    for cmd in cmd_base:
-        print( "##############################################################################" )
-        print( "### " + cmd )
-        print( "##############################################################################" )
-        res = run_cmd( cmd.split( " " ), env )
-        print(res.stdout)
-        print(res.stderr)
-        assert res.returncode == 0
+cmd_graphdb = [
+    "kgsteward doc/first_steps/graphdb.yaml --graphdb_upload_queries -v",
+    "kgsteward doc/first_steps/graphdb.yaml --graphdb_upload_prefixes -v",
+    "kgsteward doc/first_steps/graphdb.yaml --graphdb_free_access -v",
+]
 
-def test_cli_graphdb( triplestore ):
-    run_cmd_base()
+@pytest.mark.parametrize( "cmd", cmd_base + cmd_graphdb )
+def test_run_cmd_graphdb( triplestore , cmd):
+    print( "##############################################################################" )
+    print( "### " + cmd )
+    print( "##############################################################################" )
+    res = run_cmd( cmd.split( " " ), env )
+    print(res.stdout)
+    print(res.stderr)
+    assert res.returncode == 0

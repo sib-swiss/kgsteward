@@ -1,12 +1,25 @@
 {
   "$defs": {
-    "ChunkedStoreFileLoader": {
+    "CurlRiotChunkStoreUrlLoader": {
       "properties": {
         "method": {
-          "const": "store_chunks",
-          "description": "http_file_server",
-          "title": "HTTP file server",
+          "const": "curl_riot_chunk_store",
+          "description": "URL are downloaded using curl to a temporary file, which is then loaded with `riot_chunk_store` method.",
+          "title": "curl/riot/store URL loader",
           "type": "string"
+        },
+        "tmp_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "/tmp",
+          "description": "temporary directory",
+          "title": "temporary directory"
         },
         "size": {
           "anyOf": [
@@ -18,14 +31,14 @@
             }
           ],
           "default": 100000000,
-          "description": "chunked_store_file",
-          "title": "chunked_store"
+          "description": "chunk size",
+          "title": "chunk stize"
         }
       },
       "required": [
         "method"
       ],
-      "title": "ChunkedStoreFileLoader",
+      "title": "CurlRiotChunkStoreUrlLoader",
       "type": "object"
     },
     "DatasetConf": {
@@ -62,7 +75,7 @@
             }
           ],
           "default": null,
-          "description": "A list of names to declare dependency between dataset records.  Updating the parent datset will provoke the update of its children, unless it is frozen.",
+          "description": "A list of dataset names to declare dependency between dataset records.  Updating the parent datset will provoke the update of its children, unless it is frozen.",
           "title": "Parent(s) of a dataset record"
         },
         "frozen": {
@@ -91,7 +104,7 @@
             }
           ],
           "default": null,
-          "description": "A list of system command.  This is a simple convenience provided by kgsteward which is not meant to be a replacement  for serious Make-like system as for example git/dvc.",
+          "description": "A list of system command.  This is a simple convenience provided by kgsteward, which is not meant to be a replacement  for serious Make-like system as for example git/dvc.",
           "title": "UNIX system command(s)"
         },
         "file": {
@@ -139,7 +152,7 @@
             }
           ],
           "default": null,
-          "description": "List of paths to files which last modification dates will used. The file contents are ignored. Wildcard `*` can be used.",
+          "description": "List of file paths or URLs to which last modification dates will used. The file contents are ignored. Wildcards `*` can be used.",
           "title": "Stamp file(s)"
         },
         "replace": {
@@ -171,7 +184,7 @@
             }
           ],
           "default": null,
-          "description": "List of files containing SPARQL update commands.  Wildcard are not supported here!",
+          "description": "List of files containing SPARQL update commands.  Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters!",
           "title": "SPARQL update file(s)"
         },
         "zenodo": {
@@ -197,36 +210,6 @@
       "title": "DatasetConf",
       "type": "object"
     },
-    "DirectFileLoader": {
-      "properties": {
-        "method": {
-          "const": "sparql_load",
-          "description": "File are loaded using the SPARQL update statement: \"LOAD <file://<file-path> INTO...\". This strategy is likely to failed for large files, or worst silently truncate them.",
-          "title": "direct file_loader",
-          "type": "string"
-        }
-      },
-      "required": [
-        "method"
-      ],
-      "title": "DirectFileLoader",
-      "type": "object"
-    },
-    "DirectUrlLoader": {
-      "properties": {
-        "method": {
-          "const": "sparql_load",
-          "description": "URL are loaded using the SPARQL update statement: \"LOAD <url> INTO...\". This strategy could fail for large files, or worst silently truncate them.",
-          "title": "direct url loader",
-          "type": "string"
-        }
-      },
-      "required": [
-        "method"
-      ],
-      "title": "DirectUrlLoader",
-      "type": "object"
-    },
     "FusekiConf": {
       "additionalProperties": true,
       "properties": {
@@ -237,12 +220,12 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. Fuseki servers have location 'http://localhost:3030' by default",
+          "description": "URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. Fuseki has location 'http://localhost:3030' by default",
           "title": "Server URL",
           "type": "string"
         },
         "repository": {
-          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
           "pattern": "^\\w{1,32}$",
           "title": "Repository ID",
           "type": "string"
@@ -279,12 +262,12 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. GraphDB servers have location 'http://localhost:7200' by default",
+          "description": "URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. GraphDB has location 'http://localhost:7200' by default",
           "title": "Server URL",
           "type": "string"
         },
         "server_config": {
-          "description": "Filename with the triplestore configuration, possibly a turtle file.  `graphdb_config` is a deprecated synonym.  This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,  thus permitting to reproduce the repository configuration elsewhere.  This file is used by the `-I` and `-F` options.  Beware that the repository ID could be hard-coded in the config file and  should be maintained in sync with `repository`.",
+          "description": "Filename with the triplestore configuration, possibly a turtle file.  This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,  thus permitting to reproduce the repository configuration elsewhere.  This file is used by the `-I` and `-F` options.  Beware that the repository ID could be hard-coded in the config file and  should be maintained in sync with `repository`.",
           "title": "Server config file",
           "type": "string"
         },
@@ -344,7 +327,7 @@
           "title": "GraphDB namespace"
         },
         "repository": {
-          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
           "pattern": "^\\w{1,32}$",
           "title": "Repository ID",
           "type": "string"
@@ -363,7 +346,7 @@
       "properties": {
         "method": {
           "const": "http_server",
-          "description": "http_file_server",
+          "description": "Files are exposed through a temproray HTTP server. This is the recommended method with GraphDB.",
           "title": "HTTP file server",
           "type": "string"
         },
@@ -397,12 +380,12 @@
           "type": "string"
         },
         "location": {
-          "description": "URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand. RDF4J servers have location 'http://localhost:8080' by default",
+          "description": "URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. RDF4J has location 'http://localhost:8080' by default",
           "title": "Server URL",
           "type": "string"
         },
         "repository": {
-          "description": "The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.",
+          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
           "pattern": "^\\w{1,32}$",
           "title": "Repository ID",
           "type": "string"
@@ -428,6 +411,79 @@
       ],
       "title": "RDF4JConf",
       "type": "object"
+    },
+    "RiotChunkStoreFileLoader": {
+      "properties": {
+        "method": {
+          "const": "riot_chunk_store",
+          "description": "riot_chunk_store",
+          "title": "riot/store file loader",
+          "type": "string"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 100000000,
+          "description": "chunk size",
+          "title": "chunk size"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "RiotChunkStoreFileLoader",
+      "type": "object"
+    },
+    "SparqlFileLoader": {
+      "properties": {
+        "method": {
+          "const": "sparql_load",
+          "description": "Files are loaded using the SPARQL update statement: \"LOAD <file://<file-path> INTO...\". This strategy is likely to failed for large files, or worst silently truncate them.",
+          "title": "sparql file loader",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "SparqlFileLoader",
+      "type": "object"
+    },
+    "SparqlUrlLoader": {
+      "properties": {
+        "method": {
+          "const": "sparql_load",
+          "description": "URL are loaded using the SPARQL update statement: \"LOAD <url> INTO...\". This strategy could fail for large files, or worst silently truncate them.",
+          "title": "direct url loader",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "SparqlUrlLoader",
+      "type": "object"
+    },
+    "StoreFileLoader": {
+      "properties": {
+        "method": {
+          "const": "file_store",
+          "description": "Files are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them.",
+          "title": "store file loader",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "StoreFileLoader",
+      "type": "object"
     }
   },
   "additionalProperties": true,
@@ -439,7 +495,15 @@
       "type": "string"
     },
     "server": {
-      "anyOf": [
+      "discriminator": {
+        "mapping": {
+          "fuseki": "#/$defs/FusekiConf",
+          "graphdb": "#/$defs/GraphDBConf",
+          "rdf4j": "#/$defs/RDF4JConf"
+        },
+        "propertyName": "brand"
+      },
+      "oneOf": [
         {
           "$ref": "#/$defs/GraphDBConf"
         },
@@ -455,19 +519,30 @@
     "file_loader": {
       "anyOf": [
         {
-          "$ref": "#/$defs/DirectFileLoader"
+          "$ref": "#/$defs/SparqlFileLoader"
+        },
+        {
+          "$ref": "#/$defs/StoreFileLoader"
         },
         {
           "$ref": "#/$defs/HttpServerFileLoader"
         },
         {
-          "$ref": "#/$defs/ChunkedStoreFileLoader"
+          "$ref": "#/$defs/RiotChunkStoreFileLoader"
         }
       ],
       "title": "File Loader"
     },
     "url_loader": {
-      "$ref": "#/$defs/DirectUrlLoader"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SparqlUrlLoader"
+        },
+        {
+          "$ref": "#/$defs/CurlRiotChunkStoreUrlLoader"
+        }
+      ],
+      "title": "Url Loader"
     },
     "dataset": {
       "description": "Mandatory key to specify the content of the knowledge graph in the triplestore",
