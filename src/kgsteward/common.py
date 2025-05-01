@@ -79,7 +79,7 @@ def http_call( request_args, status_code = [ 200 ], echo = True ):
         dumper.dump( request_args )
         print_warn( "Status code = " + str( r.status_code ))
         print_warn( r.text if not r.text is None else '' )
-        stop_error( "HTTP request failed!" )
+        raise Exception( "HTTP request failed!" )
     if echo :
         report( "elapsed time", ( "%.3f" % ( end_time - start_time )))
     return r

@@ -5,16 +5,12 @@ import os
 import sys
 import re
 import hashlib
-import glob
 import requests  # https://docs.python-requests.org/en/master/user/quickstart/
 import subprocess
 import urllib
 
-import rdflib
-import getpass
 from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
-from   rdflib    import *
 
 from .common     import *
 from .yamlconfig import parse_yaml_conf
@@ -186,8 +182,8 @@ def get_sha256( config, name, echo = True ) :
                 info = get_head_info( path, echo = echo  ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
-                filenames = sorted( glob.glob( replace_env_var( path )))
-                for filename in filenames :
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
+                    filename = dir + "/" + fn
                     with open( replace_env_var( filename ), "rb") as f :
                         for chunk in iter( lambda: f.read(4096), b"") :
                             sha256.update( chunk )
@@ -210,11 +206,12 @@ def get_sha256( config, name, echo = True ) :
             sha256.update( key.encode( 'utf-8' ))
             sha256.update( target["replace"][key].encode( 'utf-8' ))
     if "update" in target :
-        for filename in target["update"] :
-            # sha256.update( filename.encode('utf-8'))
-            with open( replace_env_var( filename )) as f:
-                sparql = f.read()
-            sha256.update( sparql.encode('utf-8'))
+        for path in target["update"] :
+            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                filename = dir + "/" + fn
+                with open( filename ) as f:
+                    sparql = f.read()
+                sha256.update( sparql.encode('utf-8'))
     return sha256.hexdigest()
 
 def update_config( server, config, echo = True ) :
@@ -462,17 +459,13 @@ INSERT DATA {{
                         if not os.path.isfile( dir + "/" + fn ):
                             stop_error( "File not found: " + dir + "/" + fn )
                         fs.expose( dir ) # cache already exposed directory
-                        if not is_running_in_a_container: 
+                        if not is_running_in_a_container:
                             try:
                                 path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
                                 server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
                             except Exception as e:
-                                msg = str( e )
-                                if msg == "HTTP request failed!":
-                                    is_running_in_a_container = True 
-                                    print_warn( "Maybe the server is running in a container => let's try again!" )
-                                else:
-                                    stop_error( msg)
+                                is_running_in_a_container = True # new guess 
+                                print_warn( "Maybe the server is running in a container => let's try again!" )
                         if is_running_in_a_container:
                             # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                             path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
@@ -523,15 +516,16 @@ INSERT DATA {{
                 replace[key] = replace_env_var( target["replace"][key] )
 
         if "update" in target :
-            for filename in target["update"]:
-                report( "read", filename )
-                with open( replace_env_var( filename )) as f:
-                    sparql = f.read()
-                # if replace is not None:
-                for key in sorted( replace.keys()):
-                    sparql = sparql.replace( key, replace[ key ])
-                for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
-                    server.sparql_update( s, echo = args.v )
+            for path in target["update"] :
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    filename = dir + "/" + fn
+                    report( "read", filename )
+                    with open( filename ) as f:
+                        sparql = f.read()
+                    for key in sorted( replace.keys()):
+                        sparql = sparql.replace( key, replace[ key ])
+                    for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
+                        server.sparql_update( s, echo = args.v )
 
         update_dataset_info( server, config, name, echo = args.v )
 
@@ -604,8 +598,8 @@ INSERT DATA {{
         if "queries" not in config:
             stop_error( "There are no 'queries' key in config! ")
         for path in config["queries"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
+            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                filename = dir + "/" + fn
                 print_break()
                 with open( filename ) as f: sparql = f.read()
                 name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
@@ -627,8 +621,9 @@ INSERT DATA {{
                     'params' : { 'name': item['name']}
                 })
             for path in config["queries"] :
-                filenames = sorted( glob.glob( replace_env_var( path )))
-                for filename in filenames :
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    filename = dir + "/" + fn
+                    report( "read", filename )
                     print_break()
                     with open( filename ) as f: sparql = f.read()
                     name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
@@ -676,8 +671,9 @@ INSERT DATA {{
         g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
 
         for path in config["queries"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
+            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                filename = dir + "/" + fn
+                report( "read", filename )
                 report( "parse file", filename )
                 counter = counter + 1
                 comment = []
@@ -727,8 +723,8 @@ INSERT DATA {{
         if not os.path.isdir( args.x ):
             stop_error( "Not a directory: " + args.x )
         for path in config["queries"] :
-            filenames = sorted( glob.glob( replace_env_var( path )))
-            for filename in filenames :
+            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                filename = dir + "/" + fn
                 print_break()
                 report( "read file", filename )
                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )

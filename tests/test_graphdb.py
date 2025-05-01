@@ -13,7 +13,7 @@ TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.5'
 env["GRAPHDB_USERNAME"] = "admin"
 env["GRAPHDB_PASSWORD"] = "root"
 
-@pytest.fixture(scope="module")
+@pytest.fixture( scope="module" )
 
 def triplestore():
     """Start GraphDB container as a fixture."""
@@ -22,8 +22,8 @@ def triplestore():
     container.with_env("JAVA_OPTS", "-Xms1g -Xmx4g")
     container.start()
     delay = wait_for_logs(container, "Started GraphDB")
-    host = container.get_container_host_ip()
-    port = container.get_exposed_port(7200)
+    # host = container.get_container_host_ip()
+    # port = container.get_exposed_port(7200)
     # base_url = f"http://{host}:{port}"
     base_url = f"http://{container.get_container_host_ip()}:{container.get_exposed_port(7200)}"
 
@@ -31,18 +31,24 @@ def triplestore():
     # print(container.get_logs())
     yield base_url
 
+cmd_base = [
+    "kgsteward doc/first_steps/graphdb.yaml -I",
+    "kgsteward doc/first_steps/graphdb.yaml -C",
+    "kgsteward doc/first_steps/graphdb.yaml -V",
+    "mkdir -p tmp/first_steps",
+    "rm -f tmp/first_steps/*.tsv",
+    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps",
+    "diff -r doc/first_steps/ref tmp/first_steps"
+]
+
+def run_cmd_base():
+    for cmd in cmd_base:
+        print( "*** " + cmd + " ***" )
+        res = run_cmd( cmd.split( " " ), env )
+        print(res.stdout)
+        print(res.stderr)
+        assert res.returncode == 0
 
 def test_cli_graphdb( triplestore ):
-    res_init = run_cmd(["kgsteward", "doc/first_steps/graphdb.yaml", "-I"], env)
-    print(res_init.stdout)
-    assert res_init.returncode == 0
+    run_cmd_base()
 
-    res_complete = run_cmd(["kgsteward", "doc/first_steps/graphdb.yaml", "-C"], env)
-    print(res_complete.stdout)
-    assert res_complete.returncode == 0
-
-    res_validate = run_cmd(["kgsteward", "doc/first_steps/graphdb.yaml", "-V"], env)
-    print(res_validate.stdout)
-    assert res_validate.returncode == 0
-
-    sys.exit( 0 )

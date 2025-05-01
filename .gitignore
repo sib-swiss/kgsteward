@@ -7,6 +7,9 @@ build/
 kgsteward.egg-info/
 dist/
 
+# testing 
+tmp/
+
 # virtualenv
 Pipfile
 Pipfile.lock

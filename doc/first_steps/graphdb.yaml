@@ -8,9 +8,11 @@ server:
   repository    : first_steps
 context_base_IRI: http://example.org/context/
 file_loader:
-  method: sparql_load
+  method: http_server
 url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
+queries:
+  - sparql/query/*.rq
 validations: 
   - sparql/validate/*.rq
