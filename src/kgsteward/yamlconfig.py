@@ -77,7 +77,7 @@ Using a file server, these limitations are overcomed, but see the security warni
 "frozen": "Frozen record, can only be updated explicitely with the `-d <name>` option. The option `-C` has no effect",
 "zenodo": """Do not use!
 Fetch turtle files from zenodo.
-This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
+This is a completely ad hoc command developped for ENPKG, that will be suppressed sooner or later
 """,
 "update": """List of files containing SPARQL update commands.
 Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters!
