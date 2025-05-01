@@ -20,7 +20,7 @@ repos:
         name: Run script to generate YAML docs
         entry: bash -c "cd doc/yaml && uv run make_yaml_README.py"
         language: system
-        always_run: true
+        # always_run: true
         pass_filenames: false
         verbose: true
         files: src/kgsteward/yamlconfig.py
