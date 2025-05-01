@@ -68,7 +68,7 @@ This is a simple convenience provided by kgsteward, which is not meant to be a r
 for serious Make-like system as for example git/dvc.
 """,
 "file": """List of files containing RDF data.
-Wildcard `*` can be used.
+Wildcards `*` can be used.
 The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`).
 With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported.
 Using a file server, these limitations are overcomed, but see the security warning described above.
