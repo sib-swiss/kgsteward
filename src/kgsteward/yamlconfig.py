@@ -46,7 +46,7 @@ thus permitting to reproduce the repository configuration elsewhere.
 This file is used by the `-I` and `-F` options.
 Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.
 """,
-    "dataset": "Mandatory key to specify the content of the knowledge graph in the triplestore",
+    "dataset": "Mandatory key to specify the content of the knowledge graph in the triplestore.",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
 Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,
 with a short timeout.
