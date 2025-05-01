@@ -10,16 +10,17 @@ repos:
       name:  Check YAML"
       args:
       - --unsafe
-    - id: end-of-file-fixer
-      name: "Fix end of files"
-    - id: trailing-whitespace
-      name: "Trim trailing whitespaces"
+    # - id: end-of-file-fixer
+    #   name: "Fix end of files"
+    # - id: trailing-whitespace
+    #   name: "Trim trailing whitespaces"
   - repo: local
     hooks:
       - id: gen-yaml-docs
         name: Run script to generate YAML docs
-        entry: cd doc/yaml && uv run make_yaml_README.py
+        entry: bash -c "cd doc/yaml && uv run make_yaml_README.py"
         language: system
         always_run: true
         pass_filenames: false
         verbose: true
+        files: src/kgsteward/yamlconfig.py
