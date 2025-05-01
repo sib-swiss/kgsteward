@@ -8,5 +8,7 @@
     - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/c*mpany.ttl # wildcard in absolute path
     - data/pr*duct.ttl                                       # wildcard in relative path
 - name: update_data
+  parent:
+    - foaf_data
   update:
     - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/sparql/update/a_blue_car_for_Alice.rq

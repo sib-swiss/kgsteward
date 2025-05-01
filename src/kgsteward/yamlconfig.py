@@ -41,7 +41,6 @@ Beware that the used python-based server is potentially insecure
 This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.
 """,
     "server_config":  """Filename with the triplestore configuration, possibly a turtle file. 
-`graphdb_config` is a deprecated synonym. 
 This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, 
 thus permitting to reproduce the repository configuration elsewhere. 
 This file is used by the `-I` and `-F` options. 
@@ -81,17 +80,17 @@ Fetch turtle files from zenodo.
 This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
 """,
 "update": """List of files containing SPARQL update commands. 
-Wildcard are not supported here!
+Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters!
 """,
 #"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
 #and inserted in the current graphs list.
 #""",
-    "parent": """A list of names to declare dependency between dataset records. 
+    "parent": """A list of dataset names to declare dependency between dataset records. 
 Updating the parent datset will provoke the update of its children, unless it is frozen.
 """,
-    "stamp": """List of paths to files which last modification dates will used.
+    "stamp": """List of file paths or URLs to which last modification dates will used.
 The file contents are ignored.
-Wildcard `*` can be used.
+Wildcards `*` can be used.
 """,
     "replace": """Dictionary to perform string substitution in SPARQL queries from `update` list.
 Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.
@@ -101,12 +100,12 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
         This list will used to update the namespace definitions in GraphDB and RDF4J.
         Otherwise it is ignored
     """,
-    "sparql_file_loader" : """File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. """,
-    "store_file_loader"  : """File are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them. """,
-    "http_file_server"   : """toto""",
-    "riot_chunk_store"   : """titi""",
-    "direct_url_loader"  : """URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. """,
-
+    "sparql_file_loader" : """Files are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them.""",
+    "store_file_loader"  : """Files are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them. """,
+    "http_file_server"   : """Files are exposed through a temproray HTTP server. This is the recommended method with GraphDB.""",
+    "riot_chunk_store"   : """Files are parsed through riot (part of JENA distribution), and submitted by chunks using graph store protocol. This is the recommended method with Fuseki. """,
+    "sparql_url_loader"  : """URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. """,
+    "curl_riot_chunk_store" : """URL are downloaded using curl to a temporary file, which is then loaded with `riot_chunk_store` method.""",
 }
 
 description["location_graphdb"] = description["location"] + " GraphDB has location 'http://localhost:7200' by default"
@@ -164,15 +163,14 @@ class StoreFileLoader( BaseModel ):
 class HttpServerFileLoader( BaseModel ):
     method : Literal[ "http_server" ] = Field( title = "HTTP file server", description = describe( "http_file_server" ))
     port : Optional[ int ] = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
-class RiotStoreFileLoader( BaseModel ):
+class RiotChunkStoreFileLoader( BaseModel ):
     method : Literal[ "riot_chunk_store" ] = Field( title = "riot/store file loader", description = "riot_chunk_store" )
     size : Optional[ int ] = Field( 100_000_000, title = "chunk size", description = "chunk size" )
 
-class DirectUrlLoader( BaseModel ):
-    method : Literal[ "sparql_load" ] = Field( title = "direct url loader", description = describe( "direct_url_loader" ))
-
-class CurlRiotStoreUrlLoader( BaseModel ):
-    method : Literal[ "curl_riot_store" ] = Field( title = "curl/riot/store URL loader", description = "curl/riot/store URL loader" )
+class SparqlUrlLoader( BaseModel ):
+    method : Literal[ "sparql_load" ] = Field( title = "direct url loader", description = describe( "sparql_url_loader" ))
+class CurlRiotChunkStoreUrlLoader( BaseModel ):
+    method : Literal[ "curl_riot_chunk_store" ] = Field( title = "curl/riot/store URL loader", description = describe( "curl_riot_chunk_store" ))
     tmp_dir : Optional[ str ] = Field( "/tmp", title = "temporary directory", description = "temporary directory" )
     size : Optional[ int ] = Field( 100_000_000, title = "chunk stize", description = "chunk size" )
 
@@ -180,8 +178,8 @@ class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ] = Field( discriminator = 'brand' )
-    file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotStoreFileLoader ]
-    url_loader        : Union[ DirectUrlLoader, CurlRiotStoreUrlLoader ]
+    file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotChunkStoreFileLoader ]
+    url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
     queries           : Optional[ list[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
