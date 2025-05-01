@@ -13,11 +13,11 @@ from .common       import *
 
 description = {
     "schema": """
-    Configuration file follows YAML syntax. 
-    UNIX environmenent variables can be accessed anywhere in the YAML config through the `${<env-var>}` syntax. 
-    The use of UNIX environment variables permits the portability of kgsteward config file, as local path are supplied through variables. 
-    For security reason, kgsteward checks that every used variable exitsts and is not an empty string. 
-    In addition, to the environment variables available at statup of kgsteward, a certain number of variables are defined at run-time:  
+    Configuration file follows YAML syntax.
+    UNIX environmenent variables can be accessed anywhere in the YAML config through the `${<env-var>}` syntax.
+    The use of UNIX environment variables permits the portability of kgsteward config file, as local path are supplied through variables.
+    For security reason, kgsteward checks that every used variable exitsts and is not an empty string.
+    In addition, to the environment variables available at statup of kgsteward, a certain number of variables are defined at run-time:
     `${}`, `${}` and `${}`.
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
@@ -25,67 +25,67 @@ description = {
     "location" :  """URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand.""" ,
     "repository": """The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
-    "password":      """The password of a user with write-access rights to the triplestore. 
-It is recommended that the value of this variable is passed trough an environment variable. 
+    "password":      """The password of a user with write-access rights to the triplestore.
+It is recommended that the value of this variable is passed trough an environment variable.
 By this way the password is not stored explicitely in the config file.
 Alternatively `?` can be used and the password will be asked interactively at run time.""",
     "context_base_IRI": """Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try.""",
-    "file_server_port": """Integer, `0` by default, i.e. the file server is turned off. 
-When set to a positive integer, say `8000`, local files will be exposed through a temporary 
-HTTP server and loaded from it. Support for different RDF file types and their compressed 
-version depend on the tripelstore. The benefit is the that RDF data from `file` are processed 
-with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, 
-file-size limits are suppressed and compressed formats are supported. 
+    "file_server_port": """Integer, `0` by default, i.e. the file server is turned off.
+When set to a positive integer, say `8000`, local files will be exposed through a temporary
+HTTP server and loaded from it. Support for different RDF file types and their compressed
+version depend on the tripelstore. The benefit is the that RDF data from `file` are processed
+with the same protocol as those supplied remotely through `url`. Essentially for GraphDB,
+file-size limits are suppressed and compressed formats are supported.
 Beware that the used python-based server is potentially insecure
-(see [here](https://docs.python.org/3/library/http.server.html) for details). 
+(see [here](https://docs.python.org/3/library/http.server.html) for details).
 This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.
 """,
-    "server_config":  """Filename with the triplestore configuration, possibly a turtle file. 
-This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, 
-thus permitting to reproduce the repository configuration elsewhere. 
-This file is used by the `-I` and `-F` options. 
-Beware that the repository ID could be hard-coded in the config file and 
+    "server_config":  """Filename with the triplestore configuration, possibly a turtle file.
+This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,
+thus permitting to reproduce the repository configuration elsewhere.
+This file is used by the `-I` and `-F` options.
+Beware that the repository ID could be hard-coded in the config file and
 should be maintained in sync with `repository`.
 """,
     "dataset": "Mandatory key to specify the content of the knowledge graph in the triplestore",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
-Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, 
+Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint,
 with a short timeout.
-The query result is not iteself checked. 
-Wildcard `*` can be used.
+The query result is not iteself checked.
+Wildcards `*` can be used.
 """,
     "validations": """A list of paths to files contining SPARQL queries used to validate the repsository.
-Wildcard `*` can be used.
-By convention, a valid result should be empty, i.e. no row is returned. 
+Wildcards `*` can be used.
+By convention, a valid result should be empty, i.e. no row is returned.
 Failed results should return rows permitting to diagnose the problems.
 """,
     "name": """Mandatory name of a dataset record.""",
     "context": """ The IRI of the target context.
 If missing, it will be built by concataining `context_base_IRI` and `name`.
 """,
-"system": """A list of system command. 
-This is a simple convenience provided by kgsteward, which is not meant to be a replacement 
-for serious Make-like system as for example git/dvc. 
+"system": """A list of system command.
+This is a simple convenience provided by kgsteward, which is not meant to be a replacement
+for serious Make-like system as for example git/dvc.
 """,
-"file": """List of files containing RDF data. 
+"file": """List of files containing RDF data.
 Wildcard `*` can be used.
-The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). 
-With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. 
-Using a file server, these limitations are overcomed, but see the security warning described above. 
+The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`).
+With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported.
+Using a file server, these limitations are overcomed, but see the security warning described above.
 """,
 "url": """List of url from which to load RDF data""",
 "frozen": "Frozen record, can only be updated explicitely with the `-d <name>` option. The option `-C` has no effect",
 "zenodo": """Do not use!
-Fetch turtle files from zenodo. 
+Fetch turtle files from zenodo.
 This is a completely ad hoc command developped for ENPKG (), that will be suppressed sooner or later
 """,
-"update": """List of files containing SPARQL update commands. 
+"update": """List of files containing SPARQL update commands.
 Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters!
 """,
-#"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted 
+#"source": """Path to another kgsteward YAML file from which the graphs list of record will be extracted
 #and inserted in the current graphs list.
 #""",
-    "parent": """A list of dataset names to declare dependency between dataset records. 
+    "parent": """A list of dataset names to declare dependency between dataset records.
 Updating the parent datset will provoke the update of its children, unless it is frozen.
 """,
     "stamp": """List of file paths or URLs to which last modification dates will used.
@@ -96,7 +96,7 @@ Wildcards `*` can be used.
 Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.
 """,
     "prefixes": """
-        A list of Turtle files from which prefix definitions can be obtained. 
+        A list of Turtle files from which prefix definitions can be obtained.
         This list will used to update the namespace definitions in GraphDB and RDF4J.
         Otherwise it is ignored
     """,
@@ -200,7 +200,7 @@ def parse_yaml_conf( path : str ):
     except Exception as e:
         stop_error( "Something goes wrong with YAML parsing: " + repr( e ))
     if "version" not in data:
-        stop_error( 'Key "version" not found in YAML file: ' + path ) 
+        stop_error( 'Key "version" not found in YAML file: ' + path )
     try:
         config = KGStewardConf( **data ).model_dump( exclude_none = True )
     except ValidationError as e:
@@ -229,7 +229,7 @@ def parse_yaml_conf( path : str ):
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
         dataset.append( item )
     config["dataset"] = dataset
-    return config 
+    return config
 
 def save_json_schema( path ):
     schema = KGStewardConf.model_json_schema()
