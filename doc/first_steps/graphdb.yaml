@@ -8,7 +8,7 @@ server:
   repository    : first_steps
 context_base_IRI: http://example.org/context/
 file_loader:
-  method: http_server
+  method: file_store
 url_loader:
   method: sparql_load
 dataset: !include dataset.yaml

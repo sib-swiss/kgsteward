@@ -51,4 +51,3 @@ def run_cmd_base():
 
 def test_cli_graphdb( triplestore ):
     run_cmd_base()
-

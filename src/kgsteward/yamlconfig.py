@@ -22,8 +22,8 @@ description = {
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
     "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' """,
-    "location" :   """URL of the server. The SPARQL endpoint location for queries and updates are specific to a server brand.""" ,
-    "repository": """The name of the 'repository' (GraphDB naming) or 'dataset' (fuseki) in the triplestore.""",
+    "location" :  """URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand.""" ,
+    "repository": """The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore. 
 It is recommended that the value of this variable is passed trough an environment variable. 
@@ -65,8 +65,8 @@ Failed results should return rows permitting to diagnose the problems.
 If missing, it will be built by concataining `context_base_IRI` and `name`.
 """,
 "system": """A list of system command. 
-This is a simple convenience provided by kgsteward which is not meant to be a replacement 
-for serious Make-like system as for example git/dvc.
+This is a simple convenience provided by kgsteward, which is not meant to be a replacement 
+for serious Make-like system as for example git/dvc. 
 """,
 "file": """List of files containing RDF data. 
 Wildcard `*` can be used.
@@ -101,7 +101,10 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
         This list will used to update the namespace definitions in GraphDB and RDF4J.
         Otherwise it is ignored
     """,
-    "direct_file_loader" : """File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. """,
+    "sparql_file_loader" : """File are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them. """,
+    "store_file_loader"  : """File are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them. """,
+    "http_file_server"   : """toto""",
+    "riot_chunk_store"   : """titi""",
     "direct_url_loader"  : """URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. """,
 
 }
@@ -154,15 +157,15 @@ class DatasetConf( BaseModel ):
     update   : Optional[ list[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
     zenodo   : Optional[ list[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
 
-class DirectFileLoader( BaseModel ):
-    method : Literal[ "sparql_load" ] = Field( title = "direct file_loader", description = describe( "direct_file_loader" ) )
-
+class SparqlFileLoader( BaseModel ):
+    method : Literal[ "sparql_load" ] = Field( title = "sparql file loader", description = describe( "sparql_file_loader" ) )
+class StoreFileLoader( BaseModel ):
+    method : Literal[ "file_store" ] = Field( title = "store file loader", description = describe( "store_file_loader" ) )
 class HttpServerFileLoader( BaseModel ):
-    method : Literal[ "http_server" ] = Field( title = "HTTP file server", description = "http_file_server" )
+    method : Literal[ "http_server" ] = Field( title = "HTTP file server", description = describe( "http_file_server" ))
     port : Optional[ int ] = Field( 8000, title = "file_server_port", description = describe( "file_server_port" ))
-
 class RiotStoreFileLoader( BaseModel ):
-    method : Literal[ "riot_store" ] = Field( title = "riot/store file loader", description = "http_file_server" )
+    method : Literal[ "riot_chunk_store" ] = Field( title = "riot/store file loader", description = "riot_chunk_store" )
     size : Optional[ int ] = Field( 100_000_000, title = "chunk size", description = "chunk size" )
 
 class DirectUrlLoader( BaseModel ):
@@ -177,7 +180,7 @@ class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ] = Field( discriminator = 'brand' )
-    file_loader       : Union[ DirectFileLoader, HttpServerFileLoader, RiotStoreFileLoader ]
+    file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotStoreFileLoader ]
     url_loader        : Union[ DirectUrlLoader, CurlRiotStoreUrlLoader ]
     dataset           : list[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )

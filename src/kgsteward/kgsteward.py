@@ -484,7 +484,9 @@ INSERT DATA {{
                         filename = dir + "/" + fn
                         if config["file_loader"]["method"] == "sparql_load":
                             server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>", echo = args.v )
-                        elif config["file_loader"]["method"] == "riot_store":
+                        elif config["file_loader"]["method"] == "file_store":
+                            server.load_from_file_using_riot( filename, context, echo = args.v )
+                        elif config["file_loader"]["method"] == "riot_chunk_store":
                             server.load_from_file_using_riot( filename, context, echo = args.v )
                         else:
                             raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
