@@ -485,7 +485,7 @@ INSERT DATA {{
                         if config["file_loader"]["method"] == "sparql_load":
                             server.sparql_update( f"LOAD <file://{filename}> INTO GRAPH <{context}>", echo = args.v )
                         elif config["file_loader"]["method"] == "file_store":
-                            server.load_from_file_using_riot( filename, context, echo = args.v )
+                            server.load_from_file( filename, context, echo = args.v )
                         elif config["file_loader"]["method"] == "riot_chunk_store":
                             server.load_from_file_using_riot( filename, context, echo = args.v )
                         else:
