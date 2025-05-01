@@ -32,18 +32,20 @@ def triplestore():
     yield base_url
 
 cmd_base = [
-    "kgsteward doc/first_steps/graphdb.yaml -I",
-    "kgsteward doc/first_steps/graphdb.yaml -C",
-    "kgsteward doc/first_steps/graphdb.yaml -V",
+    "kgsteward doc/first_steps/graphdb.yaml -I -v",
+    "kgsteward doc/first_steps/graphdb.yaml -C -v",
+    "kgsteward doc/first_steps/graphdb.yaml -V -v",
     "mkdir -p tmp/first_steps",
     "rm -f tmp/first_steps/*.tsv",
-    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps",
+    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps -v",
     "diff -r doc/first_steps/ref tmp/first_steps"
 ]
 
 def run_cmd_base():
     for cmd in cmd_base:
-        print( "*** " + cmd + " ***" )
+        print( "##############################################" )
+        print( "### " + cmd )
+        print( "##############################################" )
         res = run_cmd( cmd.split( " " ), env )
         print(res.stdout)
         print(res.stderr)
