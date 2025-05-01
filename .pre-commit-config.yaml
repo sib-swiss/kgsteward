@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    - id: check-added-large-files
+      name: "Check for added large files"
+    - id: check-toml
+      name: "Check TOML"
+    - id: check-yaml
+      name:  Check YAML"
+      args:
+      - --unsafe
+    - id: end-of-file-fixer
+      name: "Fix end of files"
+    - id: trailing-whitespace
+      name: "Trim trailing whitespaces"
+  - repo: local
+    hooks:
+      - id: gen-yaml-docs
+        name: Run script to generate YAML docs
+        entry: cd doc/yaml && uv run make_yaml_README.py
+        language: system
+        types: [python]

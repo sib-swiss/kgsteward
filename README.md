@@ -46,6 +46,12 @@ Requirements:
 
 - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
+- Install pre-commit hooks (once):
+
+```sh
+uvx pre-commit install
+```
+
 Run tests, `-s` will print all outputs:
 
 ```bash
@@ -64,5 +70,3 @@ Start documentation website in development:
 ```bash
 uv run mkdocs serve
 ```
-
-
