@@ -44,8 +44,7 @@ This should however pose no real treat if used on a personal computer or on a se
 This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively,
 thus permitting to reproduce the repository configuration elsewhere.
 This file is used by the `-I` and `-F` options.
-Beware that the repository ID could be hard-coded in the config file and
-should be maintained in sync with `repository`.
+Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.
 """,
     "dataset": "Mandatory key to specify the content of the knowledge graph in the triplestore",
     "queries": """A list of paths to files with SPARQL queries to be add to the repository user interface.
