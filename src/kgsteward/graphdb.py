@@ -126,7 +126,8 @@ class GraphDBClient( GenericClient ):
                 'headers' : { **self.headers, **headers },
                 'params'  : params,
             },
-            status_code_ok
+            status_code_ok,
+            echo
         )
         if timeout is not None:
             if r.status_code == 503 :

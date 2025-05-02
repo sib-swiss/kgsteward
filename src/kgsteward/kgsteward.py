@@ -571,7 +571,7 @@ INSERT DATA {{
         for path in config["validations"] :
             for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                 filename = dir + "/" + fn
-                print_break()
+                # print_break()
                 report( 'query file', filename )
                 with open( filename ) as f: sparql = f.read()
                 r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
@@ -597,6 +597,8 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.Q:
+        print_break()
+        print_task( "Run SPARQL queries to validate their syntax" )
         if "queries" not in config:
             stop_error( "There are no 'queries' key in config! ")
         for path in config["queries"] :
@@ -610,6 +612,8 @@ INSERT DATA {{
                 server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 
     if args.graphdb_upload_queries:
+        print_break()
+        print_task( "GraphDB upload queries" )     
         if not config["server"]["brand"] == "graphdb":
             print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
         else:
@@ -646,6 +650,8 @@ INSERT DATA {{
                     }, [ 201 ] )
 
     if args.sib_swiss_editor:
+        print_break()
+        print_task( "Prepare queries for SIB-swiss editor" )     
         counter = 0 # to keep track of the original input order 
         prefix = {} # to create a non-redundant list
         catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
@@ -718,6 +724,8 @@ INSERT DATA {{
         sys.exit( 0 )
         
     if args.x:
+        print_break()
+        print_task( "Serialize query results" )     
         if "queries" not in config:
             stop_error( "There are no 'queries' key in config! ")
         print_break()
@@ -761,6 +769,8 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     if args.graphdb_free_access :
+        print_break()
+        print_task( "Set GraphDB repository in free read-only mode" )     
         if not config["server"]["brand"] == "graphdb":
             print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
         else:
