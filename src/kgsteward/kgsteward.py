@@ -157,7 +157,7 @@ def get_target( config, name ):
     raise RuntimeError( "Target name not found: " + name )
 
 def get_sha256( config, name, echo = True ) :
-    """ Compute checksums of dataset record """
+    """ Compute checksums of dataset record"""
     target = get_target( config, name )
     context = name2context[ name ] # get_context( config, name )
     os.environ["TARGET_GRAPH_CONTEXT"] = context
@@ -171,9 +171,13 @@ def get_sha256( config, name, echo = True ) :
         for url in target["url"] :
             path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
-            if re.search( r"https?:", path ) : # do not run HEAD on ftp server FIXME: implement something better
+            if re.search( r"https?:", path ) :
                info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
-               sha256.update( info.encode('utf-8') )
+               sha256.update( info.encode('utf-8'))
+            elif re.search( r"ftp:", path ) : # do not run HEAD on ftp server FIXME: implement something better
+                continue
+            else:
+                stop_error( "It does not look like an URL: " + path )
     if "stamp" in target :
         for link in target["stamp"] :
             path = replace_env_var( link )
