@@ -13,6 +13,7 @@ from   dumper    import dump # get ready to help debugging
 from   termcolor import colored
 
 from .common     import *
+from .special    import *
 from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
@@ -535,6 +536,30 @@ INSERT DATA {{
 
         update_dataset_info( server, config, name, echo = args.v )
 
+        if "special" in target:
+            for key in target["special"]:
+                if key == "sib_swiss_void":
+                    server.sparql_update( make_void_description( context )) 
+                if key == "sib_swiss_prefix":
+                    if "prefixes" in config:
+                        sparql = make_prefix_description( context, config["prefixes"] )
+                        for s in sparql:
+                            server.sparql_update( s )
+                    else:
+                        print_warn( "Key not found in YAML config: prefixes" )
+                if key == "sib_swiss_query":
+                    filenames = []
+                    if "queries" in config:
+                        for path in config["queries"] :
+                            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                                filenames.append( dir + "/" + fn )
+                        sparql = make_query_description( context, filenames )
+                        for s in sparql:
+                            server.sparql_update( s )
+                    else:
+                        print_warn( "Key not found in YAML config: queries" )
+                
+    
     # --------------------------------------------------------- #
     # Force update namespace declarations
     # --------------------------------------------------------- #
@@ -681,10 +706,8 @@ INSERT DATA {{
         g.bind( "owl",    OWL )
         g.bind( "sparql_query_" + config["server"]["repository"], SPARQLQUERY )
         g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
-
-        for path in config["queries"] :
-            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                filename = dir + "/" + fn
+        if "queries" in config:
+            for filename in config["queries"] :
                 report( "read", filename )
                 report( "parse file", filename )
                 counter = counter + 1
@@ -718,7 +741,7 @@ INSERT DATA {{
                     if match:
                         prefix[ match.group( 1 ) ] = match.group( 2 )
         for key in prefix:
-            g.add(( prefixes_iri,    SH.declare,   PREFIX[ key ]))
+            g.add(( prefixes_iri,  SH.declare,   PREFIX[ key ]))
             g.add(( PREFIX[ key ], SH.prefix,    Literal( key )))
             g.add(( PREFIX[ key ], SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
         g.serialize(

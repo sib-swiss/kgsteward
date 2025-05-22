@@ -44,8 +44,8 @@ Top level YAML keys
 | url_loader | `object` | ✅ | [CurlRiotChunkStoreUrlLoader](#curlriotchunkstoreurlloader) and/or [SparqlUrlLoader](#sparqlurlloader) |  |
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf) | Mandatory key to specify the content of the knowledge graph in the triplestore. |
 | context_base_IRI | `string` | ✅ | string | Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try. |
-| queries | `array` or `null` |  | string | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not iteself checked. Wildcards `*` can be used. |
-| validations | `array` or `null` |  | string | A list of paths to files contining SPARQL queries used to validate the repsository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems. |
+| queries | `array` or `null` |  | string | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not itself checked. Wildcards `*` can be used. |
+| validations | `array` or `null` |  | string | A list of paths to files contining SPARQL queries used to validate the repository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems. |
 
 
 ---
@@ -77,12 +77,13 @@ No description provided for this model.
 | parent | `array` or `null` |  | string | A list of dataset names to declare dependency between dataset records. Updating the parent datset will provoke the update of its children, unless it is frozen. |
 | frozen | `boolean` or `null` |  | boolean | Frozen record, can only be updated explicitely with the `-d <name>` option. The option `-C` has no effect |
 | system | `array` or `null` |  | string | A list of system command. This is a simple convenience provided by kgsteward, which is not meant to be a replacement for serious Make-like system as for example git/dvc. |
-| file | `array` or `null` |  | string | List of files containing RDF data. Wildcards `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. Using a file server, these limitations are overcomed, but see the security warning described above. |
+| file | `array` or `null` |  | string | List of files containing RDF data. Wildcards `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. Using a file server, these limitations are overcome, but see the security warning described above. |
 | url | `array` or `null` |  | string | List of url from which to load RDF data |
 | stamp | `array` or `null` |  | string | List of file paths or URLs to which last modification dates will used. The file contents are ignored. Wildcards `*` can be used. |
 | replace | `object` or `null` |  | object | Dictionary to perform string substitution in SPARQL queries from `update` list. Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context. |
-| update | `array` or `null` |  | string | List of files containing SPARQL update commands. Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters! |
-| zenodo | `array` or `null` |  | integer | Do not use! Fetch turtle files from zenodo. This is a completely ad hoc command developped for ENPKG, that will be suppressed sooner or later. |
+| update | `array` or `null` |  | string | List of files containing SPARQL update commands. Wildcards are not recommended here, as the order of the SPARQL updates possibly matters! |
+| zenodo | `array` or `null` |  | integer | Do not use! Fetch turtle files from zenodo. This is a completely ad hoc command developed for ENPKG, that will be suppressed sooner or later. |
+| special | `array` or `null` |  | [SpecialEnum](#specialenum) | A list of special dataset records. Supported values are "sib_swiss_void". |
 
 ## FusekiConf
 
@@ -122,7 +123,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| method | `const` | ✅ | `http_server` |  | Files are exposed through a temproray HTTP server. This is the recommended method with GraphDB. |
+| method | `const` | ✅ | `http_server` |  | Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB. |
 | port | `integer` or `null` |  | integer | `8000` | Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
 
 ## RDF4JConf
@@ -168,6 +169,14 @@ No description provided for this model.
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
 | method | `const` | ✅ | `sparql_load` | URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. |
+
+## SpecialEnum
+
+No description provided for this model.
+
+#### Type: `string`
+
+**Possible Values:** `sib_swiss_void` or `sib_swiss_prefix` or `sib_swiss_query`
 
 ## StoreFileLoader
 

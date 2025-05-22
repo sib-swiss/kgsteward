@@ -139,7 +139,7 @@ def guess_mime_type( filename ):
         stop_error( "cannot guess RDF mime-type from filename: " + filename )
 
 
-capture_block  = re.compile( r"(.+);\s*(\#[^\n]+\n)*\s*(LOAD|CLEAR|DROP|CREATE|ADD|MOVE|COPY|WITH|DELETE|INSERT)(.+)$", re.IGNORECASE | re.MULTILINE | re.DOTALL )
+capture_block  = re.compile( r"(.+)\n;\s*(\#[^\n]*\n)*\s*(LOAD|CLEAR|DROP|CREATE|ADD|MOVE|COPY|WITH|DELETE|INSERT)(.+)$", re.IGNORECASE | re.MULTILINE | re.DOTALL )
 capture_prefix = re.compile( r"(PREFIX\s+\S+\s+\S+)\s*", re.IGNORECASE | re.MULTILINE | re.DOTALL )
 
 def split_sparql_update( sparql ): # FIXME: handle comments 

@@ -32,7 +32,7 @@
           ],
           "default": 100000000,
           "description": "chunk size",
-          "title": "chunk stize"
+          "title": "chunk size"
         }
       },
       "required": [
@@ -46,7 +46,7 @@
         "name": {
           "description": "Mandatory name of a dataset record.",
           "pattern": "^[a-zA-Z]\\w{0,31}$",
-          "title": "Short name of a dataset reccord",
+          "title": "Short name of a dataset record",
           "type": "string"
         },
         "context": {
@@ -120,7 +120,7 @@
             }
           ],
           "default": null,
-          "description": "List of files containing RDF data. Wildcards `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. Using a file server, these limitations are overcomed, but see the security warning described above.",
+          "description": "List of files containing RDF data. Wildcards `*` can be used. The strategy used to load these files will depends on if a file server is used (see `file_server_port` option`). With GraphDB, there might be a maximum file size (200 MB by default (?)) and compressed files may not be supported. Using a file server, these limitations are overcome, but see the security warning described above.",
           "title": "Load RDF from file(s)"
         },
         "url": {
@@ -169,7 +169,7 @@
           ],
           "default": null,
           "description": "Dictionary to perform string substitution in SPARQL queries from `update` list. Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.",
-          "title": "String subtitution in SPARQL update(s)"
+          "title": "String substitution in SPARQL update(s)"
         },
         "update": {
           "anyOf": [
@@ -184,7 +184,7 @@
             }
           ],
           "default": null,
-          "description": "List of files containing SPARQL update commands. Wildcards are not recommended here, as the order of the SPARQL uspdates possibly matters!",
+          "description": "List of files containing SPARQL update commands. Wildcards are not recommended here, as the order of the SPARQL updates possibly matters!",
           "title": "SPARQL update file(s)"
         },
         "zenodo": {
@@ -200,8 +200,24 @@
             }
           ],
           "default": null,
-          "description": "Do not use! Fetch turtle files from zenodo. This is a completely ad hoc command developped for ENPKG, that will be suppressed sooner or later.",
+          "description": "Do not use! Fetch turtle files from zenodo. This is a completely ad hoc command developed for ENPKG, that will be suppressed sooner or later.",
           "title": "Ignore me"
+        },
+        "special": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SpecialEnum"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of special dataset records. Supported values are \"sib_swiss_void\".",
+          "title": "Special dataset"
         }
       },
       "required": [
@@ -346,7 +362,7 @@
       "properties": {
         "method": {
           "const": "http_server",
-          "description": "Files are exposed through a temproray HTTP server. This is the recommended method with GraphDB.",
+          "description": "Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB.",
           "title": "HTTP file server",
           "type": "string"
         },
@@ -470,6 +486,15 @@
       "title": "SparqlUrlLoader",
       "type": "object"
     },
+    "SpecialEnum": {
+      "enum": [
+        "sib_swiss_void",
+        "sib_swiss_prefix",
+        "sib_swiss_query"
+      ],
+      "title": "SpecialEnum",
+      "type": "string"
+    },
     "StoreFileLoader": {
       "properties": {
         "method": {
@@ -570,7 +595,7 @@
         }
       ],
       "default": null,
-      "description": "A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not iteself checked. Wildcards `*` can be used.",
+      "description": "A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not itself checked. Wildcards `*` can be used.",
       "title": "GraphDB queries"
     },
     "validations": {
@@ -586,7 +611,7 @@
         }
       ],
       "default": null,
-      "description": "A list of paths to files contining SPARQL queries used to validate the repsository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems.",
+      "description": "A list of paths to files contining SPARQL queries used to validate the repository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems.",
       "title": "Validation queries"
     }
   },
