@@ -46,10 +46,10 @@ Requirements:
 
 - [Docker](https://docs.docker.com/engine/install/) installed (we use [`testcontainers`](https://github.com/testcontainers/testcontainers-python) to deploy triplestores for testing)
 
-- Install pre-commit hooks (once):
+- Install uv pre-commit hooks (once):
 
 ```sh
-uvx pre-commit install
+uv tool install pre-commit --with pre-commit-uv --force-reinstall
 ```
 
 Run tests, `-s` will print all outputs:
