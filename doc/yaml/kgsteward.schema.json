@@ -386,6 +386,79 @@
       "title": "HttpServerFileLoader",
       "type": "object"
     },
+    "QueryConf": {
+      "properties": {
+        "name": {
+          "description": "Mandatory name of a set queries",
+          "pattern": "^[a-zA-Z]\\w{0,31}$",
+          "title": "Short name of a query set",
+          "type": "string"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of system command. This is a simple convenience provided by kgsteward, which is not meant to be a replacement for serious Make-like system as for example git/dvc.",
+          "title": "UNIX system command(s)"
+        },
+        "test": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TestConf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "assert nothing/something",
+          "title": "Assertion to be tested"
+        },
+        "public": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "description": "no description",
+          "title": "Should query be published"
+        },
+        "file": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of files containing one SPARQL query each. Wildcards `*` can be used, and implied file names will be sorted alphabetically. The file name of each file is interpreted as the query label. In each file, lines starting with \"#\" are considered as the query documentation (comment)",
+          "title": "Load queries from files"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "QueryConf",
+      "type": "object"
+    },
     "RDF4JConf": {
       "additionalProperties": true,
       "properties": {
@@ -509,6 +582,36 @@
       ],
       "title": "StoreFileLoader",
       "type": "object"
+    },
+    "TestConf": {
+      "properties": {
+        "min_row_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimal number of rows to expect"
+        },
+        "max_row_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximal number of rows to expect"
+        }
+      },
+      "title": "TestConf",
+      "type": "object"
     }
   },
   "additionalProperties": true,
@@ -586,7 +689,7 @@
       "anyOf": [
         {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/QueryConf"
           },
           "type": "array"
         },
@@ -594,9 +697,8 @@
           "type": "null"
         }
       ],
-      "default": null,
-      "description": "A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not itself checked. Wildcards `*` can be used.",
-      "title": "GraphDB queries"
+      "description": "Structured list of SPARQL queries.",
+      "title": "Collection of SPARQL queries"
     },
     "validations": {
       "anyOf": [
@@ -621,7 +723,8 @@
     "file_loader",
     "url_loader",
     "dataset",
-    "context_base_IRI"
+    "context_base_IRI",
+    "queries"
   ],
   "title": "KGStewardConf",
   "type": "object",

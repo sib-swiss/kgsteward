@@ -550,15 +550,16 @@ INSERT DATA {{
                 if key == "sib_swiss_query":
                     filenames = []
                     if "queries" in config:
-                        for path in config["queries"] :
-                            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                                filenames.append( dir + "/" + fn )
-                        sparql = make_query_description( context, filenames )
-                        for s in sparql:
-                            server.sparql_update( s )
+                        for record in config["queries"] :
+                            for path in record["file"]:
+                                #FIXME: filter on publish
+                                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                                    filenames.append( dir + "/" + fn )
+                            sparql = make_query_description( context, filenames )
+                            for s in sparql:
+                                server.sparql_update( s )
                     else:
                         print_warn( "Key not found in YAML config: queries" )
-                
     
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -596,30 +597,49 @@ INSERT DATA {{
     if args.V:
         print_break()
         print_task( "Run SPARQL queries to validate repository content." )
-        exit_code = 0
-        for path in config["validations"] :
-            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                filename = dir + "/" + fn
-                # print_break()
-                report( 'query file', filename )
-                with open( filename ) as f: sparql = f.read()
-                r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
-                if args.timeout is not None and r is None: # likely timeout
-                    report( "Result", "Unknown" )
-                    continue
-                header, rows = sparql_result_to_table( r )
-                if len( rows ) == 0 :
-                    report( "Result", "Pass ;-)" )
-                else:
-                    if not args.v:
+        if "queries" not in config:
+            stop_error( "There are no 'queries' key in config! ")
+        test_ok = 0
+        test_ko = 0 
+        for record in config["queries"] :
+            if "test" not in record:
+                continue
+            for path in record["file"]: 
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    filename = dir + "/" + fn
+                    # print_break()
+                    report( 'query file', filename )        
+                    with open( filename ) as f: sparql = f.read()
+                    if args.v:
                         print_strip( sparql, color = "green" )
-                    print( colored( "\t".join( header ), "red" ))
-                    for row in rows:
-                        print( colored( "\t".join( map( str, row )), "red" ))
-                    report( "Result", "Failed ;-(" )
-                    exit_code = 1
-        print( '----------------------------------------------------------')
-        sys.exit( exit_code )
+                    r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
+                    header, rows = sparql_result_to_table( r )
+                    if args.timeout is not None and r is None: # likely timeout
+                        # report( "Result", "Unknown" )
+                        continue
+                    ok = True
+                    if "min_row_count" in record["test"]:
+                        if len( rows ) < record["test"]["min_row_count"] :
+                            print_warn( "Expected at least " + str( record["test"]["min_row_count"] ) + " rows, but got " + str( len( rows )))
+                            test_ko = test_ko + 1
+                            ok = False
+                        else: 
+                            test_ok = test_ok + 1
+                    if "max_row_count" in record["test"]:
+                        if len( rows ) > record["test"]["max_row_count"] :
+                            print_warn( "Expected at most " + str( record["test"]["max_row_count"] ) + " rows, but got " + str( len( rows )))
+                            test_ko = test_ko + 1
+                            ok = False
+                        else: 
+                            test_ok = test_ok + 1
+                    if not ok:
+                        if not args.v: print_strip( sparql, color = "green" )
+                        print( colored( "\t".join( header ), "red" ))
+                        for row in rows:
+                            print( colored( "\t".join( map( str, row )), "red" ))
+        report( "test passed", test_ok )
+        report( "test failed", test_ko )
+        sys.exit( test_ko == 0 )
 
     # --------------------------------------------------------- #
     # Refresh all GraphDB preloaded queries
@@ -630,15 +650,16 @@ INSERT DATA {{
         print_task( "Run SPARQL queries to validate their syntax" )
         if "queries" not in config:
             stop_error( "There are no 'queries' key in config! ")
-        for path in config["queries"] :
-            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                filename = dir + "/" + fn
-                print_break()
-                with open( filename ) as f: sparql = f.read()
-                name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
-                report( "validate", filename )
-                server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
+        for record in config["queries"] :
+            for path in record["file"]: 
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    filename = dir + "/" + fn
+                    print_break()
+                    with open( filename ) as f: sparql = f.read()
+                    name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                    sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
+                    report( "validate", filename )
+                    server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 
     if args.graphdb_upload_queries:
         print_break()
@@ -655,28 +676,29 @@ INSERT DATA {{
                     'method' : 'DELETE',
                     'params' : { 'name': item['name']}
                 })
-            for path in config["queries"] :
-                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                    filename = dir + "/" + fn
-                    report( "read", filename )
-                    print_break()
-                    with open( filename ) as f: sparql = f.read()
-                    name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                    sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
+            for record in config["queries"] :
+                for path in record["file"]: 
+                    for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                        filename = dir + "/" + fn
+                        report( "read", filename )
+                        print_break()
+                        with open( filename ) as f: sparql = f.read()
+                        name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                        sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
 #                    report( "validate", filename )
 #                    server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 #                    if not args.graphdb_upload_query:
 #                        continue
-                    report( "load", filename )
-                    server.graphdb_call({
-                        'url'    : '/rest/sparql/saved-queries',
-                        'method'  : 'POST',
-                        'headers' : {
-                            'Content-Type': 'application/json', 
-                            'Accept-Encoding': 'identity'
-                        },
-                        'json'    : { 'name': name, 'body': sparql, "shared": "true" }
-                    }, [ 201 ] )
+                        report( "load", filename )
+                        server.graphdb_call({
+                            'url'    : '/rest/sparql/saved-queries',
+                            'method'  : 'POST',
+                            'headers' : {
+                                'Content-Type': 'application/json', 
+                                'Accept-Encoding': 'identity'
+                            },
+                            'json'    : { 'name': name, 'body': sparql, "shared": "true" }
+                        }, [ 201 ] )
 
     if args.sib_swiss_editor:
         print_break()
@@ -707,31 +729,32 @@ INSERT DATA {{
         g.bind( "sparql_query_" + config["server"]["repository"], SPARQLQUERY )
         g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
         if "queries" in config:
-            for filename in config["queries"] :
-                report( "read", filename )
-                report( "parse file", filename )
-                counter = counter + 1
-                comment = []
-                select  = [] # i.e. the SPARQL query itself
-                name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                with open( filename ) as file:
-                    for line in file:
-                        if re.match( "^#", line ):
-                            comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
-                        else:
-                            select.append( line.rstrip().replace( "\t", "    "))
-                            match = catch_key_value_rq.search( line )
-                            if match:
-                                prefix[match.group( 1 )] = match.group( 2 )
-                # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
-                iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
-                g.add(( iri, RDF.type, SH.SPARQLExecutable ))
-                g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
-                g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
-                g.add(( iri, SH.prefixes,   prefixes_iri ))
-                g.add(( iri, SH.select,     Literal( "\n".join( select ))))
-                # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
+            for record in config["queries"] :
+                for filename in record["file"]:
+                    report( "read", filename )
+                    report( "parse file", filename )
+                    counter = counter + 1
+                    comment = []
+                    select  = [] # i.e. the SPARQL query itself
+                    name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                    with open( filename ) as file:
+                        for line in file:
+                            if re.match( "^#", line ):
+                                comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
+                            else:
+                                select.append( line.rstrip().replace( "\t", "    "))
+                                match = catch_key_value_rq.search( line )
+                                if match:
+                                    prefix[match.group( 1 )] = match.group( 2 )
+                    # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
+                    iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
+                    g.add(( iri, RDF.type, SH.SPARQLExecutable ))
+                    g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
+                    # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
+                    g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
+                    g.add(( iri, SH.prefixes,   prefixes_iri ))
+                    g.add(( iri, SH.select,     Literal( "\n".join( select ))))
+                    # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
         if "prefixes" in config:
             for filename in config["prefixes"] :
                 report( "parse file", filename )
@@ -759,23 +782,24 @@ INSERT DATA {{
         print_task( "Dump all query results in TSV format" )
         if not os.path.isdir( args.x ):
             stop_error( "Not a directory: " + args.x )
-        for path in config["queries"] :
-            for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                filename = dir + "/" + fn
-                print_break()
-                report( "read file", filename )
-                name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                with open( filename ) as file:
-                    sparql = file.read()
-                r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
-                if r is not None: # no timeout, i.e. the data are here
-                    header, rows = sparql_result_to_table( r )
-                    out_path =  args.x + "/" + name + ".tsv"
-                    report( "write file", out_path )
-                    with open( out_path, "w", encoding="utf-8" ) as f:
-                        f.write( "\t".join( header ) + "\n" )
-                        for row in sorted( rows ):
-                            f.write( "\t".join( map( str, row )) + "\n" )
+        for record in config["queries"] :
+            for path in record["file"]:
+                for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                    filename = dir + "/" + fn
+                    print_break()
+                    report( "read file", filename )
+                    name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+                    with open( filename ) as file:
+                        sparql = file.read()
+                    r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
+                    if r is not None: # no timeout, i.e. the data are here
+                        header, rows = sparql_result_to_table( r )
+                        out_path =  args.x + "/" + name + ".tsv"
+                        report( "write file", out_path )
+                        with open( out_path, "w", encoding="utf-8" ) as f:
+                            f.write( "\t".join( header ) + "\n" )
+                            for row in sorted( rows ):
+                                f.write( "\t".join( map( str, row )) + "\n" )
 
     if args.y:
         print_break()

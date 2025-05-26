@@ -197,11 +197,14 @@ def print_strip( txt, color = 'black' ):
     else :
         print( txt , flush = True )
 
-def report( key, value, color = "black" ) :
-    print( '# ' + colored( f"{key:>12} : {value}" , color ), flush = True )
+def report( key, value, color = None ) :
+    if color is not None:
+        print( '# ' + colored( f"{key:>12} : {value}" , color ), flush = True )
+    else:
+        print( '# ' + f"{key:>12} : {value}", flush = True )
 
 def print_task( txt ):
-    report( 'TASK', txt, color = "black" )
+    report( 'TASK', txt )
 
 def print_warn( txt ):
     report( 'warning', txt, color = "red" )

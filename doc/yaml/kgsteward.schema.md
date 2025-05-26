@@ -44,7 +44,7 @@ Top level YAML keys
 | url_loader | `object` | ✅ | [CurlRiotChunkStoreUrlLoader](#curlriotchunkstoreurlloader) and/or [SparqlUrlLoader](#sparqlurlloader) |  |
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf) | Mandatory key to specify the content of the knowledge graph in the triplestore. |
 | context_base_IRI | `string` | ✅ | string | Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try. |
-| queries | `array` or `null` |  | string | A list of paths to files with SPARQL queries to be add to the repository user interface. Each query is first checked for syntactic correctness by being submitted to the SPARQL endpoint, with a short timeout. The query result is not itself checked. Wildcards `*` can be used. |
+| queries | `array` or `null` | ✅ | [QueryConf](#queryconf) | Structured list of SPARQL queries. |
 | validations | `array` or `null` |  | string | A list of paths to files contining SPARQL queries used to validate the repository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems. |
 
 
@@ -126,6 +126,20 @@ No description provided for this model.
 | method | `const` | ✅ | `http_server` |  | Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB. |
 | port | `integer` or `null` |  | integer | `8000` | Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
 
+## QueryConf
+
+No description provided for this model.
+
+#### Type: `object`
+
+| Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+| -------- | ---- | -------- | --------------- | ------- | ----------- |
+| name | `string` | ✅ | [`^[a-zA-Z]\w{0,31}$`](https://regex101.com/?regex=%5E%5Ba-zA-Z%5D%5Cw%7B0%2C31%7D%24) |  | Mandatory name of a set queries |
+| system | `array` or `null` |  | string |  | A list of system command. This is a simple convenience provided by kgsteward, which is not meant to be a replacement for serious Make-like system as for example git/dvc. |
+| test | `object` or `null` |  | [TestConf](#testconf) |  | assert nothing/something |
+| public | `boolean` or `null` |  | boolean | `true` | no description |
+| file | `array` or `null` |  | string |  | List of files containing one SPARQL query each. Wildcards `*` can be used, and implied file names will be sorted alphabetically. The file name of each file is interpreted as the query label. In each file, lines starting with "#" are considered as the query documentation (comment) |
+
 ## RDF4JConf
 
 No description provided for this model.
@@ -187,6 +201,17 @@ No description provided for this model.
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
 | method | `const` | ✅ | `file_store` | Files are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them. |
+
+## TestConf
+
+No description provided for this model.
+
+#### Type: `object`
+
+| Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
+| -------- | ---- | -------- | --------------- | ----------- |
+| min_row_count | `integer` or `null` |  | integer |  |
+| max_row_count | `integer` or `null` |  | integer |  |
 
 
 ---

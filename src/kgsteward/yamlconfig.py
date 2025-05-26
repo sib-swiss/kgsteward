@@ -191,18 +191,18 @@ class CurlRiotChunkStoreUrlLoader( BaseModel ):
 #    nothing   = 'nothing'
 #    something = 'something'
 
-#class ExpectConf( BaseModel ):
-#    min_line_count : Optional[ int ] = Field( None, title = "Minimal number of lines to expect" )
-#    max_line_count : Optional[ int ] = Field( None, title = "Maximal number of lines to expect" )
+class TestConf( BaseModel ):
+    min_row_count : Optional[ int ] = Field( None, title = "Minimal number of rows to expect" )
+    max_row_count : Optional[ int ] = Field( None, title = "Maximal number of rows to expect" )
 #    min_unbound_count = Optional[ int ] = Field( None, title = "Minimal number of unbound values to expect" )
 #    max_unbound_count = Optional[ int ] = Field( None, title = "Maximal number of unbound values to expect" )
 
-#class QueryConf( BaseModel ):
-#    name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a query record", description = describe( "name_query" ))
-#    system   : Optional[ List[ str ]] = Field( None, title = "UNIX system command(s)", description = describe(  "system" ))
-#    expect   : Optional[ ExpectConf ] = Field( None, title = "Assertion to be tested", description = "assert nothing/something" )
-#    publish  : Optional[ bool ]       = Field( True, title = "Should query be published", description= "no description" )
-#    file     : Optional[ List[ str ]] = Field( None, title = "Load queries from files", description = describe(  "file_query" ))
+class QueryConf( BaseModel ):
+    name     : str = Field( pattern = r"^[a-zA-Z]\w{0,31}$", title = "Short name of a query set", description = describe( "name_query" ))
+    system   : Optional[ List[ str ]] = Field( None, title = "UNIX system command(s)", description = describe(  "system" ))
+    test     : Optional[ TestConf ] = Field( None, title = "Assertion to be tested", description = "assert nothing/something" )
+    public   : Optional[ bool ]       = Field( True, title = "Should query be published", description= "no description" )
+    file     : Optional[ List[ str ]] = Field( None, title = "Load queries from files", description = describe(  "file_query" ))
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
@@ -212,8 +212,8 @@ class KGStewardConf( BaseModel ):
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
-    queries           : Optional[ List[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
-# queries2          : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
+#   queries           : Optional[ Union[ List[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
+    queries           : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
     validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 def parse_yaml_conf( path : str ):
