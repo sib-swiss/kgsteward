@@ -534,17 +534,16 @@ INSERT DATA {{
                     for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
                         server.sparql_update( s, echo = args.v )
 
-        update_dataset_info( server, config, name, echo = args.v )
-
         if "special" in target:
             for key in target["special"]:
                 if key == "sib_swiss_void":
-                    server.sparql_update( make_void_description( context )) 
+                    for s in split_sparql_update( make_void_description( context )):
+                        server.sparql_update( s, echo = args.v )
                 if key == "sib_swiss_prefix":
                     if "prefixes" in config:
                         sparql = make_prefix_description( context, config["prefixes"] )
                         for s in sparql:
-                            server.sparql_update( s )
+                            server.sparql_update( s, echo = args.v )
                     else:
                         print_warn( "Key not found in YAML config: prefixes" )
                 if key == "sib_swiss_query":
@@ -557,10 +556,11 @@ INSERT DATA {{
                                     filenames.append( dir + "/" + fn )
                             sparql = make_query_description( context, filenames )
                             for s in sparql:
-                                server.sparql_update( s )
+                                server.sparql_update( s, echo = args.v )
                     else:
                         print_warn( "Key not found in YAML config: queries" )
     
+        update_dataset_info( server, config, name, echo = args.v )
     # --------------------------------------------------------- #
     # Force update namespace declarations
     # --------------------------------------------------------- #

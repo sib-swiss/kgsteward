@@ -7,10 +7,9 @@ catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE
 def make_void_description( context ):
     return """PREFIX void:     <http://rdfs.org/ns/void#>
 PREFIX void-ext: <http://ldf.fi/void-ext#>
-PREFIX ex:       <http://example.org/void/>
 
 INSERT{
-    GRAPH ?context {
+    GRAPH <""" + context + """> {
         ?cp void:class    ?class ;
             void:entities ?count .
     }
@@ -23,11 +22,11 @@ WHERE{
         }
         GROUP BY ?class
     }
-    BIND( IRI( CONCAT( "http://example.org/void/class_partition_", MD5( STR( ?class )))) AS ?cp )
+    BIND( IRI( CONCAT( '""" + context + """/void/class_partition_', MD5( STR( ?class )))) AS ?cp )
 }
 ;
 INSERT{
-    GRAPH ?context {
+    GRAPH <""" + context + """> {
         ?cps void:propertyPartition ?pp .
         ?pp void:property       ?prop  ;
             void:triples        ?count ;  
@@ -44,13 +43,13 @@ WHERE{
      	} 
      	GROUP BY ?prop ?c_s ?c_o
     }
-    BIND( IRI( CONCAT( "http://example.org/void/class_partition_", MD5( STR( ?c_s )))) AS ?cps )
-    BIND( IRI( CONCAT( "http://example.org/void/class_partition_", MD5( STR( ?c_o )))) AS ?cpo )
-    BIND( IRI( CONCAT( "http://example.org/void/property_partition_", MD5( STR( ?prop )))) AS ?pp )
+    BIND( IRI( CONCAT( '""" + context + """/void/class_partition_',    MD5( STR( ?c_s ))))  AS ?cps )
+    BIND( IRI( CONCAT( '""" + context + """/void/class_partition_',    MD5( STR( ?c_o ))))  AS ?cpo )
+    BIND( IRI( CONCAT( '""" + context + """/void/property_partition_', MD5( STR( ?prop )))) AS ?pp )
 }
 ;
 INSERT{
-    GRAPH ?context {
+    GRAPH <""" + context + """> {
         ?cps void:propertyPartition ?pp .
         ?pp void:property       ?prop  ;
             void:triples        ?count ;  
@@ -69,10 +68,10 @@ WHERE{
      	} 
      	GROUP BY ?prop ?c_s ?dt
     }
-    BIND( IRI( CONCAT( "http://example.org/void/class_partition_", MD5( STR( ?c_s )))) AS ?cps )
-    BIND( IRI( CONCAT( "http://example.org/void/datatype_partition_", MD5( STR( ?dt )))) AS ?dtp )
-    BIND( IRI( CONCAT( "http://example.org/void/property_partition_", MD5( STR( ?prop )))) AS ?pp )
-}""".replace( "http://example.org/void/", context + "/void/" )
+    BIND( IRI( CONCAT( '""" + context + """/void/class_partition_',    MD5( STR( ?c_s ))))  AS ?cps )
+    BIND( IRI( CONCAT( '""" + context + """/void/datatype_partition_', MD5( STR( ?dt ))))   AS ?dtp )
+    BIND( IRI( CONCAT( '""" + context + """/void/property_partition_', MD5( STR( ?prop )))) AS ?pp )
+}"""
 
 def make_prefix_description( context, filenames ):
     for filename in filenames :
@@ -102,14 +101,14 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 INSERT DATA{{ 
     GRAPH <{context}> {{ 
         <{prefix_IRI}> sh:declare
-            {" ,\n            ".join( iris[i:i+10] )} .
+            """ + " ,\n            ".join( iris[i:i+10] ) + f""" .
     }}
 }}""" )
         sparql.append( f"""PREFIX sh: <http://www.w3.org/ns/shacl#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 INSERT DATA{{ 
     GRAPH <{context}> {{ 
-        {"\n        ".join( ttl[i:i+10] )}
+        """ + "\n        ".join( ttl[i:i+10] ) + f"""
     }}
 }}""" )
     return sparql
@@ -136,17 +135,16 @@ def make_query_description( context, filenames ):
                         prefix[match.group( 1 )] = match.group( 2 )
         iri = query_IRI + "/" + str( counter ).rjust( 4, '0' )
         com = "<b>" + name.replace( "_", " ") + "</b>\n<br>\n" + "\n".join( comment )
-        sparql.append( f"""
+        sparql.append( """
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX sh:   <http://www.w3.org/ns/shacl#>
                       
-INSERT DATA{{
-    GRAPH <{context}> {{ 
-        <{iri}> a sh:SPARQLExecutable, sh:SPARQLSelectExecutable ;
-            rdfs:label "{name.replace( "_", " ")}" ;
-            rdfs:comment \"\"\"{com}\"\"\" ;
-            # sh:prefixes <{context}/prefix> ;
-            sh:select \"\"\"{ "\n".join( select )}\"\"\" ;
-    }}
-}}""" )
+INSERT DATA{
+    GRAPH <""" + context + """> { 
+        <""" + iri + """> a sh:SPARQLExecutable, sh:SPARQLSelectExecutable ;
+            rdfs:label '""" + name.replace( "_", " ") + """' ;
+            rdfs:comment \"\"\"""" + com + """\"\"\" ;
+            sh:select \"\"\"""" + "\n".join( select ) + "\n" + """\"\"\" ;
+    }
+}""" )
     return sparql
