@@ -29,7 +29,7 @@ from .generic import GenericClient
 
 class GraphDBClient( GenericClient ):
 
-    def __init__( self, graphdb_url, username, password, repository_id ):
+    def __init__( self, graphdb_url, username, password, repository_id, echo = True ):
         # TODO: ping server first and produce a dcent error message!
         super().__init__( 
             graphdb_url + "/repositories/" + repository_id,
@@ -44,20 +44,35 @@ class GraphDBClient( GenericClient ):
         print_break()
         print_task( "contacting server" )
         if self.username is not None :
-            r = http_call({
-                'method'  : 'POST',
-                'url'     : self.graphdb_url + "/rest/login/" + self.username,
-                'headers' : {
-                    "X-GraphDB-Repository" : self.repository_id,
-                    "X-GraphDB-Password"   : self.password
-                }
-            })
+            r = http_call(
+                {
+                    'method'  : 'POST',
+                    'url'     : self.graphdb_url + "/rest/login/" + self.username,
+                    'headers' : {
+                        "X-GraphDB-Repository" : self.repository_id,
+                        "X-GraphDB-Password"   : self.password
+                    }
+                },
+                echo = echo 
+            )
             if 'Authorization' in r.headers:
                 self.headers = { 'Authorization': r.headers[ 'Authorization' ] }
             else:
                 raise RuntimeError(
                     f"Authentication to GraphDB server failed: {self.graphdb_url}"
                 )
+
+    def list_repository( self ):
+        r = http_call({
+            'method' : 'GET',
+            'url'    : self.graphdb_url + '/rest/repositories',
+            'headers' : self.headers
+        })
+        dump( r )
+        stop_error( "toto" )
+        repos = []
+
+    return repos
 
     def rewrite_repository( self, graphdb_config_filename ) :
         http_call({
