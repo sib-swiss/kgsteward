@@ -626,10 +626,14 @@ INSERT DATA {{
                     if args.v:
                         print_strip( sparql, color = "green" )
                     r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
+                    if r is None:
+                        if args.timeout is not None: # this is likely a timeout and "timeout" message was already printed
+                            continue
+                        else:
+                            if not args.v:
+                                print_strip( sparql, color = "green" )
+                            stop_error( "Something went wrong!" )
                     header, rows = sparql_result_to_table( r )
-                    if args.timeout is not None and r is None: # likely timeout
-                        # report( "Result", "Unknown" )
-                        continue
                     ok = True
                     if "min_row_count" in record["test"]:
                         if len( rows ) < record["test"]["min_row_count"] :
