@@ -206,7 +206,7 @@ class QueryConf( BaseModel ):
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    version           : Literal[ "kgsteward_yaml_2" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
+    version           : Literal[ "kgsteward_yaml_3" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
     server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ] = Field( discriminator = 'brand' )
     file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotChunkStoreFileLoader ]
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
