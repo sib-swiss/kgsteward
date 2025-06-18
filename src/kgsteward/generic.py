@@ -19,6 +19,10 @@ class GenericClient():
         self.cookies         = None
         self.headers         = None
 
+    def list_repository( self ):
+        """ Return a list of existing repository """
+        raise Exception( "Abstract method called: list_repository()" )
+
     def rewrite_repository( self, arg ):
         """ Create an empty repository or empty an existing one """
         raise Exception( "Abstract method called: rewrite_repository()" )

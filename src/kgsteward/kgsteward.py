@@ -311,7 +311,9 @@ def main():
     # --------------------------------------------------------- #
 
     print_break()
-    print_task( "read YAML config" );
+    print_task( "read YAML config" )
+    if not args.yamlfile[0]:
+        stop_error( "No YAML file provided! Use -h for help." )
     config = parse_yaml_conf( replace_env_var( args.yamlfile[0] ))
     for item in config["dataset"]:
         name2context[ item["name"] ] = item["context"]
@@ -329,33 +331,37 @@ def main():
         password = None
 
     if config["server"]["brand"] == "graphdb":
-        server = GraphDBClient(
-            replace_env_var( config["server"]["location"] ),
-            username,
-            password,
-            replace_env_var( config["server"]["repository"] )
-        )
+        try:
+            server = GraphDBClient(
+                replace_env_var( config["server"]["location"] ),
+                username,
+                password,
+                replace_env_var( config["server"]["repository"] ),
+                echo = args.v
+            )
+        except Exception as e:
+            stop_error( "Failed to connect to GraphDB server: " + str( e ))
     elif config["server"]["brand"] == "rdf4j":
-        server = RFD4JClient(
-            replace_env_var( config["server"]["location"] ),
-            username,
-            password,
-            replace_env_var( config["server"]["repository"] )
-        )
+        try:
+            server = RFD4JClient(
+                replace_env_var( config["server"]["location"] ),
+                username,
+                password,
+                replace_env_var( config["server"]["repository"] ),
+                echo = args.v
+            )
+        except Exception as e:
+            stop_error( "Failed to connect to RDF4J server: " + str( e ))
     elif config["server"]["brand"] == "fuseki":
-        server = FusekiClient(
-            replace_env_var( config["server"]["location"] ),
-            replace_env_var( config["server"]["repository"] ),
-            replace_env_var( config["server"]["server_config"] )
-        )
-#            replace_env_var( config["server"]["location"] ),
-#            username,
-#            replace_env_var( config["server"]["repository"] )
-#            password,
-#    elif config["server"]["type"] == "oxigraph":
-#        server = OxigraphClient(
-#            replace_env_var( config["server"]["location"] )
-#        )
+        try:
+            server = FusekiClient(
+                replace_env_var( config["server"]["location"] ),
+                replace_env_var( config["server"]["repository"] ),
+                replace_env_var( config["server"]["server_config"] ),
+                echo = args.v
+            )
+        except Exception as e:
+            stop_error( "Failed to connect to Fuseki server: " + str( e ))
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
@@ -367,6 +373,10 @@ def main():
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
+
+    # FIXME: check if the repository exists 
+    # if not:
+    #    stop_error( "The repository does not exist. Use -I to create it." )
 
     if args.I :
         if "server_config" in config["server"]:
