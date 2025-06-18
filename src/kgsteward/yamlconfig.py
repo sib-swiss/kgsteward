@@ -101,7 +101,7 @@ Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict 
     """,
     "sparql_file_loader" : """Files are loaded using the SPARQL update statement: "LOAD <file://<file-path> INTO...". This strategy is likely to failed for large files, or worst silently truncate them.""",
     "store_file_loader"  : """Files are loaded using the graph store protocol. This strategy is likely to failed for large files, or worst silently truncate them. """,
-    "http_file_server"   : """Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB.""",
+    "http_file_server"   : """Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB, however CORS mut be enabled.""",
     "riot_chunk_store"   : """Files are parsed through riot (part of JENA distribution), and submitted by chunks using graph store protocol. This is the recommended method with Fuseki. """,
     "sparql_url_loader"  : """URL are loaded using the SPARQL update statement: "LOAD <url> INTO...". This strategy could fail for large files, or worst silently truncate them. """,
     "curl_riot_chunk_store" : """URL are downloaded using curl to a temporary file, which is then loaded with `riot_chunk_store` method.""",
