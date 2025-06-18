@@ -340,7 +340,9 @@ def main():
                 echo = args.v
             )
         except Exception as e:
-            stop_error( "Failed to connect to GraphDB server: " + str( e ))
+            print_warn( "Failed to connect to GraphDB server, or the repository does not exist yet (use -I to create it)!" ) 
+            stop_error( str( e ))
+
     elif config["server"]["brand"] == "rdf4j":
         try:
             server = RFD4JClient(
@@ -375,8 +377,9 @@ def main():
     # --------------------------------------------------------- #
 
     # FIXME: check if the repository exists 
-    # if not:
-    #    stop_error( "The repository does not exist. Use -I to create it." )
+    repo = replace_env_var( config["server"]["repository"] )
+    if not repo in server.list_repository():
+        stop_error( "The repository does not exist (use -I to create it): " + repo )
 
     if args.I :
         if "server_config" in config["server"]:

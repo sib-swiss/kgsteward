@@ -30,7 +30,7 @@ from .generic import GenericClient
 class GraphDBClient( GenericClient ):
 
     def __init__( self, graphdb_url, username, password, repository_id, echo = True ):
-        # TODO: ping server first and produce a dcent error message!
+        # This constructor works even if the repo does not exist yet
         super().__init__( 
             graphdb_url + "/repositories/" + repository_id,
             graphdb_url + "/repositories/" + repository_id + "/statements",
@@ -61,18 +61,15 @@ class GraphDBClient( GenericClient ):
                 raise RuntimeError(
                     f"Authentication to GraphDB server failed: {self.graphdb_url}"
                 )
-
     def list_repository( self ):
         r = http_call({
-            'method' : 'GET',
+            'method' : 'get',
             'url'    : self.graphdb_url + '/rest/repositories',
             'headers' : self.headers
         })
-        dump( r )
-        stop_error( "toto" )
         repos = []
-
-    return repos
+        for rec in r.json(): repos.append( rec["id"] )
+        return repos
 
     def rewrite_repository( self, graphdb_config_filename ) :
         http_call({
