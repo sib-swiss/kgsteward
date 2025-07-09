@@ -212,7 +212,6 @@ class KGStewardConf( BaseModel ):
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
-#   queries           : Optional[ Union[ List[ str ]]  = Field( None, title = "GraphDB queries", description = describe( "queries" ))
     queries           : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
     validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
