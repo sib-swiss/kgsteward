@@ -379,7 +379,8 @@ def main():
     # FIXME: check if the repository exists 
     repo = replace_env_var( config["server"]["repository"] )
     if not repo in server.list_repository():
-        stop_error( "The repository does not exist (use -I to create it): " + repo )
+        if not args.I:
+            stop_error( "The repository does not exist, use -I to create it: " + repo )
 
     if args.I :
         if "server_config" in config["server"]:
