@@ -613,6 +613,7 @@ INSERT DATA {{
         print_task( "Run SPARQL queries to validate repository content." )
         if "queries" not in config:
             stop_error( "There are no 'queries' key in config! ")
+        test_to = 0
         test_ok = 0
         test_ko = 0 
         for record in config["queries"] :
@@ -630,6 +631,7 @@ INSERT DATA {{
                     header, rows = sparql_result_to_table( r )
                     if args.timeout is not None and r is None: # likely timeout
                         # report( "Result", "Unknown" )
+                        test_to = test_to + 1
                         continue
                     ok = True
                     if "min_row_count" in record["test"]:
@@ -651,8 +653,9 @@ INSERT DATA {{
                         print( colored( "\t".join( header ), "red" ))
                         for row in rows:
                             print( colored( "\t".join( map( str, row )), "red" ))
-        report( "test passed", test_ok )
-        report( "test failed", test_ko )
+        report( "test timeout", test_to )
+        report( "test passed",  test_ok )
+        report( "test failed",  test_ko )
         sys.exit( test_ko == 0 )
 
     # --------------------------------------------------------- #
