@@ -8,8 +8,8 @@ from . import run_cmd, env
 # NOTE: in case issue in rootless docker: https://github.com/testcontainers/testcontainers-python/issues/537
 # TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/run/user/$(id -u)/docker.sock uv run pytest -s
 
-TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.5' # latest 10 release with no license
-
+# TRIPLESTORE_IMAGE = 'ontotext/graphdb:10.8.6' # latest 10 release with no license
+TRIPLESTORE_IMAGE = 'khaller/graphdb-free:latest' # latest 10 release with no license
 env["GRAPHDB_USERNAME"] = "admin"
 env["GRAPHDB_PASSWORD"] = "root"
 
