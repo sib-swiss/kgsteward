@@ -628,11 +628,11 @@ INSERT DATA {{
                     if args.v:
                         print_strip( sparql, color = "green" )
                     r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
-                    header, rows = sparql_result_to_table( r )
                     if args.timeout is not None and r is None: # likely timeout
                         # report( "Result", "Unknown" )
                         test_to = test_to + 1
                         continue
+                    header, rows = sparql_result_to_table( r )
                     ok = True
                     if "min_row_count" in record["test"]:
                         if len( rows ) < record["test"]["min_row_count"] :
@@ -817,7 +817,9 @@ INSERT DATA {{
                             f.write( "\t".join( header ) + "\n" )
                             for row in sorted( rows ):
                                 f.write( "\t".join( map( str, row )) + "\n" )
-
+                    else
+                        print_warn( "Timeout while executing query: " + filename )
+                        report( "write file", "skipped" )
     if args.y:
         print_break()
         print_task( "Dump all contexts in TSV format" )
