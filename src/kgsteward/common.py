@@ -182,7 +182,8 @@ def sparql_result_to_table( r ):
             tbl.append( row )
         return header, tbl
     except Exception as e :
-        dumper.dump( j )
+        if j is not None:
+            dumper.dump( j )
         dumper.dump( e )
         stop_error( "Parsing went wrong!" )
 
