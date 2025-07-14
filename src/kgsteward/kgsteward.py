@@ -817,7 +817,7 @@ INSERT DATA {{
                             f.write( "\t".join( header ) + "\n" )
                             for row in sorted( rows ):
                                 f.write( "\t".join( map( str, row )) + "\n" )
-                    else
+                    else:
                         print_warn( "Timeout while executing query: " + filename )
                         report( "write file", "skipped" )
     if args.y:
