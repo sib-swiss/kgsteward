@@ -270,7 +270,6 @@ WHERE{
     return config
 
 def update_dataset_info( server, config, name, echo = True ) :
-    print_break()
     context = name2context[ name ]
     sha256 = get_sha256( config, name, echo = echo )
     server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
@@ -376,7 +375,6 @@ def main():
     # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
 
-    # FIXME: check if the repository exists 
     repo = replace_env_var( config["server"]["repository"] )
     if not repo in server.list_repository():
         if not args.I:
