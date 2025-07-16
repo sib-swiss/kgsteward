@@ -5,9 +5,9 @@ import yaml
 import yaml_include
 from dumper        import dump
 from enum          import Enum
-from typing        import List, Optional, Union, Literal
+from typing        import List, Optional, Union, Literal, Any
 from pprintpp      import pformat
-from pydantic      import BaseModel, Field, ValidationError, ConfigDict
+from pydantic      import BaseModel, Field, ValidationError, ConfigDict, validator
 import json
 from .common       import *
 
@@ -125,6 +125,17 @@ def describe( term ):
     else:
         stop_error( "No description for: " + term )
 
+def flatten_nested_list(v: Any) -> List[str]:
+    if isinstance(v, str):
+        return [v]
+    elif isinstance(v, list):
+        result = []
+        for i in v:
+            result.extend(flatten_nested_list(i))
+        return result
+    else:
+        raise TypeError(f"Invalid item: {v} (must be str or list)")
+    
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
@@ -168,6 +179,9 @@ class DatasetConf( BaseModel ):
     update   : Optional[ List[ str ]] = Field( None,  title = "SPARQL update file(s)", description = describe(  "update" ))
     zenodo   : Optional[ List[ int ]] = Field( None,  title = "Ignore me", description = describe(  "zenodo" ))
     special  : Optional[ List[ SpecialEnum ]] = Field( None, title = "Special dataset", description = describe(  "special" ))
+    @validator( 'parent', 'system', 'file', 'url', 'stamp', 'update', pre=True)
+    def flatten_lists( cls, v ):
+        return flatten_nested_list(v)
 
 class SparqlFileLoader( BaseModel ):
     method : Literal[ "sparql_load" ] = Field( title = "sparql file loader", description = describe( "sparql_file_loader" ) )
@@ -203,6 +217,9 @@ class QueryConf( BaseModel ):
     test     : Optional[ TestConf ] = Field( None, title = "Assertion to be tested", description = "assert nothing/something" )
     public   : Optional[ bool ]       = Field( True, title = "Should query be published", description= "no description" )
     file     : Optional[ List[ str ]] = Field( None, title = "Load queries from files", description = describe(  "file_query" ))
+    @validator( 'system', 'file', pre=True)
+    def flatten_lists(cls, v):
+        return flatten_nested_list(v)
 
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
@@ -213,7 +230,7 @@ class KGStewardConf( BaseModel ):
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
     queries           : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
-    validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
+    # validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a four step process:

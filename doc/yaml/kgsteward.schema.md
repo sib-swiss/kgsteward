@@ -38,14 +38,13 @@ Top level YAML keys
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| version | `const` | ✅ | `kgsteward_yaml_2` | This mandatory fixed value determines the admissible YAML syntax |
+| version | `const` | ✅ | `kgsteward_yaml_3` | This mandatory fixed value determines the admissible YAML syntax |
 | server | `object` | ✅ | [FusekiConf](#fusekiconf) or [GraphDBConf](#graphdbconf) or [RDF4JConf](#rdf4jconf) |  |
 | file_loader | `object` | ✅ | [HttpServerFileLoader](#httpserverfileloader) and/or [RiotChunkStoreFileLoader](#riotchunkstorefileloader) and/or [SparqlFileLoader](#sparqlfileloader) and/or [StoreFileLoader](#storefileloader) |  |
 | url_loader | `object` | ✅ | [CurlRiotChunkStoreUrlLoader](#curlriotchunkstoreurlloader) and/or [SparqlUrlLoader](#sparqlurlloader) |  |
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf) | Mandatory key to specify the content of the knowledge graph in the triplestore. |
 | context_base_IRI | `string` | ✅ | string | Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try. |
 | queries | `array` or `null` | ✅ | [QueryConf](#queryconf) | Structured list of SPARQL queries. |
-| validations | `array` or `null` |  | string | A list of paths to files contining SPARQL queries used to validate the repository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems. |
 
 
 ---
@@ -123,7 +122,7 @@ No description provided for this model.
 
 | Property | Type | Required | Possible values | Default |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ------- | ----------- |
-| method | `const` | ✅ | `http_server` |  | Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB. |
+| method | `const` | ✅ | `http_server` |  | Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB, however CORS mut be enabled. |
 | port | `integer` or `null` |  | integer | `8000` | Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall. |
 
 ## QueryConf

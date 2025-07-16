@@ -362,7 +362,7 @@
       "properties": {
         "method": {
           "const": "http_server",
-          "description": "Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB.",
+          "description": "Files are exposed through a temporary HTTP server. This is the recommended method with GraphDB, however CORS mut be enabled.",
           "title": "HTTP file server",
           "type": "string"
         },
@@ -617,7 +617,7 @@
   "additionalProperties": true,
   "properties": {
     "version": {
-      "const": "kgsteward_yaml_2",
+      "const": "kgsteward_yaml_3",
       "description": "This mandatory fixed value determines the admissible YAML syntax",
       "title": "YAML syntax version",
       "type": "string"
@@ -699,22 +699,6 @@
       ],
       "description": "Structured list of SPARQL queries.",
       "title": "Collection of SPARQL queries"
-    },
-    "validations": {
-      "anyOf": [
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "A list of paths to files contining SPARQL queries used to validate the repository. Wildcards `*` can be used. By convention, a valid result should be empty, i.e. no row is returned. Failed results should return rows permitting to diagnose the problems.",
-      "title": "Validation queries"
     }
   },
   "required": [
