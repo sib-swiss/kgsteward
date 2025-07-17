@@ -28,4 +28,6 @@ repos:
         language: system
         pass_filenames: false
         verbose: true
-        files: src/kgsteward/yamlconfig.py
+        files: 
+          - src/kgsteward/yamlconfig.py
+          - run make_yaml_README.py
