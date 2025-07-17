@@ -12,7 +12,7 @@ with open( "kgsteward.schema.json", "w" ) as f:
 with open( "kgsteward.schema.md", "w" ) as f:
     f.write( """<sup>back to [TOC](../README.md)</sup>
 
-# YAML syntax of kgsteward config file (version 2)
+# YAML syntax of kgsteward config file (version 3)
 
 ## Preambule
             
