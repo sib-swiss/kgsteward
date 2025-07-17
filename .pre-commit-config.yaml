@@ -30,5 +30,5 @@ repos:
         verbose: true
         files: 
           - src/kgsteward/yamlconfig.py
-          - run make_yaml_README.py
+          - doc/yaml/make_yaml_README.py
 
