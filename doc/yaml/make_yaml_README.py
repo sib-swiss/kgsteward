@@ -25,6 +25,7 @@ This inclusion mechanism is executed early, before the YAML configuration is val
 
 * During the parsing of YAML, lists are systematically flatten.
 This permit to use `!include <filename>` as a list item, to import and insert a sub-list in place. 
+This mechanism is neither reflected in the documentation below, nor in the `kgsteward.schema.json` file.
 
 * Within the YAM config file(s), UNIX environment variables can by referred to using `${...}` syntax. 
 Evaluation of these is performed late, i.e. at the time of command execution. 
