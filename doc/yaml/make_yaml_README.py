@@ -23,6 +23,9 @@ This directive will insert in place the content of `filename`.
 The path of `<filename>` is interpreted with the directory of the parent YAML file as default directory. 
 This inclusion mechanism is executed early, before the YAML configuration is validated.  
 
+* During the parsing of YAML, lists are systematically flatten.
+This permit to use `!include <filename>` as a list item, to import and insert a sub-list in place. 
+
 * Within the YAM config file(s), UNIX environment variables can by referred to using `${...}` syntax. 
 Evaluation of these is performed late, i.e. at the time of command execution. 
 Hence `${...}` syntax cannot be used in `!include` directive.
