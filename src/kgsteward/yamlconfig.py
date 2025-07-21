@@ -1,6 +1,8 @@
 # https://stackoverflow.com/questions/58703926/how-do-i-generate-yaml-containing-local-tags-with-ruamel-yaml$
 # https://app.soos.io/research/packages/Python/-/pydantic-yaml-parser/
 
+# FIXME: does "file_server_port" still make sense ?
+
 import yaml
 import yaml_include
 from dumper        import dump
@@ -118,6 +120,7 @@ In each file, lines starting with "#" are considered as the query documentation 
 description["location_graphdb"] = description["location"] + " GraphDB has location 'http://localhost:7200' by default"
 description["location_fuseki"]  = description["location"] + " Fuseki has location 'http://localhost:3030' by default"
 description["location_rdf4j"]   = description["location"] + " RDF4J has location 'http://localhost:8080' by default"
+description["location_qlever"]  = description["location"] + " Qlever has location 'http://localhost:7019' by default"
 
 def describe( term ):
     if term in description:
@@ -158,6 +161,13 @@ class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_rdf4j" ))
+    repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
+    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+
+class QleverConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    brand             : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe(  "server_brand" ))
+    location          : str = Field( title = "Server URL", description = describe( "location_qlever" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
@@ -224,7 +234,7 @@ class QueryConf( BaseModel ):
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_3" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
-    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf ] = Field( discriminator = 'brand' )
+    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf, QleverConf ] = Field( discriminator = 'brand' )
     file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotChunkStoreFileLoader ]
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))

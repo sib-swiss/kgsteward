@@ -18,6 +18,7 @@ from .yamlconfig import parse_yaml_conf
 from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient
+from .qlever     import QleverClient
 # from .oxigraph   import OxigraphClient  # in preparation
 # from .virtuoso   import VirtuosoClient  # in preparation
 from .fileserver import LocalFileServer
@@ -363,13 +364,23 @@ def main():
             )
         except Exception as e:
             stop_error( "Failed to connect to Fuseki server: " + str( e ))
+    elif config["server"]["brand"] == "qlever":
+        try:
+            server = QleverClient(
+                replace_env_var( config["server"]["location"] ),
+                # replace_env_var( config["server"]["repository"] ),
+                # replace_env_var( config["server"]["server_config"] ),
+                echo = args.v
+            )
+        except Exception as e:
+            stop_error( "Failed to connect to Qlever server: " + str( e ))
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
     os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
-    os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
+os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
 
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
