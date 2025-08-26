@@ -368,8 +368,6 @@ def main():
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["location"] ),
-                # replace_env_var( config["server"]["repository"] ),
-                # replace_env_var( config["server"]["server_config"] ),
                 echo = args.v
             )
         except Exception as e:
@@ -641,7 +639,12 @@ INSERT DATA {{
                         # report( "Result", "Unknown" )
                         test_to = test_to + 1
                         continue
-                    header, rows = sparql_result_to_table( r )
+                    try:
+                        header, rows = sparql_result_to_table( r )
+                    except Exception as e :
+                        print_warn( str( e ))
+                        test_ko = test_ko + 1
+                        continue
                     ok = True
                     if "min_row_count" in record["test"]:
                         if len( rows ) < record["test"]["min_row_count"] :

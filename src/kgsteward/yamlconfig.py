@@ -144,7 +144,7 @@ class GraphDBConf( BaseModel ):
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_graphdb" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
-    file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
+    # file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     prefixes          : Optional[ List[str]]  = Field( None, title = "GraphDB namespace", description = describe( "prefixes" ))
@@ -155,14 +155,21 @@ class FusekiConf( BaseModel ):
     brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_fuseki" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
-    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_rdf4j" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
-    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+
+class QleverConf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    brand             : Literal[ "qlever" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
+    location          : str = Field( title = "Server URL", description = describe( "location_qlever" ))
+    repository        : Literal[ "repository" ] = Field( title = "repository", description = "This filed is a placeholder and the only permitted value is 'repository'")
+    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class QleverConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )

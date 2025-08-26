@@ -187,7 +187,9 @@ def sparql_result_to_table( r ):
         if j is not None:
             dumper.dump( j )
         dumper.dump( e )
-        stop_error( "Parsing went wrong!" )
+        raise e
+        # stop_error( "Parsing went wrong!" )
+        # raise Exception( "Parsing went wrong!")
 
 def print_break():
     print( '# ----------------------------------------------------------------------------')
