@@ -368,6 +368,7 @@ def main():
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["location"] ),
+                replace_env_var( config["server"]["access_token"] ),
                 echo = args.v
             )
         except Exception as e:
@@ -377,8 +378,8 @@ def main():
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
-    os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
-os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
+        os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
+        os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
 
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
