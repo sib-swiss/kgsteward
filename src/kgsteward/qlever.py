@@ -6,26 +6,23 @@ import urllib
 from .common import *
 from .generic import GenericClient
 
-# FIXME: implement curl -XPOST http://localhost:3030/$/compact/TEST?deleteOld=true
-# FIXME: test env variable JVM_ARGS
-
 class QleverClient( GenericClient ):
 
     def __init__( self, location, access_token = None, echo = True  ):
-        super().__init__( location, location, None )
+        super().__init__( location, None, None )
         self.access_token = access_token
         try:
             r = http_call({
-                'method'  : 'GET',
+                'method'  : 'GET', # not supported by qlever, but return 404
                 'url'     : location
-                }, [ 404 ], echo = echo )
+                }, [ 404 ], echo = echo ) 
         except:
             stop_error( "Cannot contact qlever at location: " + location ) 
 
     def list_repository( self ):
-        return [ "ReconXKG" ]
+        return [ "repository" ] # also hardcoded in yamlconfig.py
 
-    def sparql_query( self, sparql, status_code_ok = [ 200, 400, 500 ], echo = True, timeout = None ):
+    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         headers = {
@@ -41,11 +38,10 @@ class QleverClient( GenericClient ):
             params["timeout"] = timeout
         r = http_call(
             {
-                'method'  : 'POST',  # allows for big query string
+                'method'  : 'POST',
                 'url'     : self.endpoint_query,
                 'headers' : headers,
                 'data'    : params,
-                # 'cookies' : self.cookies
             },
             status_code_ok,
         )
@@ -61,9 +57,11 @@ class QleverClient( GenericClient ):
         return r
     
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
+        stop_error( "Qlever server is supported read-only: QleverConf.sparql_update() is not available" )
+        # the code below worked with INSERT WHERE clause, but not with LOAD INTO ;-()
         if self.access_token is None:
             raise Exception( "Missing access token: QleverConf.sparql_update()" )
-        if echo :
+         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         headers = {
             'Accept' : 'application/qlever-results+json', 
@@ -93,8 +91,6 @@ class QleverClient( GenericClient ):
         return contexts
 
     def drop_context( self, context, echo = True ):
+        stop_error( "Qlever server is supported read-only: QleverConf.drop_context() is not available" )
+        # the code below is nevertheless working
         self.sparql_update( f"DROP GRAPH <{context}>", echo = echo )
-
-#        raise Exception( "Not yet implemented: QleverConf.drop_context()" )
-
-#     def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ): 
