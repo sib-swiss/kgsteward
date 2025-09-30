@@ -11,8 +11,9 @@ from .generic import GenericClient
 
 class QleverClient( GenericClient ):
 
-    def __init__( self, location, config_file = None, access_token = None, echo = True  ):
-        super().__init__( location, location, location ) # FIXME !
+    def __init__( self, location, access_token = None, echo = True  ):
+        super().__init__( location, location, None )
+        self.access_token = access_token
         try:
             r = http_call({
                 'method'  : 'GET',
@@ -22,7 +23,7 @@ class QleverClient( GenericClient ):
             stop_error( "Cannot contact qlever at location: " + location ) 
 
     def list_repository( self ):
-        return [ "repository" ]
+        return [ "ReconXKG" ]
 
     def sparql_query( self, sparql, status_code_ok = [ 200, 400, 500 ], echo = True, timeout = None ):
         if echo :
@@ -60,7 +61,28 @@ class QleverClient( GenericClient ):
         return r
     
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        raise Exception( "Not yet implemented: QleverConf.sparql_update()" )
+        if self.access_token is None:
+            raise Exception( "Missing access token: QleverConf.sparql_update()" )
+        if echo :
+            print_strip( sparql.replace( "\t", "    " ), color = "green" )
+        headers = {
+            'Accept' : 'application/qlever-results+json', 
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Bearer ' + self.access_token
+        }
+        params = { 'update' : sparql }
+        r = http_call(
+            {
+                'method'  : 'POST',  # allows for big query string
+                'url'     : self.endpoint_update,
+                'headers' : headers,
+                'data'    : params,
+                # 'cookies' : self.cookies
+            },
+            status_code_ok,
+        )
+        return r
+        # raise Exception( "Not yet implemented: QleverConf.sparql_update()" )
 
     def list_context( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
@@ -70,7 +92,9 @@ class QleverClient( GenericClient ):
                 contexts.add( rec["g"]["value"] )
         return contexts
 
-    def drop_context( self, context, echo = True ): 
-        raise Exception( "Not yet implemented: QleverConf.drop_context()" )
+    def drop_context( self, context, echo = True ):
+        self.sparql_update( f"DROP GRAPH <{context}>", echo = echo )
+
+#        raise Exception( "Not yet implemented: QleverConf.drop_context()" )
 
 #     def load_from_url( self, url, context, tmpdir = "/tmp", echo = True ): 
