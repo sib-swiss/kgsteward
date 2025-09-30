@@ -23,7 +23,7 @@ description = {
     `${}`, `${}` and `${}`.
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
-    "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' """,
+    "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' """,
     "location" :  """URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand.""" ,
     "repository": """The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
@@ -120,7 +120,7 @@ In each file, lines starting with "#" are considered as the query documentation 
 description["location_graphdb"] = description["location"] + " GraphDB has location 'http://localhost:7200' by default"
 description["location_fuseki"]  = description["location"] + " Fuseki has location 'http://localhost:3030' by default"
 description["location_rdf4j"]   = description["location"] + " RDF4J has location 'http://localhost:8080' by default"
-description["location_qlever"]  = description["location"] + " Qlever has location 'http://localhost:7019' by default"
+description["location_qlever"]  = description["location"] + " Qlever has location 'http://localhost:7019' by default (this is a read-only server)"
 
 def describe( term ):
     if term in description:
@@ -164,19 +164,13 @@ class RDF4JConf( BaseModel ):
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
-class QleverConf( BaseModel ):
-    model_config = ConfigDict( extra='allow' )
-    brand             : Literal[ "qlever" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
-    location          : str = Field( title = "Server URL", description = describe( "location_qlever" ))
-    repository        : Literal[ "repository" ] = Field( title = "repository", description = "This filed is a placeholder and the only permitted value is 'repository'")
-    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
-
-class QleverConf( BaseModel ):
+class QleverConf( BaseModel ): # Nota Bene: qlever is currently read-only,  access_token, file_server_port are useless
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe(  "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_qlever" ))
-    repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
-    file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    repository        : Literal[ "repository" ] = Field( title = "repository", description = "This filed is a placeholder, which only permitted value is 'repository'")
+    # access_token      : str = Field( title = "Qlever access token", description = "Qlever access token is mandatory to write the repsoitory" )
+    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class SpecialEnum( str, Enum ):
     sib_swiss_void   = 'sib_swiss_void'
