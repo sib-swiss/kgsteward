@@ -74,9 +74,9 @@ WHERE{
 }"""
 
 def make_prefix_description( context, filenames ):
+    prefix = {}
     for filename in filenames :
-        report( "parse file", filename )
-        prefix = {}
+        report( "parse file", filename )    
         file = open( replace_env_var( filename ))
         for line in file:
             match = catch_key_value_ttl.search( line )
