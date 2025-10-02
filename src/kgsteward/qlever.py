@@ -58,10 +58,10 @@ class QleverClient( GenericClient ):
     
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
         stop_error( "Qlever server is supported read-only: QleverConf.sparql_update() is not available" )
-        # the code below worked with INSERT WHERE clause, but not with LOAD INTO ;-()
+        # the code below works with INSERT WHERE clause, but not with LOAD INTO ;-()
         if self.access_token is None:
             raise Exception( "Missing access token: QleverConf.sparql_update()" )
-         if echo :
+        if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         headers = {
             'Accept' : 'application/qlever-results+json', 
