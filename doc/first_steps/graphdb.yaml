@@ -15,6 +15,6 @@ dataset: !include dataset.yaml
 queries:
   - name: "query"
     file: "sparql/query/*.rq"
-validations: 
+validations:
   - name: "validation"
     file: "sparql/validate/*.rq"

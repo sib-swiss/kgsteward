@@ -1,6 +1,6 @@
 version: kgsteward_yaml_3
 server:
-  brand             : fuseki
+  brand            : fuseki
   location         : http://localhost:3030
   server_config    : fuseki.config.ttl # actually unused
   repository       : first_steps
@@ -10,6 +10,6 @@ file_loader:
 url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
-validations: 
+validations:
   - name: "validation"
     file: "sparql/validate/*.rq"

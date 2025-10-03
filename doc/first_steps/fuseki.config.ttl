@@ -17,7 +17,7 @@ PREFIX ja:      <http://jena.hpl.hp.com/2005/11/Assembler#>
     fuseki:name "first_steps" ;
     fuseki:endpoint [
         fuseki:operation fuseki:query ;
-        fuseki:name "query" 
+        fuseki:name "query"
     ] ;
     fuseki:endpoint [
         fuseki:operation fuseki:update ;
@@ -27,14 +27,14 @@ PREFIX ja:      <http://jena.hpl.hp.com/2005/11/Assembler#>
         fuseki:operation fuseki:gsp-r ;
         fuseki:name "get"
     ] ;
-    fuseki:endpoint [ 
-        fuseki:operation fuseki:gsp-rw ; 
+    fuseki:endpoint [
+        fuseki:operation fuseki:gsp-rw ;
         fuseki:name "store"
-    ] ; 
-    fuseki:endpoint [ 
+    ] ;
+    fuseki:endpoint [
         fuseki:operation fuseki:patch ;
         fuseki:name "patch"
-    ] ; 
+    ] ;
     fuseki:dataset <#dataset>
     .
 
