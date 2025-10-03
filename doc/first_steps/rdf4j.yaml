@@ -1,4 +1,4 @@
-version: kgsteward_yaml_2
+version: kgsteward_yaml_3
 server:
   brand             : rdf4j
   location         : http://localhost:8080/rdf4j-server
@@ -11,5 +11,6 @@ url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
 validations:
-  - sparql/validate/*.rq
+  - name: "validation"
+    file: "sparql/validate/*.rq"
 

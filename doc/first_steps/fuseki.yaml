@@ -1,4 +1,4 @@
-version: kgsteward_yaml_2
+version: kgsteward_yaml_3
 server:
   brand             : fuseki
   location         : http://localhost:3030
@@ -11,4 +11,5 @@ url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
 validations: 
-  - sparql/validate/*.rq
+  - name: "validation"
+    file: "sparql/validate/*.rq"

@@ -1,4 +1,4 @@
-version: kgsteward_yaml_2
+version: kgsteward_yaml_3
 server:
   brand         : graphdb
   location      : http://localhost:7200
@@ -13,6 +13,8 @@ url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
 queries:
-  - sparql/query/*.rq
+  - name: "query"
+    file: "sparql/query/*.rq"
 validations: 
-  - sparql/validate/*.rq
+  - name: "validation"
+    file: "sparql/validate/*.rq"
