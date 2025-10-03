@@ -669,7 +669,7 @@ INSERT DATA {{
         report( "test timeout", test_to )
         report( "test passed",  test_ok )
         report( "test failed",  test_ko )
-        sys.exit( test_ko == 0 )
+        sys.exit( 0 if test_ko == 0 else 1 )
 
     # --------------------------------------------------------- #
     # Refresh all GraphDB preloaded queries

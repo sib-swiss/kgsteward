@@ -10,7 +10,4 @@ file_loader:
 url_loader:
   method: sparql_load
 dataset: !include dataset.yaml
-validations:
-  - name: "validation"
-    file: "sparql/validate/*.rq"
-
+queries: !include query.yaml
