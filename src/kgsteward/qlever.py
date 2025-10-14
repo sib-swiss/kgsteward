@@ -8,9 +8,9 @@ from .generic import GenericClient
 
 class QleverClient( GenericClient ):
 
-    def __init__( self, location, access_token = None, echo = True  ):
+    def __init__( self, location, repository, echo = True  ):
         super().__init__( location, None, None )
-        self.access_token = access_token
+        self.repository = repository # Qlever have no repository, this hack helps
         try:
             r = http_call({
                 'method'  : 'GET', # not supported by qlever, but return 404
@@ -19,10 +19,13 @@ class QleverClient( GenericClient ):
         except:
             stop_error( "Cannot contact qlever at location: " + location ) 
 
-    def list_repository( self ):
-        return [ "repository" ] # also hardcoded in yamlconfig.py
+    def get_endpoint_update( self ):
+        return None
 
-    def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
+    def list_repository( self ):
+        return [ self.repository ]
+
+    def sparql_query( self, sparql, status_code_ok = [ 200, 400, 500 ], echo = True, timeout = None ):
         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         headers = {
@@ -36,15 +39,24 @@ class QleverClient( GenericClient ):
             if not 500 in status_code_ok: # returned by "service" GraphDB timeout
                 status_code_ok.append( 500 )
             params["timeout"] = timeout
-        r = http_call(
-            {
-                'method'  : 'POST',
-                'url'     : self.endpoint_query,
-                'headers' : headers,
-                'data'    : params,
-            },
-            status_code_ok,
-        )
+        try:
+            r = http_call(
+                {
+                    'method'  : 'POST',
+                    'url'     : self.endpoint_query,
+                    'headers' : headers,
+                    'data'    : params,
+                    # 'timeout' : 2 # timeout  # this timeout on the Python request client side unfortunately
+                },
+                status_code_ok,
+                echo
+            )
+        except Exception as e:
+            print_warn( str( e ) )
+            return None
+        if r.status.code != 200:
+            print_warn( "unknown error" )
+            return None
         if timeout is not None:
             if r.status_code == 503 :
                 time.sleep( 1 )
@@ -52,7 +64,7 @@ class QleverClient( GenericClient ):
                 return None
             elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
                 time.sleep( 1 )
-                print_warn( "status", "unknown error, possibly timeout" )
+                print_warn( "unknown error, possibly timeout" )
                 return None
         return r
     
