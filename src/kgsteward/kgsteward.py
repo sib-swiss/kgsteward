@@ -368,7 +368,7 @@ def main():
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["location"] ),
-                replace_env_var( config["server"]["access_token"] ),
+                replace_env_var( config["server"]["repository"] ),
                 echo = args.v
             )
         except Exception as e:
@@ -378,8 +378,8 @@ def main():
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
-        os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
-        os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
+    os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
+    os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
 
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
@@ -730,78 +730,78 @@ INSERT DATA {{
                             'json'    : { 'name': name, 'body': sparql, "shared": "true" }
                         }, [ 201 ] )
 
-    if args.sib_swiss_editor:
-        print_break()
-        print_task( "Prepare queries for SIB-swiss editor" )     
-        counter = 0 # to keep track of the original input order 
-        prefix = {} # to create a non-redundant list
-        catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
-        catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
-        g = Graph()
-        SPARQLQUERY   = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
-        prefixes_iri  = URIRef(    server.get_endpoint_query() + "/.well-known/prefixes" )
-        PREFIX        = Namespace( server.get_endpoint_query() + "/.well-known/prefix/" )
-        RDF           = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
-        RDFS          = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
-        SCHEMA        = Namespace( "https://schema.org/" )
-        SH            = Namespace( "http://www.w3.org/ns/shacl#" )
-        SPEX          = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
-        XSD           = Namespace( "http://www.w3.org/2001/XMLSchema#" )
-        OWL           = Namespace( "http://www.w3.org/2002/07/owl#" )
-        g.bind( "rdf",    RDF )
-        g.bind( "rdfs",   RDFS )
-        g.bind( "rdfs",   RDFS )
-        g.bind( "schema", SCHEMA )
-        g.bind( "sh",     SH )
-        g.bind( "spex",   SPEX )
-        g.bind( "xsd",    XSD )
-        g.bind( "owl",    OWL )
-        g.bind( "sparql_query_" + config["server"]["repository"], SPARQLQUERY )
-        g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
-        if "queries" in config:
-            for record in config["queries"] :
-                for filename in record["file"]:
-                    report( "read", filename )
-                    report( "parse file", filename )
-                    counter = counter + 1
-                    comment = []
-                    select  = [] # i.e. the SPARQL query itself
-                    name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                    with open( filename ) as file:
-                        for line in file:
-                            if re.match( "^#", line ):
-                                comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
-                            else:
-                                select.append( line.rstrip().replace( "\t", "    "))
-                                match = catch_key_value_rq.search( line )
-                                if match:
-                                    prefix[match.group( 1 )] = match.group( 2 )
-                    # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
-                    iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
-                    g.add(( iri, RDF.type, SH.SPARQLExecutable ))
-                    g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
-                    # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
-                    g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
-                    g.add(( iri, SH.prefixes,   prefixes_iri ))
-                    g.add(( iri, SH.select,     Literal( "\n".join( select ))))
-                    # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
-        if "prefixes" in config:
-            for filename in config["prefixes"] :
-                report( "parse file", filename )
-                file = open( replace_env_var( filename ))
-                for line in file:
-                    match = catch_key_value_ttl.search( line )
-                    if match:
-                        prefix[ match.group( 1 ) ] = match.group( 2 )
-        for key in prefix:
-            g.add(( prefixes_iri,  SH.declare,   PREFIX[ key ]))
-            g.add(( PREFIX[ key ], SH.prefix,    Literal( key )))
-            g.add(( PREFIX[ key ], SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
-        g.serialize(
-            format="turtle",
-            destination = args.sib_swiss_editor
-        )
-        sys.exit( 0 )
+    # if args.sib_swiss_editor:
+    #     print_break()
+    #     print_task( "Prepare queries for SIB-swiss editor" )     
+    #     counter = 0 # to keep track of the original input order 
+    #     prefix = {} # to create a non-redundant list
+    #     catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
+    #     catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
+    #     g = Graph()
+    #     SPARQLQUERY   = Namespace( server.get_endpoint_query() + "/.well-known/sparql-examples/" )
+    #     prefixes_iri  = URIRef(    server.get_endpoint_query() + "/.well-known/prefixes" )
+    #     PREFIX        = Namespace( server.get_endpoint_query() + "/.well-known/prefix/" )
+    #     RDF           = Namespace( "http://www.w3.org/1999/02/22-rdf-syntax-ns#" )
+    #     RDFS          = Namespace( "http://www.w3.org/2000/01/rdf-schema#" )
+    #     SCHEMA        = Namespace( "https://schema.org/" )
+    #     SH            = Namespace( "http://www.w3.org/ns/shacl#" )
+    #     SPEX          = Namespace( "https://purl.expasy.org/sparql-examples/ontology#" )
+    #     XSD           = Namespace( "http://www.w3.org/2001/XMLSchema#" )
+    #     OWL           = Namespace( "http://www.w3.org/2002/07/owl#" )
+    #     g.bind( "rdf",    RDF )
+    #     g.bind( "rdfs",   RDFS )
+    #     g.bind( "rdfs",   RDFS )
+    #     g.bind( "schema", SCHEMA )
+    #     g.bind( "sh",     SH )
+    #     g.bind( "spex",   SPEX )
+    #     g.bind( "xsd",    XSD )
+    #     g.bind( "owl",    OWL )
+    #     g.bind( "sparql_query_" + config["server"]["repository"], SPARQLQUERY )
+    #     g.bind( "prefix_" + config["server"]["repository"],    PREFIX )
+    #     if "queries" in config:
+    #         for record in config["queries"] :
+    #             for filename in record["file"]:
+    #                 report( "read", filename )
+    #                 report( "parse file", filename )
+    #                 counter = counter + 1
+    #                 comment = []
+    #                 select  = [] # i.e. the SPARQL query itself
+    #                 name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+    #                 with open( filename ) as file:
+    #                     for line in file:
+    #                         if re.match( "^#", line ):
+    #                             comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
+    #                         else:
+    #                             select.append( line.rstrip().replace( "\t", "    "))
+    #                             match = catch_key_value_rq.search( line )
+    #                             if match:
+    #                                 prefix[match.group( 1 )] = match.group( 2 )
+    #                 # server.validate_sparql_query( "\n".join( select ), echo=args.v, timeout=args.timeout )
+    #                 iri = SPARQLQUERY[ "query_" + config["server"]["repository"] + str( counter ).rjust( 4, '0' )]
+    #                 g.add(( iri, RDF.type, SH.SPARQLExecutable ))
+    #                 g.add(( iri, RDF.type, SH.SPARQLSelectExecutable ))
+    #                 # g.add(( iri, RDFS.label,    Literal( "<b>" + name.replace( "_", " ") + "</b><br>")))
+    #                 g.add(( iri, RDFS.comment,  Literal( "<b>" + name.replace( "_", " ") + "</b><br>") + "\n".join( comment )))
+    #                 g.add(( iri, SH.prefixes,   prefixes_iri ))
+    #                 g.add(( iri, SH.select,     Literal( "\n".join( select ))))
+    #                 # g.add(( iri, SCHEMA.target, URIRef( server.get_endpoint_query()))) not portable
+    #     if "prefixes" in config:
+    #         for filename in config["prefixes"] :
+    #             report( "parse file", filename )
+    #             file = open( replace_env_var( filename ))
+    #             for line in file:
+    #                 match = catch_key_value_ttl.search( line )
+    #                 if match:
+    #                     prefix[ match.group( 1 ) ] = match.group( 2 )
+    #     for key in prefix:
+    #         g.add(( prefixes_iri,  SH.declare,   PREFIX[ key ]))
+    #         g.add(( PREFIX[ key ], SH.prefix,    Literal( key )))
+    #         g.add(( PREFIX[ key ], SH.namespace, Literal( prefix[key], datatype=XSD.anyURI )))
+    #     g.serialize(
+    #         format="turtle",
+    #         destination = args.sib_swiss_editor
+    #     )
+    #     sys.exit( 0 )
         
     if args.x:
         print_break()

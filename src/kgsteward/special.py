@@ -1,7 +1,8 @@
 import re
 from .common import *
 
-catch_key_value_ttl = re.compile( r"@prefix\s+(\S*):\s+<([^>]+)>", re.IGNORECASE )
+# Unsolved problem catch_key_value_rq is a particular case of catch_key_value_ttl
+catch_key_value_ttl = re.compile( r"\@prefix\s+(\S*):\s+<([^>]+)>\s*\.", re.IGNORECASE )
 catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE )
 
 def make_void_description( context ):
@@ -114,37 +115,55 @@ INSERT DATA{{
     return sparql
 
 def make_query_description( context, filenames ):
-    counter = 0
-    query_IRI = context + "/query"
     sparql = []
-    prefix = {}
+    seen = {}
     for filename in filenames:
         report( "read query", filename )
-        counter = counter + 1
-        comment = []
-        select  = [] # i.e. the SPARQL query itself
-        name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+        comment  = []
+        query    = [] # i.e. the SPARQL query itself
+        more_ttl = []
+        name     = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
+        name     = re.sub( r"\W", "_", name )
+        if name in seen:
+            stop_error( "Duplicated query name: " + name)
+        else:
+            seen[name] = True
         with open( filename ) as file:
             for line in file:
-                if re.match( "^#", line ):
+                if re.match( "^#\+", line ):
+                    l = re.sub( r"^#\+", "", line.rstrip() )
+                    more_ttl.append( l )
+                elif re.match( "^#", line ):
                     comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                 else:
-                    select.append( line.rstrip().replace( "\t", "    "))
-                    match = catch_key_value_rq.search( line )
-                    if match:
-                        prefix[match.group( 1 )] = match.group( 2 )
-        iri = query_IRI + "/" + str( counter ).rjust( 4, '0' )
-        com = "<b>" + name.replace( "_", " ") + "</b>\n<br>\n" + "\n".join( comment )
-        sparql.append( """
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX sh:   <http://www.w3.org/ns/shacl#>
-                      
+                    query.append( line.rstrip().replace( "\t", "    "))
+        iri = context + "/query_" + name
+        sparql.append( """PREFIX sh: <http://www.w3.org/ns/shacl#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 INSERT DATA{
     GRAPH <""" + context + """> { 
         <""" + iri + """> a sh:SPARQLExecutable, sh:SPARQLSelectExecutable ;
-            rdfs:label '""" + name.replace( "_", " ") + """' ;
-            rdfs:comment \"\"\"""" + com + """\"\"\" ;
-            sh:select \"\"\"""" + "\n".join( select ) + "\n" + """\"\"\" ;
+            rdfs:label \"""" + name.replace( "_", " " ) + """\" ;
+            rdfs:comment \"\"\"""" + "\n".join( comment ) + """\"\"\" ;
+            sh:select \"\"\"""" + "\n".join( query ) + """\"\"\" .            
+    }
+}""" )
+        if more_ttl:
+            prefix = []
+            triple = []
+            for line in more_ttl:
+                # print_warn( line )
+                match = catch_key_value_rq.search( line )
+                if match:
+                    prefix.append( "PREFIX " + match.group( 1 ) + ": <" + match.group( 2 ) + ">" )
+                else:
+                    triple.append( line.replace( "$this", "<" + iri + ">" ))
+            sparql.append( "\n".join( prefix ) + """
+INSERT DATA {
+    GRAPH <""" + context + """> {
+    """ + "\n".join( triple ) + """
     }
 }""" )
     return sparql
+
+
