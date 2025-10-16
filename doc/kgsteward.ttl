@@ -1,1 +1,61 @@
-#TODO, currently placeholder to activate purl.expasy.org/kg/
+@prefix kgsteward: <purl.expasy.org/kgsteward/>                       .
+@prefix rdf:       <http://www.w3.org/1999/02/22-rdf-syntax-ns#>      .
+@prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#>            .
+@prefix void:      <http://rdfs.org/ns/void#>                         .
+@prefix dcterms:   <http://purl.org/dc/terms/>                        .
+@prefix owl:       <http://www.w3.org/2002/07/owl#>                   .
+@prefix schema:    <https://schema.org/>                              .
+@prefix pav:       <http://purl.org/pav/>                             .  
+@prefix sd:        <http://www.w3.org/ns/sparql-service-description#> . 
+@prefix orcid:     <http://orcid.org/>                                .
+@prefix spdx:      <http://spdx.org/rdf/terms#>                       .
+@prefix xsd:       <http://www.w3.org/2001/XMLSchema#>                .
+
+kgsteward: a owl:Ontology ;
+    owl:versionIRI kgsteward:ontology_version\/1.0.0 ;
+    owl:versionInfo "1.0.0" ;
+    dcterms:description "A simple RDF vocabulary used by the kgsteward command-line tool to manage named graphs" ;
+    dcterms:title "kgsteward RDF vocabulary" ;
+    dcterms:license <https://creativecommons.org/licenses/by-nc-sa/4.0/> ;
+    dcterms:creator  orcid:0000-0001-9292-9463 ;
+    dcterms:abstract """
+A simple RDF vocabulary used by the kgsteward command-line 
+tool to annotate named graphs.
+This vocabulary re-defines a class and several properties,
+which already exist in other namespaces. The motivation
+for redefining these, is to isolate them 
+from the vocabularies that are imported while aggregating 
+multiple RDF documents together. 
+""" .
+
+kgsteward:Graph a rdfs:Class ;
+    rdfs:label "a named graph managed by kgsteward" ;
+    owl:equivalentClass sd:Graph .
+
+kgsteward:triples a rdf:property ;
+    rdfs:label "number of triples" ;
+    owl:equivalentProperty void:triples ;
+    rdfs:domain kgsteward:Graph ;
+    rdfs:range  xsd:integer .
+
+kgsteward:modified a rdf:property ;
+    rdfs:label "last modification date" ;
+    owl:equivalentProperty dcterms:modified, schema:dateModified, pav:lastUpdatedOn ;
+    rdfs:domain kgsteward:Graph ;
+    rdfs:range  xsd:date .
+
+kgsteward:checksum a rdf:property ;
+    rdfs:label "checksum related to the generation of the named graph" ;
+    rdfs:comment """
+The checksum is computed from the instructions used by the
+command-line tool to populate the named graph. It is not a 
+checksum of the RDF data themself.
+""" ;
+    rdfs:equivalentProperty spdx:checksum ;
+    rdfs:domain kgsteward:Graph ;
+    rdfs:range  xsd:string .
+
+kgsteward:dependsOn a rdf:Property ;
+    rdfs:label "graph dependency among named graphs" ;
+    rdfs:domain kgsteward:Graph ;
+    rdfs:range  kgsteward:Graph .
