@@ -283,6 +283,10 @@ INSERT {{
             void:triples               ?c   ;
             dct:modified               ?now ;
             ex:has_sha256              "{sha256}" .
+            
+            kgsteward:triples 
+            kgsteward:modified
+            kgsteward:checksum
     }}
 }}
 WHERE {{
@@ -636,9 +640,11 @@ INSERT DATA {{
                     if args.v:
                         print_strip( sparql, color = "green" )
                     r = server.sparql_query( sparql, echo = args.v, timeout=args.timeout )
-                    if args.timeout is not None and r is None: # likely timeout
-                        # report( "Result", "Unknown" )
-                        test_to = test_to + 1
+                    if r is None:
+                        if args.timeout is not None: # likely timeout
+                            test_to = test_to + 1
+                        else:
+                            test_ko = test_ko + 1
                         continue
                     try:
                         header, rows = sparql_result_to_table( r )

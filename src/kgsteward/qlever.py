@@ -20,7 +20,7 @@ class QleverClient( GenericClient ):
             stop_error( "Cannot contact qlever at location: " + location ) 
 
     def get_endpoint_update( self ):
-        return None
+        return ""
 
     def list_repository( self ):
         return [ self.repository ]
@@ -33,39 +33,39 @@ class QleverClient( GenericClient ):
             'Content-Type': 'application/x-www-form-urlencoded' 
         }
         params = { 'query' : sparql }
-        if timeout is not None:
-            if not 503 in status_code_ok: # returned by "normal" GraphDB timeout
-                status_code_ok.append( 503 ) 
-            if not 500 in status_code_ok: # returned by "service" GraphDB timeout
-                status_code_ok.append( 500 )
-            params["timeout"] = timeout
-        try:
-            r = http_call(
-                {
-                    'method'  : 'POST',
-                    'url'     : self.endpoint_query,
-                    'headers' : headers,
-                    'data'    : params,
-                    # 'timeout' : 2 # timeout  # this timeout on the Python request client side unfortunately
-                },
-                status_code_ok,
-                echo
-            )
-        except Exception as e:
-            print_warn( str( e ) )
+#        if timeout is not None:
+#            if not 503 in status_code_ok: # returned by "normal" GraphDB timeout
+#                status_code_ok.append( 503 ) 
+#            if not 500 in status_code_ok: # returned by "service" GraphDB timeout
+#                status_code_ok.append( 500 )
+#            params["timeout"] = timeout
+        r = http_call(
+            {
+                'method'  : 'POST',
+                'url'     : self.endpoint_query,
+                'headers' : headers,
+                'data'  : params,
+                # 'timeout' : 2 # timeout  # this timeout on the Python request client side unfortunately
+            },
+            status_code_ok,
+            echo
+        )
+        # qlever may return 500 for execution errors  
+        if r.status_code in [ 400, 500 ] and r.text :
+            print_warn( r.text )
             return None
-        if r.status.code != 200:
-            print_warn( "unknown error" )
-            return None
-        if timeout is not None:
-            if r.status_code == 503 :
-                time.sleep( 1 )
-                print_warn( "query timed out" )
-                return None
-            elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
-                time.sleep( 1 )
-                print_warn( "unknown error, possibly timeout" )
-                return None
+        if r.status_code != 200:
+            dump( r )
+            stop_error( "Unknown error" )
+#        if timeout is not None:
+#            if r.status_code == 503 :
+#                time.sleep( 1 )
+#                print_warn( "query timed out" )
+#                return None
+#            elif r.status_code == 500 : # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+#                time.sleep( 1 )
+#                print_warn( "unknown error, possibly timeout" )
+#                return None
         return r
     
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
