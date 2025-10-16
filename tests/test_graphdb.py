@@ -35,10 +35,10 @@ cmd_base = [
     "kgsteward doc/first_steps/graphdb.yaml -C -v", # Complete (populate) repository
     "kgsteward doc/first_steps/graphdb.yaml -V -v", # Validate repository
     "kgsteward doc/first_steps/graphdb.yaml -Q -v", # validate Queries 
-    "mkdir -p tmp/first_steps",
-    "rm -f tmp/first_steps/*.tsv",
-    "kgsteward doc/first_steps/graphdb.yaml -x tmp/first_steps -v", # Serialize query results for testing
-    "diff -r doc/first_steps/ref tmp/first_steps"
+    "mkdir -p /tmp/first_steps",
+    "rm -f /tmp/first_steps/*.tsv",
+    "kgsteward doc/first_steps/graphdb.yaml -x /tmp/first_steps -v", # Serialize query results for testing
+    "diff -r doc/first_steps/ref /tmp/first_steps"
 ]
 
 cmd_graphdb = [
