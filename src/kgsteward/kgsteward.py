@@ -283,10 +283,6 @@ INSERT {{
             void:triples               ?c   ;
             dct:modified               ?now ;
             ex:has_sha256              "{sha256}" .
-            
-            kgsteward:triples 
-            kgsteward:modified
-            kgsteward:checksum
     }}
 }}
 WHERE {{

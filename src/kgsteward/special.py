@@ -130,10 +130,10 @@ def make_query_description( context, filenames ):
             seen[name] = True
         with open( filename ) as file:
             for line in file:
-                if re.match( "^#\+", line ):
+                if re.match( r"^#\+", line ):
                     l = re.sub( r"^#\+", "", line.rstrip() )
                     more_ttl.append( l )
-                elif re.match( "^#", line ):
+                elif re.match( r"^#", line ):
                     comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                 else:
                     query.append( line.rstrip().replace( "\t", "    "))
