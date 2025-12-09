@@ -137,7 +137,7 @@ def make_query_description( context, filenames ):
                     comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
                 else:
                     query.append( line.rstrip().replace( "\t", "    "))
-        iri = context + "/query_" + name
+        iri = "http://rdf.example.org/queryform/" + name
         sparql.append( """PREFIX sh: <http://www.w3.org/ns/shacl#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 INSERT DATA{
