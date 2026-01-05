@@ -138,6 +138,11 @@ def get_user_input():
         help = "Allow read-only, public free-access to a repository in GraphDB. "
     )
     parser.add_argument(
+        '--graphdb_compact_indexes',
+        action = 'store_true',
+        help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
+    )
+    parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
                "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
@@ -860,6 +865,14 @@ INSERT DATA {{
             print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
         else:
             server.free_access()
+
+    if args.graphdb_compact_indexes:
+        print_break()
+        print_task( "Compact GraphDB indexes" )     
+        if not config["server"]["brand"] == "graphdb":
+            print_warn( "Option --graphdb_compact_indexes not supported for server brand: " + config["server"]["brand"] )
+        else:
+            server.compact_indexes()
 
     # --------------------------------------------------------- #
     # Print final repository status

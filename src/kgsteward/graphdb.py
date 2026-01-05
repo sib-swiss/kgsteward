@@ -119,6 +119,9 @@ class GraphDBClient( GenericClient ):
             }
         })
 
+    def compact_indexes( self ) :
+        self.sparql_update( "INSERT DATA { [] <http://www.ontotext.com/compactIndexes> [] . }")
+        
     def sparql_query( self, sparql, status_code_ok = [ 200 ], echo = True, timeout = None ):
         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
