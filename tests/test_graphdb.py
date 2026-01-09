@@ -83,4 +83,4 @@ def test_run_cmd_graphdb( triplestore , cmd):
     res = run_cmd( cmd.split( " " ), env )
     print(res.stdout)
     print(res.stderr)
-    assert res.returncode == 0
+    assert res.returncode == 0, f"Command failed found:\\n{res.stdout}\\n{res.stderr}"
