@@ -19,14 +19,14 @@ env["GRAPHDB_PASSWORD"] = "root"
 @pytest.fixture( scope="module" )
 def triplestore():
     """Start GraphDB container as a fixture."""
-    # Auto-detect Docker socket if DOCKER_HOST is not set or is just a path
-    if "DOCKER_HOST" not in os.environ or os.environ["DOCKER_HOST"].startswith("/"):
+    # Auto-detect Docker socket if DOCKER_HOST is not set, is just a path, or is the CLI socket
+    if "DOCKER_HOST" not in os.environ or os.environ["DOCKER_HOST"].startswith("/") or "docker-cli.sock" in os.environ["DOCKER_HOST"]:
         # Common socket paths to check
         possible_sockets = [
+            Path.home() / ".docker/run/docker.sock",  # Docker Desktop (Mac/Linux) standard
             Path("/var/run/docker.sock"),  # Standard Linux
             Path("/run/user") / str(os.getuid()) / "docker.sock",  # Rootless Linux
-            Path.home() / ".docker/run/docker.sock",  # Docker Desktop for Linux
-            Path.home() / "Library/Containers/com.docker.docker/Data/docker-cli.sock",  # Docker Desktop for Mac
+            Path.home() / "Library/Containers/com.docker.docker/Data/docker.sock",  # Docker Desktop for Mac (raw)
         ]
         
         # If DOCKER_HOST is set but is a path, try to use it as a socket
