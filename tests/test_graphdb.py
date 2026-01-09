@@ -45,8 +45,10 @@ def triplestore():
         container.with_env("JAVA_OPTS", "-Xms1g -Xmx4g")
         container.start()
     except DockerException as e:
+        print(f"Docker connection failed: {e}")
         pytest.skip(f"Docker not available: {e}")
     except Exception as e:
+        print(f"Docker connection failed details: {e}")
         pytest.skip(f"Docker not available: {e}")
     delay = wait_for_logs(container, "Started GraphDB")
     # host = container.get_container_host_ip()
