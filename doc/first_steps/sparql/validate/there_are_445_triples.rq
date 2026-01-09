@@ -6,5 +6,5 @@ WHERE{
             ?s ?p ?o
         }
     }
-    FILTER( ?c != 453 )
+    FILTER( ?c != 445 )
 }
