@@ -1,6 +1,9 @@
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
+from docker.errors import DockerException
+import os
+from pathlib import Path
 
 from . import run_cmd, env
 
@@ -16,15 +19,40 @@ env["GRAPHDB_PASSWORD"] = "root"
 @pytest.fixture( scope="module" )
 def triplestore():
     """Start GraphDB container as a fixture."""
-    container = DockerContainer(TRIPLESTORE_IMAGE)
-    container.with_exposed_ports(7200).with_bind_ports(7200, 7200)
-    container.with_env("JAVA_OPTS", "-Xms1g -Xmx4g")
-    container.start()
+    # Auto-detect Docker socket if DOCKER_HOST is not set or is just a path
+    if "DOCKER_HOST" not in os.environ or os.environ["DOCKER_HOST"].startswith("/"):
+        # Common socket paths to check
+        possible_sockets = [
+            Path("/var/run/docker.sock"),  # Standard Linux
+            Path("/run/user") / str(os.getuid()) / "docker.sock",  # Rootless Linux
+            Path.home() / ".docker/run/docker.sock",  # Docker Desktop for Linux
+            Path.home() / "Library/Containers/com.docker.docker/Data/docker-cli.sock",  # Docker Desktop for Mac
+        ]
+        
+        # If DOCKER_HOST is set but is a path, try to use it as a socket
+        if "DOCKER_HOST" in os.environ and os.environ["DOCKER_HOST"].startswith("/"):
+             possible_sockets.insert(0, Path(os.environ["DOCKER_HOST"]))
+
+        for socket_path in possible_sockets:
+            if socket_path.exists():
+                print(f"Discovered Docker socket at {socket_path}")
+                os.environ["DOCKER_HOST"] = f"unix://{socket_path}"
+                break
+
+    try:
+        container = DockerContainer(TRIPLESTORE_IMAGE)
+        container.with_exposed_ports(7200).with_bind_ports(7200, 7211)
+        container.with_env("JAVA_OPTS", "-Xms1g -Xmx4g")
+        container.start()
+    except DockerException as e:
+        pytest.skip(f"Docker not available: {e}")
+    except Exception as e:
+        pytest.skip(f"Docker not available: {e}")
     delay = wait_for_logs(container, "Started GraphDB")
     # host = container.get_container_host_ip()
     # port = container.get_exposed_port(7200)
     # base_url = f"http://{host}:{port}"
-    base_url = f"http://{container.get_container_host_ip()}:{container.get_exposed_port(7200)}"
+    base_url = f"http://localhost:7211"
 
     print(f"GraphDB started in {delay:.0f}s at {base_url}")
     # print(container.get_logs())
@@ -35,8 +63,8 @@ cmd_base = [
     "kgsteward doc/first_steps/graphdb.yaml -C -v", # Complete (populate) repository
     "kgsteward doc/first_steps/graphdb.yaml -V -v", # Validate repository
     "kgsteward doc/first_steps/graphdb.yaml -Q -v", # validate Queries 
+    "rm -rf /tmp/first_steps",
     "mkdir -p /tmp/first_steps",
-    "rm -f /tmp/first_steps/*.tsv",
     "kgsteward doc/first_steps/graphdb.yaml -x /tmp/first_steps -v", # Serialize query results for testing
     "diff -r doc/first_steps/ref /tmp/first_steps"
 ]
