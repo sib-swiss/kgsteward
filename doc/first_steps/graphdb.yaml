@@ -1,7 +1,7 @@
 version: kgsteward_yaml_3
 server:
   brand         : graphdb
-  location      : http://localhost:7200
+  location      : http://localhost:7211
   server_config : graphdb.config.ttl
   username      : ${GRAPHDB_USERNAME}
   password      : ${GRAPHDB_PASSWORD}

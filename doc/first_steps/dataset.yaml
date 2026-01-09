@@ -1,6 +1,6 @@
 - name: foaf_ontology
-  url:
-    - http://xmlns.com/foaf/spec/20140114.rdf
+  file:
+    - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/foaf.rdf
 - name: foaf_data
   file:
     - ${KGSTEWARD_ROOT_DIR}/doc/first_steps/data/Alice.ttl   # absolute path

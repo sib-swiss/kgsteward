@@ -1,7 +1,7 @@
 - name: "query"
   test:
-    min_row_count: 669
-    max_row_count: 669
+    min_row_count: 453
+    max_row_count: 453
   file: "sparql/query/*.rq"
 - name: "validation"
   test:
