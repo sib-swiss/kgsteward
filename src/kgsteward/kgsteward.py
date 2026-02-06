@@ -20,8 +20,14 @@ from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient
 from .qlever     import QleverClient
 # from .oxigraph   import OxigraphClient  # in preparation
+# 
+from importlib.metadata import version
+__version__ = version("kgsteward")
+
 # from .virtuoso   import VirtuosoClient  # in preparation
 from .fileserver import LocalFileServer
+
+
 
 name2context = {} # global helper dict
 context2name = {} # same
@@ -107,6 +113,11 @@ def get_user_input():
         action = 'store_true',
         help    = "Verbose mode: print out SPARQL queries being executed. "
                   "Super useful for debugging SPARQL update (after string replacement)."
+    )
+    parser.add_argument(
+        '--version',
+        action = 'version',
+        version = f'%(prog)s {__version__}'
     )
     parser.add_argument(
         '--timeout',
