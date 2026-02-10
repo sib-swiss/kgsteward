@@ -286,6 +286,10 @@ def parse_yaml_conf( path : str ):
         seen.append( item["name"] )
         if "context" not in item:
             item["context"] = str( config["context_base_IRI"] ) + str( item["name"] )
+        item["count"]      = "" # initial guesses, to be later updated with server info
+        item["date"]       = ""
+        item["sha256"]     = ""
+        item["status"]     = "EMPTY"
         dataset.append( item )
     config["dataset"] = dataset
     return config
