@@ -33,7 +33,7 @@ kgsteward:triples a rdf:Property ;
     
 kgsteward:modified a rdf:Property ;
     rdfs:subPropertyOf dct:modified ;
-    rdfs:label  "last modificationdate" ;
+    rdfs:label  "last modification date" ;
     rdfs:domain kgsteward:Dataset ;
     rdfs:range  xsd:dateTime .
 
