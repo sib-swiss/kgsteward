@@ -120,7 +120,7 @@ def get_user_input():
         version = f'%(prog)s {__version__}'
     )
     parser.add_argument(
-        '--timeout',
+        '-t', '--timeout',
         type = int,
         help   = "Timeout delay in seconds. There is no timeout by default. "
                  "Values lower than 15 are not recommended with GraphDB." 
@@ -177,14 +177,26 @@ def get_target( config, name ):
 def get_sha256( config, name, echo = True ) :
     """ Compute checksums of dataset record"""
     target = get_target( config, name )
-    context = name2context[ name ] # get_context( config, name )
+    context = name2context[ name ]
     os.environ["TARGET_GRAPH_CONTEXT"] = context
     os.environ["kgsteward_dataset_name"]    = name
     os.environ["kgsteward_dataset_context"] = context
     sha256 = hashlib.sha256()
+    if "context" in target:
+        sha256.update( target["context"].encode( 'utf-8' ))
+    if "parent" in target:
+        for parent_name in target["parent"]:
+            sha256.update( parent_name.encode( 'utf-8' )) # parent sha256 might be outdated
+    # skip frozen status, as it is not a property of the dataset content, but of the update process
     if "system" in target :
         for cmd in target["system"] :
             sha256.update( cmd.encode( 'utf-8' ))
+    if "file" in target :
+        for path in target["file"] :
+            for dir, filename in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
+                with open( replace_env_var( dir + "/" + filename ), "rb") as f :
+                    for chunk in iter( lambda: f.read(4096), b"") :
+                        sha256.update( chunk )
     if "url" in target :
         for url in target["url"] :
             path = replace_env_var( url )
@@ -209,20 +221,6 @@ def get_sha256( config, name, echo = True ) :
                     with open( replace_env_var( filename ), "rb") as f :
                         for chunk in iter( lambda: f.read(4096), b"") :
                             sha256.update( chunk )
-    if "file" in target :
-        for path in target["file"] :
-            for dir, filename in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
-                with open( replace_env_var( dir + "/" + filename ), "rb") as f :
-                    for chunk in iter( lambda: f.read(4096), b"") :
-                        sha256.update( chunk )
-    if "zenodo" in target : # FIXME: remove this!
-        for id in target["zenodo"]:
-            r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
-            if not r.status_code == 200 :
-                raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
-            info = r.json()
-            for record in info["files"] :
-                sha256.update( record["checksum"].encode('utf-8'))
     if "replace" in target:
         for key in sorted( target["replace"].keys()):
             sha256.update( key.encode( 'utf-8' ))
@@ -234,31 +232,52 @@ def get_sha256( config, name, echo = True ) :
                 with open( filename ) as f:
                     sparql = f.read()
                 sha256.update( sparql.encode('utf-8'))
+    if "zenodo" in target : # FIXME: remove this!
+        for id in target["zenodo"]:
+            r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
+            if not r.status_code == 200 :
+                raise RuntimeError( 'GET failed: ' + "https://zenodo.org/api/records/" + str( id ))
+            info = r.json()
+            for record in info["files"] :
+                sha256.update( record["checksum"].encode('utf-8'))
+    if  "special" in target:
+        for key in target["special"]:
+            sha256.update( key.encode( 'utf-8' ))
     return sha256.hexdigest()
 
-def update_config( server, config, echo = True ) :
-    """ Compute current status information about the records in repository.
+def update_config( server, config, name_to_update = set(), echo = True ) :
+    """ Compute, or update current status information about the records in repository.
         Take dependency into account."""
     print_break()
     print_task( "Retrieve current status" )
     name2item = {}
-    for item in config["dataset"] :
+    for item in config["dataset"]:
         name = item["name"]
         name2item[name]    = item
-        item["count"]      = ""
-        item["date"]       = ""
-        item["sha256_old"] = ""
-        item["status"]     = "FROZEN" if item["frozen"] else "EMPTY"
     r = server.sparql_query( """
-PREFIX void: <http://rdfs.org/ns/void#>
-PREFIX dct:  <http://purl.org/dc/terms/>
-PREFIX ex:   <http://example.org/>
+PREFIX void:      <http://rdfs.org/ns/void#>
+PREFIX dct:       <http://purl.org/dc/terms/>
+PREFIX ex:        <http://example.org/>
+PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>
+
 SELECT ?context ?x ( REPLACE( STR( ?y ), "\\\\..+", "" ) AS ?t ) ?sha256
 WHERE{
-    ?context a void:Dataset   ;
-             void:triples  ?x      ;
-             dct:modified  ?y      ;
-             ex:has_sha256 ?sha256 .
+    {
+        ?context_1 a kgsteward:Dataset   ;
+            kgsteward:triples  ?x_1     ;
+            kgsteward:modified ?y_1      ;
+            kgsteward:checksum ?sha256_1 .
+        
+    } UNION {
+        ?context_2 a void:Dataset   ;
+            void:triples                    ?x_2      ;
+            dct:modified                    ?y_2      ;
+            <http://example.org/has_sha256> ?sha256_2 .
+    }
+    BIND( COALESCE( ?context_1, ?context_2 ) AS ?context )
+    BIND( COALESCE( ?x_1, ?x_2 ) AS ?x )
+    BIND( COALESCE( ?y_1, ?y_2 ) AS ?y )
+    BIND( COALESCE( ?sha256_1, ?sha256_2 ) AS ?sha256 )
 }
 """, echo = echo )
     if r is not None:
@@ -269,36 +288,41 @@ WHERE{
                     item = name2item[ name ]
                 else:
                     continue
-                item["count"]      = rec["x"]["value"]
-                item["date"]       = rec["t"]["value"]
-                item["sha256_old"] = str( rec["sha256"]["value"] )
-                item["sha256_new"] = get_sha256( config, name, echo = echo )
-                if item["sha256_old"] == item["sha256_new"]:
-                    item["status"] = "ok"
-                elif not item["status"] == "FROZEN":
-                    item["status"] = "UPDATE"
-        except Exception as e: # test before and remove this typ/excep block 
+                item["count"]  = rec["x"]["value"]
+                item["date"]   = rec["t"]["value"]
+                item["sha256"] = str( rec["sha256"]["value"] )
+        except Exception as e: # test before and remove this try/except block 
             stop_error( "Failed parsing server response: " + str( e ))
-    for item in config["dataset"] :
-        if item["status"] == "ok" and "parent" in item :
-            for parent in item["parent"] :
-                if name2item[parent]["status"] in { "EMPTY", "UPDATE", "PROPAGATE" }:
+    for item in config["dataset"]: # ordering respet dependency
+        sha256 = get_sha256( config, item["name"], echo = echo )
+        # default status is "EMPTY"
+        if item["sha256"] == sha256:
+            item["status"] = "ok"
+        elif item["name"] in name_to_update:
+            item["status"] = "UPDATE"
+        elif item["frozen"]:
+            item["status"] = "FROZEN"
+        elif "parent" in item:
+            item["status"] = "UPDATE"
+            for parent_name in item["parent"] :
+                if name2item[parent_name]["status"] in { "UPDATE", "PROPAGATE" }:
                     item["status"] = "PROPAGATE"
+        else:
+            item["status"] = "UPDATE"
     return config
 
 def update_dataset_info( server, config, name, echo = True ) :
     context = name2context[ name ]
     sha256 = get_sha256( config, name, echo = echo )
-    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-PREFIX dct:  <http://purl.org/dc/terms/>
-PREFIX ex:   <http://example.org/>
+    server.sparql_update( f"""
+PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>
 
 INSERT {{
     GRAPH <{context}> {{
-        <{context}> a void:Dataset ;
-            void:triples               ?c   ;
-            dct:modified               ?now ;
-            ex:has_sha256              "{sha256}" .
+        <{context}> a kgsteward:Dataset ;
+            kgsteward:triples   ?c   ;
+            kgsteward:modified  ?now ;
+            kgsteward:checksum  "{sha256}" .
     }}
 }}
 WHERE {{
@@ -312,6 +336,8 @@ WHERE {{
     }}
 }}
 """, echo = echo )
+    item = get_target( config, name )
+    item["status"] = "ok"
 
 def main():
     """Main function of the kgsteward workflow."""
@@ -440,7 +466,7 @@ def main():
             else :
                 raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( server, config, echo = args.v ) # may takes a while
+        config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
         for name in rdf_graph_all :
             target = get_target( config, name )
             if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
@@ -599,6 +625,7 @@ INSERT DATA {{
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
+    
     # --------------------------------------------------------- #
     # Force update namespace declarations
     # --------------------------------------------------------- #
