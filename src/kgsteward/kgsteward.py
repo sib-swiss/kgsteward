@@ -84,8 +84,9 @@ def get_user_input():
     parser.add_argument(
         '-V',
         action = 'store_true',
-        help   = "Validate the repository content, by running SPARQL queries that supposed to return the problems. "
-                 "It might be combined with --timeout."
+        help   = "Validate the repository content and the SPARQL queries, by running all queries." 
+                 "Test the query results, if tests are defined in the YAML config. "
+                 "It might be executed with timeout using option -t."
     )
     parser.add_argument(
         '-Q',
@@ -122,8 +123,7 @@ def get_user_input():
     parser.add_argument(
         '-t', '--timeout',
         type = int,
-        help   = "Timeout delay in seconds. There is no timeout by default. "
-                 "Values lower than 15 are not recommended with GraphDB." 
+        help   = "Timeout delay in seconds. There is no timeout by default. " 
     )
     parser.add_argument(
         '--fuseki_compress_tbd2',
@@ -668,8 +668,6 @@ INSERT DATA {{
         test_ok = 0
         test_ko = 0 
         for record in config["queries"] :
-            if "test" not in record:
-                continue
             for path in record["file"]: 
                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                     filename = dir + "/" + fn
@@ -690,6 +688,8 @@ INSERT DATA {{
                     except Exception as e :
                         print_warn( str( e ))
                         test_ko = test_ko + 1
+                        continue
+                    if "test" not in record:
                         continue
                     ok = True
                     if "min_row_count" in record["test"]:
