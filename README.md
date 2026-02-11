@@ -16,7 +16,7 @@ The recommended option is to install `kgsteward` with [`uv`](https://docs.astral
 uv tool install kgsteward
 ```
 
-and to ugrade it to the latest version with
+and to upgrade it to the latest version with
 
 ```shell
 uv tool upgrade kgsteward
