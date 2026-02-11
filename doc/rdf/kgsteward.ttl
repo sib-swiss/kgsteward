@@ -8,6 +8,7 @@
 @prefix orcid:      <https://orcid.org/> .
 @prefix dcterms:    <http://purl.org/dc/terms/> .
 @prefix spdx:       <http://spdx.org/rdf/terms#> .
+@prefix schema:     <https://schema.org/> . 
 
 kgsteward: a owl:Ontology ;
     owl:versionIRI kgsteward:ontology_version\/1.0.0 ;
