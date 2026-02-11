@@ -1,43 +1,52 @@
 @prefix kgsteward: <https://purl.expasy.org/kgsteward/> .
-@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix void: <http://rdfs.org/ns/void#> .
-@prefix dct: <http://purl.org/dc/terms/> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix owl: <http://www.w3.org/2002/07/owl#> .
-@prefix orcid: <https://orcid.org/> .
-@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf:        <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:       <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix void:       <http://rdfs.org/ns/void#> .
+@prefix dct:        <http://purl.org/dc/terms/> .
+@prefix xsd:        <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:        <http://www.w3.org/2002/07/owl#> .
+@prefix orcid:      <https://orcid.org/> .
+@prefix dcterms:    <http://purl.org/dc/terms/> .
+@prefix spdx:       <http://spdx.org/rdf/terms#> .
 
 kgsteward: a owl:Ontology ;
     owl:versionIRI kgsteward:ontology_version\/1.0.0 ;
     owl:versionInfo "1.0.0" ;
-    dcterms:description "The RDF vocabulary describing concepts used by kgsteward" ;
+    dcterms:description "A small RDF vocabulary used by the kgsteward command-line tool to annotate named graphs" ;
     dcterms:title "kgsteward RDF vocabulary" ;
     dcterms:license <https://creativecommons.org/licenses/by-nc-sa/4.0/> ;
     dcterms:creator orcid:0000-0001-9292-9463 ;
     dcterms:abstract """
-This tiny vocabulary is used by kgsteward to describe the datasets it manages. 
-It specializes and extends the void vocabulary with additional properties such as 
-checksum and last modification date.
+A simple RDF vocabulary used by the kgsteward command-line
+tool to annotate named graphs.
+This vocabulary re-defines a class and several properties,
+which already exist in other namespaces. The motivation
+for redefining these terms here, is to isolate them
+from the vocabularies that are imported while aggregating
+multiple RDF documents together.
 """ .
 
 kgsteward:Dataset a rdfs:Class ;
     rdfs:subClassOf void:Dataset ;
-    rdfs:label "kgsteward dataset" .
+    rdfs:label "kgsteward dataset" ;
+    rdfs:comment "A named graph managed by kgsteward." .
 
 kgsteward:triples a rdf:Property ;
     rdfs:subPropertyOf void:triples ;
+    owl:equivalentProperty void:triples ;
     rdfs:label  "number of triples" ;
     rdfs:domain kgsteward:Dataset ;
     rdfs:range  xsd:integer .
     
 kgsteward:modified a rdf:Property ;
     rdfs:subPropertyOf dct:modified ;
+    owl:equivalentProperty dcterms:modified, schema:dateModified, pav:lastUpdatedOn ;
     rdfs:label  "last modification date" ;
     rdfs:domain kgsteward:Dataset ;
     rdfs:range  xsd:dateTime .
 
 kgsteward:checksum a rdf:Property ;
+    rdfs:equivalentProperty spdx:checksum ;
     rdfs:label  "kgsteward checksum" ;
     rdfs:domain kgsteward:Dataset ;
     rdfs:range  xsd:string .
