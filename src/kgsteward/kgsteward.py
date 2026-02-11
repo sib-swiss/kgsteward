@@ -186,8 +186,8 @@ def get_sha256( config, name, echo = True ) :
         sha256.update( target["context"].encode( 'utf-8' ))
     if "parent" in target:
         for parent_name in target["parent"]:
-            sha256.update( parent_name.encode( 'utf-8' )) # parent sha256 might be outdated
-    # skip frozen status, as it is not a property of the dataset content, but of the update process
+            sha256.update( parent_name.encode( 'utf-8' )) # parent sha256 might be out of sync, it is simpler not to check it
+    # skip frozen status, as it is not a property of the dataset content generation
     if "system" in target :
         for cmd in target["system"] :
             sha256.update( cmd.encode( 'utf-8' ))
