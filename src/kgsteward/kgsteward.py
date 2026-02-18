@@ -303,6 +303,7 @@ WHERE{
         # or "UPDATE" if the checksum is different,
         # or "FROZEN" if the record is frozen, 
         # or "PROPAGATE" if it is not frozen but has a parent record to update.
+        # or "UNKNOWN" if is is not managed by kgsteward 
         if item["name"] in name_to_update:
             item["status"] = "UPDATE"
         elif item["frozen"]:
