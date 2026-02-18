@@ -182,6 +182,9 @@ def get_sha256( config, name, echo = True ) :
     os.environ["kgsteward_dataset_name"]    = name
     os.environ["kgsteward_dataset_context"] = context
     sha256 = hashlib.sha256()
+    #   sha256.update( target["count"].encode( 'utf-8' ))
+    #   sha256.update( target["date"].encode( 'utf-8' ))
+    #   sha256.update( target["sha256"].encode( 'utf-8' ))
     if "context" in target:
         sha256.update( target["context"].encode( 'utf-8' ))
     if "parent" in target:
@@ -204,7 +207,7 @@ def get_sha256( config, name, echo = True ) :
             if re.search( r"https?:", path ) :
                info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
                sha256.update( info.encode('utf-8'))
-            elif re.search( r"ftp:", path ) : # do not run HEAD on ftp server FIXME: implement something better
+            elif re.search( r"ftp:", path ):# do not run HEAD on ftp server FIXME: implement something better
                 continue
             else:
                 stop_error( "It does not look like an URL: " + path )
@@ -291,24 +294,27 @@ WHERE{
                 item["count"]  = rec["x"]["value"]
                 item["date"]   = rec["t"]["value"]
                 item["sha256"] = str( rec["sha256"]["value"] )
-        except Exception as e: # test before and remove this try/except block 
+        except Exception as e: # test before and remove this try/except block
             stop_error( "Failed parsing server response: " + str( e ))
-    for item in config["dataset"]: # ordering respet dependency
+    for item in config["dataset"]: # ordering respet dependency 
         sha256 = get_sha256( config, item["name"], echo = echo )
-        # default status is "EMPTY"
-        if item["sha256"] == sha256:
-            item["status"] = "ok"
-        elif item["name"] in name_to_update:
+        # default status is "EMPTY" if the context is not found in the repository, 
+        # otherwise "ok" if the checksum is the same, 
+        # or "UPDATE" if the checksum is different,
+        # or "FROZEN" if the record is frozen, 
+        # or "PROPAGATE" if it is not frozen but has a parent record to update.
+        if item["name"] in name_to_update:
             item["status"] = "UPDATE"
         elif item["frozen"]:
             item["status"] = "FROZEN"
-        elif "parent" in item:
-            item["status"] = "UPDATE"
-            for parent_name in item["parent"] :
-                if name2item[parent_name]["status"] in { "UPDATE", "PROPAGATE" }:
-                    item["status"] = "PROPAGATE"
+        elif item["sha256"] == sha256:
+            item["status"] = "ok" # may be still changed below if it is a parent of an UPDATE record, but it is simpler to set it as "ok" first
         else:
             item["status"] = "UPDATE"
+        if "parent" in item and not item["status"] == "FROZEN":
+            for parent_name in item["parent"] :
+                if name2item[parent_name]["status"] in { "EMPTY", "UPDATE", "PROPAGATE" }: # ignore FROZEN
+                    item["status"] = "PROPAGATE"
     return config
 
 def update_dataset_info( server, config, name, echo = True ) :
@@ -565,7 +571,6 @@ INSERT DATA {{
         <{context}> void:dataDump <file://{filename}>
     }}
 }}""", echo = args.v)
-
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -597,7 +602,6 @@ INSERT DATA {{
                         sparql = sparql.replace( key, replace[ key ])
                     for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
                         server.sparql_update( s, echo = args.v )
-
         if "special" in target:
             for key in target["special"]:
                 if key == "sib_swiss_void":
