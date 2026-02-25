@@ -306,10 +306,10 @@ WHERE{
         # or "UNKNOWN" if is is not managed by kgsteward 
         if item["name"] in name_to_update:
             item["status"] = "UPDATE"
-        elif item["frozen"]:
-            item["status"] = "FROZEN"
         elif item["sha256"] == sha256:
             item["status"] = "ok" # may be still changed below if it is a parent of an UPDATE record, but it is simpler to set it as "ok" first
+        elif item["frozen"]:
+            item["status"] = "FROZEN"        
         else:
             item["status"] = "UPDATE"
         if "parent" in item and not item["status"] == "FROZEN":
