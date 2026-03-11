@@ -126,6 +126,11 @@ def get_user_input():
         help   = "Timeout delay in seconds. There is no timeout by default. " 
     )
     parser.add_argument(
+        '--force_unfreeze',
+        action = 'store_true',
+        help = "Ignore all frozen states."
+    )
+    parser.add_argument(
         '--fuseki_compress_tbd2',
         action = 'store_true',
         help = "Compress fuseki TDB2 indexes, otherwise do nothing. This is executed at first. "
@@ -463,6 +468,11 @@ def main():
 
     for target in config["dataset"] :
         rdf_graph_all.add( target["name"] )
+
+    if args.force_unfreeze:
+        for name in rdf_graph_all :
+            target = get_target( config, name )
+            target["frozen"] = False
 
     if args.D :
         rdf_graph_to_update = rdf_graph_all
