@@ -26,15 +26,15 @@ s	p	o
 <http://example.org#exampleCars>	<http://xmlns.com/foaf/0.1/depiction>	<https://thumb1.shutterstock.com/display_pic_with_logo/3648824/532862638/stock-vector-silhouette-automated-production-line-robotic-factory-banner-532862638.jpg>
 <http://example.org#exampleCars>	<http://xmlns.com/foaf/0.1/made>	<http://example.org#CoolRedCar>
 <http://example.org#exampleCars>	<http://xmlns.com/foaf/0.1/name>	Example Cars & Co.
-<http://example.org/context/foaf_data>	<http://example.org/has_sha256>	83463c190d082ad8e63e7892394ed0cad50547c81d8ee6fc6a630feec90b0956
-<http://example.org/context/foaf_data>	<http://rdfs.org/ns/void#triples>	40
-<http://example.org/context/foaf_data>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<http://rdfs.org/ns/void#Dataset>
-<http://example.org/context/foaf_ontology>	<http://example.org/has_sha256>	b0497b153c6ac034eb9acf220ff3852daee6d31d02d9f9cdc39163528877d98a
-<http://example.org/context/foaf_ontology>	<http://rdfs.org/ns/void#triples>	397
-<http://example.org/context/foaf_ontology>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<http://rdfs.org/ns/void#Dataset>
-<http://example.org/context/update_data>	<http://example.org/has_sha256>	2e25f9691fc342413867e76208fbbbe4cd10ce67aa8cb1f1fe9fcb02b7deb79a
-<http://example.org/context/update_data>	<http://rdfs.org/ns/void#triples>	4
-<http://example.org/context/update_data>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<http://rdfs.org/ns/void#Dataset>
+<http://example.org/context/foaf_data>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<https://purl.expasy.org/kgsteward/Dataset>
+<http://example.org/context/foaf_data>	<https://purl.expasy.org/kgsteward/checksum>	8cbceea808bfd15836514cb179626b97554bdb153cecd25ab3c4b7cca81871f0
+<http://example.org/context/foaf_data>	<https://purl.expasy.org/kgsteward/triples>	40
+<http://example.org/context/foaf_ontology>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<https://purl.expasy.org/kgsteward/Dataset>
+<http://example.org/context/foaf_ontology>	<https://purl.expasy.org/kgsteward/checksum>	5af628107d6830f8c3d779afb094669c7283ad0816d7a9352dd471614d32d123
+<http://example.org/context/foaf_ontology>	<https://purl.expasy.org/kgsteward/triples>	397
+<http://example.org/context/update_data>	<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>	<https://purl.expasy.org/kgsteward/Dataset>
+<http://example.org/context/update_data>	<https://purl.expasy.org/kgsteward/checksum>	e3dd48ab4efd62b6b968e4ba17cebd7e325149b2b412137a7ff2d512a7a5fccb
+<http://example.org/context/update_data>	<https://purl.expasy.org/kgsteward/triples>	4
 <http://example.org>	<http://purl.org/dc/terms/description>	A collection of RDF sentences that describe an Organization literally identified (or labeled) as 'Example Cars & Co.'
 <http://example.org>	<http://purl.org/dc/terms/descripton>	A collection of RDF sentences that describe a Person literally identified (or labeled) as 'Alice'
 <http://example.org>	<http://purl.org/dc/terms/descripton>	A collection of RDF sentences that describe a Person literally identified (or labeled) as 'Bob'
