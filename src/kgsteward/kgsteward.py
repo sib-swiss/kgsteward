@@ -163,6 +163,12 @@ def get_user_input():
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
                "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
     )
+    parser.add_argument(
+        '--dependency_graph',
+        help = "Write a dependency graph of datasets (and their 'parent' relationships) to an SVG file. "
+               "The argument is the output filename (e.g. 'graph.svg'). "
+               "Triple counts are retrieved from the live triplestore and shown on each node."
+    )
     args = parser.parse_args()
 
     # Further processing of command line arguments
@@ -933,6 +939,11 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     config = update_config( server, config, echo = args.v )
+
+    if args.dependency_graph:
+        print_break()
+        print_task( "Write dependency graph" )
+        write_dependency_graph( config, server, args.dependency_graph )
 
     contexts = server.list_context()
     print_break()

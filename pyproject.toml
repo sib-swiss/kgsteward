@@ -22,6 +22,7 @@ dependencies = [
   "pprintpp >=0.4.0",
   "rdflib>=6.3.2",
   "pyyaml-include>=2.2",
+  "graphviz",
 ]
 
 [project.urls]

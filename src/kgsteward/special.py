@@ -166,4 +166,46 @@ INSERT DATA {
 }""" )
     return sparql
 
+def write_dependency_graph( config, server, filename ):
+    """Write a dependency graph as an SVG file using Graphviz.
+
+    Each dataset is rendered as a node labelled with its name and triple count.
+    Directed edges go from child to parent, reflecting the 'parent' dependency
+    declared in the YAML config.
+
+    Args:
+        config:   The parsed kgsteward config dict (after update_config).
+        server:   A live triplestore client (used to retrieve triple counts).
+        filename: Output SVG file path (should end with '.svg').
+    """
+    import graphviz
+
+    dot = graphviz.Digraph(
+        name      = "dependency_graph",
+        comment   = "kgsteward dataset dependency graph",
+        graph_attr = { "rankdir": "LR", "fontname": "Helvetica" },
+        node_attr  = { "shape": "box", "style": "filled", "fillcolor": "lightblue", "fontname": "Helvetica" },
+        edge_attr  = { "fontname": "Helvetica" },
+    )
+
+    for item in config["dataset"]:
+        name       = item["name"]
+        count      = item.get( "count", "" )
+        label      = f"{name}\\n({count} triples)" if count else name
+        dot.node( name, label = label )
+
+    for item in config["dataset"]:
+        name = item["name"]
+        if "parent" in item:
+            for parent_name in item["parent"]:
+                dot.edge( name, parent_name )
+
+    # Strip .svg extension for graphviz render (it adds it automatically)
+    if filename.endswith( ".svg" ):
+        base = filename[:-4]
+    else:
+        base = filename
+
+    dot.render( base, format = "svg", cleanup = True )
+    report( "write file", base + ".svg" )
 
