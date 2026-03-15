@@ -186,16 +186,57 @@ def write_dependency_graph( config, server, filename ):
     if not filename.endswith( ".html" ):
         filename = filename + ".html"
 
-    datasets = config["dataset"]
+    datasets  = config["dataset"]
+    name2item = { item["name"]: item for item in datasets }
+
+    # ---- compute depth ----
+    depth_cache = {}
+    def get_depth( name ):
+        if name in depth_cache:
+            return depth_cache[name]
+        item = name2item[name]
+        if "parent" not in item or not item["parent"]:
+            depth_cache[name] = 0
+        else:
+            depth_cache[name] = max( get_depth(p) for p in item["parent"] ) + 1
+        return depth_cache[name]
+
+    for item in datasets:
+        get_depth( item["name"] )
 
     # ---- build Vis.js nodes and edges ----
     nodes = []
     edges = []
+
+    # input  nodes: no parents  → bold, dark, prominent
+    INPUT_COLOR   = { "background": "#1a5276", "border": "#0e2f44",
+                      "highlight":  { "background": "#21618c", "border": "#0e2f44" } }
+    INPUT_FONT    = { "size": 15, "color": "#ffffff", "face": "Helvetica, Arial, sans-serif",
+                      "bold": { "color": "#ffffff" } }
+
+    # derived nodes: have parents → light, muted, secondary
+    DERIVED_COLOR = { "background": "#d6eaf8", "border": "#a9cce3",
+                      "highlight":  { "background": "#aed6f1", "border": "#7fb3d3" } }
+    DERIVED_FONT  = { "size": 12, "color": "#555555", "face": "Helvetica, Arial, sans-serif" }
+
     for item in datasets:
-        name  = item["name"]
-        count = item.get( "count", "" )
-        label = f"{name}\n{count} triples" if count else name
-        nodes.append({ "id": name, "label": label })
+        name    = item["name"]
+        count   = item.get( "count", "" )
+        depth   = depth_cache[name]
+        is_root = depth == 0
+
+        label   = f"{name}\n{count} triples" if count else name
+        node    = {
+            "id":    name,
+            "label": label,
+            "level": depth,
+            "color": INPUT_COLOR   if is_root else DERIVED_COLOR,
+            "font":  INPUT_FONT    if is_root else DERIVED_FONT,
+            "borderWidth": 2       if is_root else 1,
+            "shadow": is_root,
+        }
+        nodes.append( node )
+
         for parent in item.get( "parent", [] ) or []:
             edges.append({ "from": parent, "to": name, "arrows": "to" })
 
@@ -225,26 +266,22 @@ def write_dependency_graph( config, server, filename ):
         hierarchical: {{
           direction:        "LR",
           sortMethod:       "directed",
-          levelSeparation:  220,
-          nodeSpacing:      100
+          levelSeparation:  240,
+          nodeSpacing:      110,
+          treeSpacing:      160
         }}
       }},
       nodes: {{
-        shape:     "box",
-        margin:    10,
-        font:      {{ size: 14, face: "Helvetica, Arial, sans-serif", multi: true }},
-        color:     {{ background: "#d6eaf8", border: "#336699",
-                     highlight:  {{ background: "#aed6f1", border: "#1a5276" }} }},
-        borderWidth: 2,
-        shadow:    true
+        shape:  "box",
+        margin: 10
       }},
       edges: {{
-        color:  {{ color: "#336699", highlight: "#1a5276" }},
-        width:  2,
+        color:  {{ color: "#aaaaaa", highlight: "#336699" }},
+        width:  1.5,
         smooth: {{ type: "cubicBezier", forceDirection: "horizontal" }},
-        arrows: {{ to: {{ scaleFactor: 0.8 }} }}
+        arrows: {{ to: {{ scaleFactor: 0.7 }} }}
       }},
-      physics: {{ enabled: false }},
+      physics:     {{ enabled: false }},
       interaction: {{ hover: true, navigationButtons: true, keyboard: true }}
     }};
     new vis.Network(
@@ -260,5 +297,6 @@ def write_dependency_graph( config, server, filename ):
     with open( filename, "w", encoding="utf-8" ) as f:
         f.write( html )
     report( "write file", filename )
+
 
 
