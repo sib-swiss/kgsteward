@@ -165,8 +165,9 @@ def get_user_input():
     )
     parser.add_argument(
         '--dependency_graph',
-        help = "Write a dependency graph of datasets (and their 'parent' relationships) to an SVG file. "
-               "The argument is the output filename (e.g. 'graph.svg'). "
+        help = "Write an interactive dependency graph of datasets (and their 'parent' relationships) to an HTML file. "
+               "The argument is the output filename (e.g. 'graph.html'). "
+               "Uses Vis.js Network (loaded from CDN) — open the result in any browser. "
                "Triple counts are retrieved from the live triplestore and shown on each node."
     )
     args = parser.parse_args()
