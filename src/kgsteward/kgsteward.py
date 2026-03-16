@@ -944,7 +944,7 @@ INSERT DATA {{
     if args.dependency_graph:
         print_break()
         print_task( "Write dependency graph" )
-        write_dependency_graph( config, server, args.dependency_graph )
+        write_dependency_graph( config, args.dependency_graph )
 
     contexts = server.list_context()
     print_break()

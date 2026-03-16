@@ -166,19 +166,18 @@ INSERT DATA {
 }""" )
     return sparql
 
-def write_dependency_graph( config, server, filename ):
+def write_dependency_graph( config, filename ):
     """Write an interactive dataset dependency graph as an HTML file.
 
     Uses Vis.js Network (loaded from CDN) to render a hierarchical,
     interactive graph. No external binaries or Python packages required.
     The output file is self-contained (open in any browser).
 
-    Each node shows the dataset name and triple count (from the server).
+    Each node shows the dataset name and triple count.
     Directed edges go from parent to child.
 
     Args:
         config:   The parsed kgsteward config dict (after update_config).
-        server:   A live triplestore client (used to retrieve triple counts).
         filename: Output HTML file path (should end with '.html').
     """
     import json
