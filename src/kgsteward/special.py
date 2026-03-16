@@ -238,7 +238,18 @@ def write_dependency_graph( config, server, filename ):
         nodes.append( node )
 
         for parent in item.get( "parent", [] ) or []:
-            edges.append({ "from": parent, "to": name, "arrows": "to" })
+            has_update = bool( item.get( "update" ) )
+            edge = {
+                "from":   parent,
+                "to":     name,
+                "arrows": "to",
+                # solid arrow = child has a SPARQL update transforming the data
+                # dashed arrow = pure dependency, no update statement
+                "dashes": not has_update,
+                "color":  { "color": "#888888", "highlight": "#336699" },
+                "width":  2 if has_update else 1.5,
+            }
+            edges.append( edge )
 
     nodes_json = json.dumps( nodes, indent=2 )
     edges_json = json.dumps( edges, indent=2 )
@@ -264,11 +275,14 @@ def write_dependency_graph( config, server, filename ):
     const options = {{
       layout: {{
         hierarchical: {{
-          direction:        "LR",
-          sortMethod:       "directed",
-          levelSeparation:  240,
-          nodeSpacing:      110,
-          treeSpacing:      160
+          direction:           "LR",
+          sortMethod:          "directed",
+          levelSeparation:     260,
+          nodeSpacing:         120,
+          treeSpacing:         200,
+          blockShifting:       true,
+          edgeMinimization:    true,
+          parentCentralization: true
         }}
       }},
       nodes: {{
@@ -276,8 +290,6 @@ def write_dependency_graph( config, server, filename ):
         margin: 10
       }},
       edges: {{
-        color:  {{ color: "#aaaaaa", highlight: "#336699" }},
-        width:  1.5,
         smooth: {{ type: "cubicBezier", forceDirection: "horizontal" }},
         arrows: {{ to: {{ scaleFactor: 0.7 }} }}
       }},
