@@ -308,7 +308,7 @@ WHERE{
                 item["sha256"] = str( rec["sha256"]["value"] )
         except Exception as e: # test before and remove this try/except block
             stop_error( "Failed parsing server response: " + str( e ))
-    for item in config["dataset"]: # ordering respet dependency 
+    for item in config["dataset"]: # ordering respect dependency 
         sha256 = get_sha256( config, item["name"], echo = echo )
         # default status is "EMPTY" if the context is not found in the repository, 
         # otherwise "ok" if the checksum is the same, 
