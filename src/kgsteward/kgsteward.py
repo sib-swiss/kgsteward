@@ -429,7 +429,7 @@ def main():
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["qleverfile"] ),
-                replace_env_var( config["server"]["workdir"] ),
+                replace_env_var( config["server"]["qleverdir"] ),
                 echo = args.v
             )
         except Exception as e:

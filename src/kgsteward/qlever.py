@@ -34,7 +34,7 @@ def parse_qleverfile( qleverfile ):
 
 class QleverClient( GenericClient ):
 
-    def __init__( self, qleverfile, workdir, echo = True ):
+    def __init__( self, qleverfile, qleverdir, echo = True ):
 
         # Check that the qlever CLI tool is installed
         if shutil.which( "qlever" ) is None:
@@ -51,7 +51,7 @@ class QleverClient( GenericClient ):
 
         super().__init__( location, None, None )
         self.repository = repository  # qlever has no repository concept; this is used as a label
-        self.workdir    = workdir
+        self.qleverdir  = qleverdir
 
         try:
             r = http_call({
