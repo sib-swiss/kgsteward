@@ -64,6 +64,32 @@ The user interface becomes available at [http://localhost:8080/rdf4j-workbench](
 
 </details>
 
+<details>
+<summary>QLever through docker</summary>
+
+QLever manages its own Docker container internally via the `qlever` CLI.
+You need Docker (or Podman), the `qlever` Python CLI, and Apache Jena's `riot` for RDF format conversion.
+
+```sh
+# Install qlever CLI (requires uv or pip)
+uv tool install qlever
+
+# Install Apache Jena (provides riot)
+brew install jena          # macOS
+# or: apt install jena     # Debian/Ubuntu
+
+# Create a working directory for the qlever index
+export QLEVER_DIR=$HOME/scratch/qlever/first_steps
+mkdir -p $QLEVER_DIR
+
+# Point kgsteward to the provided Qleverfile
+export QLEVER_FILE=$KGSTEWARD_ROOT_DIR/doc/first_steps/Qleverfile
+```
+
+QLever exposes a SPARQL endpoint at http://localhost:7019 (as configured in `Qleverfile`).
+
+</details>
+
 3. ## Install `kgsteward`
 
    You can install `kgsteward` globally, following the [instructions](https://github.com/sib-swiss/kgsteward).
@@ -115,6 +141,20 @@ kgsteward rdf4j.yaml -V # validate repository
 
 </details>
 
+<details>
+<summary>QLever</summary>
+
+```sh
+cd $KGSTEWARD_ROOT_DIR/doc/first_steps
+kgsteward qlever.yaml -I # reset staging area, copy Qleverfile to QLEVER_DIR
+kgsteward qlever.yaml -C # stage all files, build index, start server
+kgsteward qlever.yaml -V # validate repository
+```
+
+> **Note:** QLever uses a static index. `-C` stages all RDF files and builds the index in one pass at the end. SPARQL updates from `update:` sections are applied after the index is built and then persisted with a `rebuild-index` step.
+
+</details>
+
 Congratulations: you have populated a repository using `kgsteward` :-)
 
 5. ## Details
@@ -135,6 +175,10 @@ The following configuration files have been used:
 * [rdf4j.yaml](rdf4j.yaml) describes how to access RDF4J, and includes a link to [dataset.yaml](dataset.yaml). This file was manually created.
 
 * [rdf4j.config.ttl](rdf4j.config.ttl) describes the configuration of a RDF4J repository. This file was exported from the RDF4J user interface, it can be manually modified to some extent. It permits to re-create the same configuration in another server instance.
+
+* [qlever.yaml](qlever.yaml) describes how to access QLever, and includes a link to [dataset.yaml](dataset.yaml). The qlever server location, repository name, and access token are read from the `Qleverfile` rather than from this YAML.
+
+* [Qleverfile](Qleverfile) is the native QLever configuration file (INI format). It specifies the dataset name, server port, access token, and Docker image. kgsteward copies this file to `$QLEVER_DIR` and patches it with `MULTI_INPUT_JSON` entries before building the index — the original file is never modified.
 
 The full supported syntax of the above YAML files is documented [here](../yaml/kgsteward.schema.md)
 

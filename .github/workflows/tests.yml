@@ -16,6 +16,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
+      - name: Install qlever and riot
+        run: |
+          uv tool install qlever
+          sudo apt-get install -y jena
+
       - name: Run tests
         run: uv run pytest
 

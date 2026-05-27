@@ -1,0 +1,17 @@
+[data]
+NAME          = first_steps
+DESCRIPTION   = kgsteward first_steps example
+
+[index]
+INPUT_FILES     = *.ttl
+CAT_INPUT_FILES = cat ${INPUT_FILES}
+SETTINGS_JSON   = { "num-triples-per-batch": 1000000 }
+
+[server]
+PORT         = 7019
+HOST_NAME    = localhost
+ACCESS_TOKEN = my_access_token
+
+[runtime]
+SYSTEM = docker
+IMAGE  = docker.io/adfreiburg/qlever:latest

@@ -63,7 +63,7 @@ def qlever_workdir( tmp_path_factory ):
 # ─── tests ───────────────────────────────────────────────────────────────────
 
 def test_index_rdf_file( qlever_workdir ):
-    """Stage foaf.rdf (RDF/XML → riot nquads → .nq.gz), build qlever index,
+    """Stage foaf.rdf (RDF/XML → riot → N-Triples), build qlever index,
     start the server, and verify the triple count via SPARQL."""
     from src.kgsteward.qlever import QleverClient
 

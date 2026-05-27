@@ -1,12 +1,12 @@
 version: kgsteward_yaml_3
 server:
   brand      : qlever
-  qleverfile : ${QLEVER_FILE}   # path to Qleverfile; location/repo/token are read from it
-  qleverdir  : ${QLEVER_DIR}    # working directory for qlever CLI commands
+  qleverfile : ${QLEVER_FILE}   # path to Qleverfile (see doc/first_steps/Qleverfile)
+  qleverdir  : ${QLEVER_DIR}    # working directory for the qlever index
 context_base_IRI: http://example.org/context/
 file_loader:
-  method: file_store            # calls QleverClient.load_from_file → staged for deferred index
+  method: file_store
 url_loader:
-  method: sparql_load           # LOAD <url> executed after server is up (limited qlever support)
+  method: sparql_load
 dataset: !include dataset.yaml
 queries: !include query.yaml
