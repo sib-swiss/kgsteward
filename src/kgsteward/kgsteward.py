@@ -446,7 +446,10 @@ def main():
     # Create a new empty repository or rewrite an existing one
     # --------------------------------------------------------- #
 
-    repo = replace_env_var( config["server"]["repository"] )
+    if "repository" in config["server"]:
+        repo = replace_env_var( config["server"]["repository"] )
+    else:
+        repo = server.repository   # qlever: derived from Qleverfile NAME
     if not repo in server.list_repository():
         if not args.I:
             stop_error( "The repository does not exist, use -I to create it: " + repo )
@@ -620,6 +623,9 @@ INSERT DATA {{
                         sparql = sparql.replace( key, replace[ key ])
                     for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
                         server.sparql_update( s, echo = args.v )
+            # Persist SPARQL updates for qlever (rebuild-index makes them durable)
+            if config["server"]["brand"] == "qlever" and server.is_running:
+                server.server_rebuild_index( echo = args.v )
         if "special" in target:
             for key in target["special"]:
                 if key == "sib_swiss_void":

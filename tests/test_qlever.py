@@ -63,7 +63,7 @@ def qlever_workdir( tmp_path_factory ):
 # ─── tests ───────────────────────────────────────────────────────────────────
 
 def test_index_rdf_file( qlever_workdir ):
-    """Stage foaf.rdf (RDF/XML → riot → .nt.gz), build qlever index,
+    """Stage foaf.rdf (RDF/XML → riot nquads → .nq.gz), build qlever index,
     start the server, and verify the triple count via SPARQL."""
     from src.kgsteward.qlever import QleverClient
 
@@ -73,9 +73,11 @@ def test_index_rdf_file( qlever_workdir ):
     assert os.path.isfile( foaf_rdf ), f"Test data not found: {foaf_rdf}"
 
     client = QleverClient( qleverfile, qleverdir, echo = True )
-    client.rewrite_repository( [foaf_rdf], echo = True )
+    client.rewrite_repository( echo = True )
+    client.load_from_file( foaf_rdf, "http://example.org/context/foaf_ontology", echo = True )
+    client.server_start( echo = True )   # triggers _finalize_index
 
-    assert client.is_running, "Server should be running after rewrite_repository"
+    assert client.is_running, "Server should be running after server_start"
 
     r = client.sparql_query(
         "SELECT ( COUNT(*) AS ?n ) WHERE { ?s ?p ?o }",
