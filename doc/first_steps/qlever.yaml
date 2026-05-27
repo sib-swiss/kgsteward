@@ -1,0 +1,12 @@
+version: kgsteward_yaml_3
+server:
+  brand      : qlever
+  location   : http://localhost:7019  # default qlever port; qlever is read-only in kgsteward
+  repository : first_steps
+context_base_IRI: http://example.org/context/
+file_loader:
+  method: sparql_load   # qlever is read-only; this loader is present to satisfy schema validation
+url_loader:
+  method: sparql_load   # same remark
+dataset: !include dataset.yaml
+queries: !include query.yaml
