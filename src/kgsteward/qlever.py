@@ -39,8 +39,8 @@ class QleverClient( GenericClient ):
 
     def __init__( self, qleverfile, qleverdir, echo = True ):
 
-        # Check that the qlever CLI tool is installed
-        if shutil.which( "qlever" ) is None:
+        # Check that uv can resolve the qlever tool
+        if subprocess.run( ["uv", "tool", "run", "qlever", "--version"], capture_output=True ).returncode != 0:
             stop_error( "qlever CLI not found. Please install it with: uv tool install qlever" )
 
         # Derive location, repository and container system from Qleverfile
@@ -54,8 +54,9 @@ class QleverClient( GenericClient ):
             stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'. Expected docker, podman or native." )
 
         super().__init__( location, None, None )
-        self.repository = repository  # qlever has no repository concept; this is used as a label
-        self.qleverdir  = qleverdir
+        self.repository  = repository  # qlever has no repository concept; this is used as a label
+        self.qleverdir   = qleverdir
+        self.qlever_cmd  = ["uv", "tool", "run", "qlever"]  # prefix for all future qlever CLI calls
 
         try:
             r = http_call({
