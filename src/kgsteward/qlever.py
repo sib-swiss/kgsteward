@@ -10,14 +10,16 @@ from .common import *
 from .generic import GenericClient
 
 def parse_qleverfile( qleverfile ):
-    """Read a Qleverfile (following symlinks) and return (location, repository).
+    """Read a Qleverfile (following symlinks) and return (location, repository, system).
 
     The Qleverfile is an INI-style file with at minimum:
       [data]
-      NAME = <dataset-name>          # used as the repository identifier
+      NAME      = <dataset-name>     # used as the repository identifier
       [server]
       HOST_NAME = localhost           # optional, defaults to localhost
       PORT      = 7019               # optional, defaults to 7019
+      [runtime]
+      SYSTEM    = docker             # optional, one of docker | podman | native; defaults to docker
     """
     real_path = os.path.realpath( qleverfile )
     if not os.path.isfile( real_path ):
@@ -27,10 +29,11 @@ def parse_qleverfile( qleverfile ):
     if "data" not in parser or "NAME" not in parser["data"]:
         stop_error( "Missing [data] NAME in Qleverfile: " + real_path )
     repository = parser["data"]["NAME"]
-    host = parser.get( "server", "HOST_NAME", fallback = "localhost" )
-    port = parser.get( "server", "PORT",      fallback = "7019" )
+    host   = parser.get( "server",  "HOST_NAME", fallback = "localhost" )
+    port   = parser.get( "server",  "PORT",      fallback = "7019" )
+    system = parser.get( "runtime", "SYSTEM",    fallback = "docker" )
     location = f"http://{host}:{port}"
-    return location, repository
+    return location, repository, system
 
 class QleverClient( GenericClient ):
 
@@ -40,14 +43,15 @@ class QleverClient( GenericClient ):
         if shutil.which( "qlever" ) is None:
             stop_error( "qlever CLI not found. Please install it with: uv tool install qlever" )
 
-        # Check that Docker or Podman daemon is running
-        docker_ok = subprocess.run( ["docker", "info"], capture_output=True ).returncode == 0
-        podman_ok = subprocess.run( ["podman", "info"], capture_output=True ).returncode == 0
-        if not docker_ok and not podman_ok:
-            stop_error( "Neither Docker nor Podman daemon is running. Please start Docker or Podman before using qlever." )
+        # Derive location, repository and container system from Qleverfile
+        location, repository, system = parse_qleverfile( qleverfile )
 
-        # Derive location and repository from Qleverfile
-        location, repository = parse_qleverfile( qleverfile )
+        # Check the container runtime required by the Qleverfile
+        if system in ( "docker", "podman" ):
+            if subprocess.run( [system, "info"], capture_output=True ).returncode != 0:
+                stop_error( f"{system} daemon is not running. Please start it before using qlever." )
+        elif system != "native":
+            stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'. Expected docker, podman or native." )
 
         super().__init__( location, None, None )
         self.repository = repository  # qlever has no repository concept; this is used as a label
