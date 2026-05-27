@@ -74,6 +74,7 @@ class QleverClient( GenericClient ):
         self.repository  = repository  # qlever has no repository concept; this is used as a label
         self.qleverfile  = qleverfile
         self.qleverdir   = qleverdir
+        self.system      = system      # docker | podman | native
         self.qlever_cmd  = ["qlever"]  # prefix for all future qlever CLI calls
 
         # Probe the server: it may legitimately be stopped (e.g. before qlever index).
@@ -110,8 +111,11 @@ class QleverClient( GenericClient ):
     def stage_for_index( self, files, echo = True ):
         """Stage RDF files into qleverdir/input/ for qlever index.
 
-        Files already in a natively supported format+compression are symlinked
-        (zero copy cost). All others are converted to .nt.gz via riot.
+        Files in a natively supported format+compression are:
+          - symlinked  when SYSTEM = native  (the process can follow symlinks)
+          - hard-linked when SYSTEM = docker/podman AND same filesystem as qleverdir
+          - copied     otherwise             (different filesystem or container isolation)
+        All other formats are converted to .nt.gz via riot.
 
         Returns a list of paths relative to qleverdir, suitable for
         INPUT_FILES in the Qleverfile [index] section.
@@ -122,16 +126,25 @@ class QleverClient( GenericClient ):
         for src in files:
             src = os.path.abspath( src )
             basename = os.path.basename( src )
+            dest = os.path.join( input_dir, basename )
             if _is_qlever_native( src ):
-                # Symlink: no data duplication
-                link = os.path.join( input_dir, basename )
-                if os.path.lexists( link ):
-                    os.remove( link )
-                os.symlink( src, link )
-                report( "symlink", link, echo )
+                if os.path.lexists( dest ):
+                    os.remove( dest )
+                if self.system == "native":
+                    # symlink: zero-cost, the native process can follow it
+                    os.symlink( src, dest )
+                    report( "symlink", dest )
+                else:
+                    # container cannot see files outside qleverdir: hard-link or copy
+                    try:
+                        os.link( src, dest )
+                        report( "hard-link", dest )
+                    except OSError:
+                        shutil.copy2( src, dest )
+                        report( "copy", dest )
                 staged.append( os.path.join( "input", basename ))
             else:
-                # Convert to .nt.gz via riot (handles any RDF format)
+                # Convert to .nt.gz via riot (handles any RDF format or compression)
                 stem = re.sub( r"\.(gz|bz2|xz)$", "", basename, flags = re.IGNORECASE )
                 stem = os.path.splitext( stem )[0]
                 out_name = stem + ".nt.gz"
@@ -149,16 +162,32 @@ class QleverClient( GenericClient ):
         return staged
 
     def _patch_input_files( self, staged_files ):
-        """Overwrite INPUT_FILES in the [index] section of the Qleverfile."""
+        """Overwrite INPUT_FILES and CAT_INPUT_FILES in the [index] section of the Qleverfile.
+
+        configparser lowercases keys by default; we set optionxform = str to
+        preserve the uppercase keys that qlever expects.
+        """
         real_path = os.path.realpath( self.qleverfile )
-        parser = configparser.ConfigParser()
+        parser = configparser.RawConfigParser()
+        parser.optionxform = str          # preserve key case (qlever needs uppercase)
         parser.read( real_path )
         if "index" not in parser:
             parser["index"] = {}
         parser["index"]["INPUT_FILES"] = " ".join( staged_files )
+        # CAT_INPUT_FILES: zcat for .gz files, cat for plain, mixed shell loop otherwise
+        all_gz  = all( f.endswith( ".gz" ) for f in staged_files )
+        none_gz = all( not f.endswith( ".gz" ) for f in staged_files )
+        if all_gz:
+            cat_cmd = "zcat ${INPUT_FILES}"
+        elif none_gz:
+            cat_cmd = "cat ${INPUT_FILES}"
+        else:
+            cat_cmd = "for f in ${INPUT_FILES}; do case $f in *.gz) zcat \"$f\";; *) cat \"$f\";; esac; done"
+        parser["index"]["CAT_INPUT_FILES"] = cat_cmd
         with open( real_path, "w" ) as f:
             parser.write( f )
-        report( "INPUT_FILES", " ".join( staged_files ))
+        report( "INPUT_FILES",     " ".join( staged_files ))
+        report( "CAT_INPUT_FILES", cat_cmd )
 
     def rewrite_repository( self, files = None, echo = True ):
         """Re-index qlever from scratch.
