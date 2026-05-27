@@ -9,8 +9,8 @@ import urllib
 from .common import *
 from .generic import GenericClient
 
-def parse_qleverfile( qleverdir ):
-    """Read the Qleverfile in qleverdir (following symlinks) and return (location, repository).
+def parse_qleverfile( qleverfile ):
+    """Read a Qleverfile (following symlinks) and return (location, repository).
 
     The Qleverfile is an INI-style file with at minimum:
       [data]
@@ -19,13 +19,13 @@ def parse_qleverfile( qleverdir ):
       HOST_NAME = localhost           # optional, defaults to localhost
       PORT      = 7019               # optional, defaults to 7019
     """
-    qleverfile = os.path.realpath( os.path.join( qleverdir, "Qleverfile" ))
-    if not os.path.isfile( qleverfile ):
-        stop_error( "Qleverfile not found in: " + qleverdir )
+    real_path = os.path.realpath( qleverfile )
+    if not os.path.isfile( real_path ):
+        stop_error( "Qleverfile not found: " + qleverfile )
     parser = configparser.ConfigParser()
-    parser.read( qleverfile )
+    parser.read( real_path )
     if "data" not in parser or "NAME" not in parser["data"]:
-        stop_error( "Missing [data] NAME in Qleverfile: " + qleverfile )
+        stop_error( "Missing [data] NAME in Qleverfile: " + real_path )
     repository = parser["data"]["NAME"]
     host = parser.get( "server", "HOST_NAME", fallback = "localhost" )
     port = parser.get( "server", "PORT",      fallback = "7019" )
@@ -34,7 +34,7 @@ def parse_qleverfile( qleverdir ):
 
 class QleverClient( GenericClient ):
 
-    def __init__( self, qleverdir, echo = True ):
+    def __init__( self, qleverfile, workdir, echo = True ):
 
         # Check that the qlever CLI tool is installed
         if shutil.which( "qlever" ) is None:
@@ -47,10 +47,11 @@ class QleverClient( GenericClient ):
             stop_error( "Neither Docker nor Podman daemon is running. Please start Docker or Podman before using qlever." )
 
         # Derive location and repository from Qleverfile
-        location, repository = parse_qleverfile( qleverdir )
+        location, repository = parse_qleverfile( qleverfile )
 
         super().__init__( location, None, None )
         self.repository = repository  # qlever has no repository concept; this is used as a label
+        self.workdir    = workdir
 
         try:
             r = http_call({

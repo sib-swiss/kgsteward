@@ -1,7 +1,8 @@
 version: kgsteward_yaml_3
 server:
-  brand     : qlever
-  qleverdir : ${QLEVER_DIR}  # path to directory containing a Qleverfile (may be a symlink)
+  brand      : qlever
+  qleverfile : ${QLEVER_FILE}   # path to Qleverfile (may be a symlink); location and repository are read from it
+  workdir    : ${QLEVER_WORKDIR}  # working directory for qlever CLI commands
 context_base_IRI: http://example.org/context/
 file_loader:
   method: sparql_load   # qlever is read-only; loader present to satisfy schema validation

@@ -167,7 +167,8 @@ class RDF4JConf( BaseModel ):
 class QleverConf( BaseModel ): # Nota Bene: qlever is currently read-only,  access_token, file_server_port are useless
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe(  "server_brand" ))
-    qleverdir         : str = Field( title = "Qlever directory", description = "Path to the directory containing the Qleverfile (may be a symlink). location, repository and other settings are read from that file." )
+    qleverfile        : str = Field( title = "Qleverfile path", description = "Path to the Qleverfile (may be a symlink). location, repository and other settings are read from that file." )
+    workdir           : str = Field( title = "Working directory", description = "Working directory from which qlever CLI commands are run." )
     # access_token      : str = Field( title = "Qlever access token", description = "Qlever access token is mandatory to write the repsoitory" )
     # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
