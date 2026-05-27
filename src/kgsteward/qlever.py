@@ -1,4 +1,6 @@
 from dumper import dump
+import configparser
+import os
 import re
 import rdflib
 import subprocess
@@ -7,11 +9,32 @@ import urllib
 from .common import *
 from .generic import GenericClient
 
+def parse_qleverfile( qleverdir ):
+    """Read the Qleverfile in qleverdir (following symlinks) and return (location, repository).
+
+    The Qleverfile is an INI-style file with at minimum:
+      [data]
+      NAME = <dataset-name>          # used as the repository identifier
+      [server]
+      HOST_NAME = localhost           # optional, defaults to localhost
+      PORT      = 7019               # optional, defaults to 7019
+    """
+    qleverfile = os.path.realpath( os.path.join( qleverdir, "Qleverfile" ))
+    if not os.path.isfile( qleverfile ):
+        stop_error( "Qleverfile not found in: " + qleverdir )
+    parser = configparser.ConfigParser()
+    parser.read( qleverfile )
+    if "data" not in parser or "NAME" not in parser["data"]:
+        stop_error( "Missing [data] NAME in Qleverfile: " + qleverfile )
+    repository = parser["data"]["NAME"]
+    host = parser.get( "server", "HOST_NAME", fallback = "localhost" )
+    port = parser.get( "server", "PORT",      fallback = "7019" )
+    location = f"http://{host}:{port}"
+    return location, repository
+
 class QleverClient( GenericClient ):
 
-    def __init__( self, location, repository, echo = True  ):
-        super().__init__( location, None, None )
-        self.repository = repository # Qlever have no repository, this hack helps
+    def __init__( self, qleverdir, echo = True ):
 
         # Check that the qlever CLI tool is installed
         if shutil.which( "qlever" ) is None:
@@ -23,9 +46,15 @@ class QleverClient( GenericClient ):
         if not docker_ok and not podman_ok:
             stop_error( "Neither Docker nor Podman daemon is running. Please start Docker or Podman before using qlever." )
 
+        # Derive location and repository from Qleverfile
+        location, repository = parse_qleverfile( qleverdir )
+
+        super().__init__( location, None, None )
+        self.repository = repository  # qlever has no repository concept; this is used as a label
+
         try:
             r = http_call({
-                'method'  : 'GET', # not supported by qlever, but return 404
+                'method'  : 'GET', # not supported by qlever, but returns 404
                 'url'     : location
                 }, [ 404 ], echo = echo )
         except:

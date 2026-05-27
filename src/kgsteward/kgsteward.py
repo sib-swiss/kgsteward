@@ -428,8 +428,7 @@ def main():
     elif config["server"]["brand"] == "qlever":
         try:
             server = QleverClient(
-                replace_env_var( config["server"]["location"] ),
-                replace_env_var( config["server"]["repository"] ),
+                replace_env_var( config["server"]["qleverdir"] ),
                 echo = args.v
             )
         except Exception as e:
