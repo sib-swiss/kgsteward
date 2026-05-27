@@ -1,6 +1,7 @@
 from dumper import dump
 import re
 import rdflib
+import subprocess
 import urllib
 
 from .common import *
@@ -11,13 +12,24 @@ class QleverClient( GenericClient ):
     def __init__( self, location, repository, echo = True  ):
         super().__init__( location, None, None )
         self.repository = repository # Qlever have no repository, this hack helps
+
+        # Check that the qlever CLI tool is installed
+        if shutil.which( "qlever" ) is None:
+            stop_error( "qlever CLI not found. Please install it with: uv tool install qlever" )
+
+        # Check that Docker or Podman daemon is running
+        docker_ok = subprocess.run( ["docker", "info"], capture_output=True ).returncode == 0
+        podman_ok = subprocess.run( ["podman", "info"], capture_output=True ).returncode == 0
+        if not docker_ok and not podman_ok:
+            stop_error( "Neither Docker nor Podman daemon is running. Please start Docker or Podman before using qlever." )
+
         try:
             r = http_call({
                 'method'  : 'GET', # not supported by qlever, but return 404
                 'url'     : location
-                }, [ 404 ], echo = echo ) 
+                }, [ 404 ], echo = echo )
         except:
-            stop_error( "Cannot contact qlever at location: " + location ) 
+            stop_error( "Cannot contact qlever at location: " + location )
 
     def get_endpoint_update( self ):
         return ""
