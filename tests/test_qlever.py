@@ -87,3 +87,26 @@ def test_index_rdf_file( qlever_workdir ):
     n = int( r.json()["results"]["bindings"][0]["n"]["value"] )
     assert n > 0, f"Expected triples after indexing foaf.rdf, got {n}"
     print( f"\nfoaf.rdf indexed: {n} triples" )
+
+
+def test_drop_context( qlever_workdir ):
+    """Verify that drop_context empties a named graph via DELETE WHERE."""
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+    ctx        = "http://example.org/context/foaf_ontology"
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+    assert client.is_running, "Server must be running (depends on test_index_rdf_file)"
+
+    r = client.sparql_query( f"SELECT (COUNT(*) AS ?n) WHERE {{ GRAPH <{ctx}> {{ ?s ?p ?o }} }}", echo = False )
+    n_before = int( r.json()["results"]["bindings"][0]["n"]["value"] )
+    assert n_before > 0, "Graph should have triples before drop"
+
+    client.drop_context( ctx, echo = True )
+
+    r = client.sparql_query( f"SELECT (COUNT(*) AS ?n) WHERE {{ GRAPH <{ctx}> {{ ?s ?p ?o }} }}", echo = False )
+    n_after = int( r.json()["results"]["bindings"][0]["n"]["value"] )
+    assert n_after == 0, f"Graph should be empty after drop_context, got {n_after}"
+    print( f"\ndrop_context: {n_before} → {n_after} triples" )

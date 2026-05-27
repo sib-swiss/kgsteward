@@ -657,10 +657,7 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     # For qlever: finalise the index after all datasets staged
     # --------------------------------------------------------- #
-    # All file loading is deferred (pending_files) while the server is
-    # stopped.  Trigger _finalize_index now so the server is running
-    # before post-loop operations (prefixes, queries, etc.).
-    if config["server"]["brand"] == "qlever" and not server.is_running:
+    if config["server"]["brand"] == "qlever" and server.pending_files:
         server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #

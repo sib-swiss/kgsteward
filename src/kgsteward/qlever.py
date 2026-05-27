@@ -282,4 +282,10 @@ class QleverClient( GenericClient ):
         return { rec["g"]["value"] for rec in r.json()["results"]["bindings"] if "g" in rec }
 
     def drop_context( self, context, echo = True ):
-        pass  # named graphs are fixed at index time; rewrite_repository() handles reset
+        # DROP GRAPH is not yet supported by qlever; use DELETE WHERE instead.
+        # If the server is not running, the graph will be absent from the rebuilt index anyway.
+        if self.is_running:
+            self.sparql_update(
+                f"DELETE WHERE {{ GRAPH <{context}> {{ ?s ?p ?o }} }}",
+                echo = echo
+            )
