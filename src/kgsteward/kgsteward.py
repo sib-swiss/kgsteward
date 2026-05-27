@@ -965,6 +965,12 @@ INSERT DATA {{
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
+    # Ensure the qlever server is running at the end of the session
+    if config["server"]["brand"] == "qlever" and not server.is_running:
+        print_break()
+        print_task( "Start qlever server" )
+        server.server_start( echo = args.v )
+
     #  save_json_schema(  "doc/kgsteward.schema.json" )
 
 # --------------------------------------------------------- #

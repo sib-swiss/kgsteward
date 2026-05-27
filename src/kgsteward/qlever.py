@@ -57,13 +57,28 @@ class QleverClient( GenericClient ):
         self.qleverdir   = qleverdir
         self.qlever_cmd  = ["qlever"]  # prefix for all future qlever CLI calls
 
+        # Probe the server: it may legitimately be stopped (e.g. before qlever index).
+        # Record the state; do NOT treat a stopped server as a fatal error here.
         try:
-            r = http_call({
-                'method'  : 'GET', # not supported by qlever, but returns 404
-                'url'     : location
-                }, [ 404 ], echo = echo )
+            http_call( { 'method': 'GET', 'url': location }, [ 404 ], echo = echo )
+            self.is_running = True
         except:
-            stop_error( "Cannot contact qlever at location: " + location )
+            self.is_running = False
+        report( "qlever server", "running" if self.is_running else "stopped" )
+
+    def server_start( self, echo = True ):
+        """Start the qlever server (runs 'qlever start' in qleverdir)."""
+        r = run_system_cmd( self.qlever_cmd + ["start"], echo = echo, cwd = self.qleverdir )
+        if r.returncode != 0:
+            stop_error( "qlever start failed" )
+        self.is_running = True
+
+    def server_stop( self, echo = True ):
+        """Stop the qlever server (runs 'qlever stop' in qleverdir)."""
+        r = run_system_cmd( self.qlever_cmd + ["stop"], echo = echo, cwd = self.qleverdir )
+        if r.returncode != 0:
+            stop_error( "qlever stop failed" )
+        self.is_running = False
 
     def get_endpoint_update( self ):
         return ""
