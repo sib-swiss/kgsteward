@@ -3,7 +3,6 @@ import configparser
 import os
 import re
 import rdflib
-import subprocess
 import urllib
 
 from .common import *
@@ -48,7 +47,7 @@ class QleverClient( GenericClient ):
 
         # Check the container runtime required by the Qleverfile
         if system in ( "docker", "podman" ):
-            if subprocess.run( [system, "info"], capture_output=True ).returncode != 0:
+            if run_system_cmd( [system, "info"], echo = echo, capture_output=True ).returncode != 0:
                 stop_error( f"{system} daemon is not running. Please start it before using qlever." )
         elif system != "native":
             stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'. Expected docker, podman or native." )

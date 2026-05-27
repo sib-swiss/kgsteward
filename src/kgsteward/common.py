@@ -2,6 +2,7 @@ import os
 import glob
 import requests
 import shutil
+import subprocess
 import time
 import re
 import dumper
@@ -190,6 +191,14 @@ def sparql_result_to_table( r ):
         raise e
         # stop_error( "Parsing went wrong!" )
         # raise Exception( "Parsing went wrong!")
+
+def run_system_cmd( cmd, echo = True, **kwargs ):
+    """Run a system command (list or string), optionally printing it first.
+    Returns the CompletedProcess object; does NOT raise on non-zero exit code."""
+    cmd_str = " ".join( cmd ) if isinstance( cmd, list ) else cmd
+    if echo:
+        print( colored( cmd_str, "cyan" ), flush = True )
+    return subprocess.run( cmd, **kwargs )
 
 def print_break():
     print( '# ----------------------------------------------------------------------------')
