@@ -653,7 +653,16 @@ INSERT DATA {{
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
-    
+
+    # --------------------------------------------------------- #
+    # For qlever: finalise the index after all datasets staged
+    # --------------------------------------------------------- #
+    # All file loading is deferred (pending_files) while the server is
+    # stopped.  Trigger _finalize_index now so the server is running
+    # before post-loop operations (prefixes, queries, etc.).
+    if config["server"]["brand"] == "qlever" and not server.is_running:
+        server.server_start( echo = args.v )
+
     # --------------------------------------------------------- #
     # Force update namespace declarations
     # --------------------------------------------------------- #

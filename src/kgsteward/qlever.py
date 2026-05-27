@@ -1,27 +1,30 @@
-from dumper import dump
 import configparser
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 
+from dumper import dump
 from .common import *
 from .generic import GenericClient
 
-# RDF formats and compression schemes that qlever can read natively (no riot needed)
-QLEVER_NATIVE_FORMATS      = { ".nt", ".ttl", ".nq", ".trig" }
-QLEVER_NATIVE_COMPRESSIONS = { "", ".gz" }
+# qlever-index format tokens for natively supported RDF formats (± .gz)
+# Any format not listed here goes through riot → N-Triples conversion.
+_QLEVER_NATIVE = { ".ttl": "ttl", ".nt": "nt" }
 
-def _is_qlever_native( filename ):
-    """Return True if qlever can read the file directly without riot conversion."""
+def _qlever_fmt( filename ):
+    """Return the qlever format token ("ttl" or "nt") for a filename,
+    or None if the format is not natively supported and needs riot.
+    .gz suffix is stripped before checking the extension.
+    """
     name = filename.lower()
-    for comp in QLEVER_NATIVE_COMPRESSIONS:
-        if comp and name.endswith( comp ):
-            name = name[ :-len( comp ) ]
-            break
+    if name.endswith( ".gz" ):
+        name = name[ :-3 ]
     _, ext = os.path.splitext( name )
-    return ext in QLEVER_NATIVE_FORMATS
+    return _QLEVER_NATIVE.get( ext )
+
 
 def parse_qleverfile( qleverfile ):
     """Read a Qleverfile (following symlinks) and return
@@ -40,7 +43,8 @@ def parse_qleverfile( qleverfile ):
     real_path = os.path.realpath( qleverfile )
     if not os.path.isfile( real_path ):
         stop_error( "Qleverfile not found: " + qleverfile )
-    parser = configparser.ConfigParser()
+    # interpolation=None avoids errors on values containing '%' characters
+    parser = configparser.ConfigParser( interpolation = None )
     parser.read( real_path )
     if "data" not in parser or "NAME" not in parser["data"]:
         stop_error( "Missing [data] NAME in Qleverfile: " + real_path )
@@ -82,11 +86,15 @@ class QleverClient( GenericClient ):
         self.system       = system        # docker | podman | native
         self.access_token = access_token
         self.qlever_cmd   = ["qlever"]    # prefix for all qlever CLI calls
-        self.pending_files   = []         # staged (relative) paths not yet indexed
-        self.pending_updates = []         # SPARQL update strings queued before first index
+
+        # pending_files: list of multi_input_json entry dicts, one per staged file.
+        # Populated by load_from_file(); consumed by _finalize_index().
+        self.pending_files = []
+        # pending_updates: real SPARQL updates queued while server is not yet running.
+        # Applied by _finalize_index() after qlever start.
+        self.pending_updates = []
 
         # Probe the server: it may legitimately be stopped (e.g. before qlever index).
-        # Record the state; do NOT treat a stopped server as a fatal error here.
         try:
             http_call( { 'method': 'GET', 'url': location }, [ 200, 404 ], echo = echo )
             self.is_running = True
@@ -101,9 +109,10 @@ class QleverClient( GenericClient ):
     def server_start( self, echo = True ):
         """Start the qlever server.
 
-        If there are staged (pending) files they have not been indexed yet —
-        delegate to _finalize_index() which indexes and then starts the server.
-        Otherwise run 'qlever start' directly.
+        If files are pending they have not been indexed yet — delegate to
+        _finalize_index(), which indexes all staged files and then starts
+        the server.  Otherwise call 'qlever start' directly (re-using an
+        existing index from a previous run).
         """
         if self.pending_files:
             self._finalize_index( echo = echo )
@@ -114,14 +123,14 @@ class QleverClient( GenericClient ):
             self.is_running = True
 
     def server_stop( self, echo = True ):
-        """Stop the qlever server (runs 'qlever stop' in qleverdir)."""
+        """Stop the qlever server ('qlever stop' in qleverdir)."""
         r = run_system_cmd( self.qlever_cmd + ["stop"], echo = echo, cwd = self.qleverdir )
         if r.returncode != 0:
             stop_error( "qlever stop failed" )
         self.is_running = False
 
     def server_rebuild_index( self, echo = True ):
-        """Persist in-memory SPARQL updates by rebuilding the qlever index.
+        """Persist in-memory SPARQL updates by re-building the qlever index.
 
         Runs 'qlever rebuild-index --restart-when-finished' in qleverdir.
         This is the only way to make SPARQL UPDATE statements durable across
@@ -135,127 +144,157 @@ class QleverClient( GenericClient ):
         )
         if r.returncode != 0:
             stop_error( "qlever rebuild-index failed" )
-        # server is restarted by --restart-when-finished
         self.is_running = True
 
     # ------------------------------------------------------------------ #
-    # Indexing pipeline
+    # Staging pipeline
     # ------------------------------------------------------------------ #
 
-    # Pre-compiled pattern matching a non-comment N-Triples data line (ends with " .")
-    _NT_LINE_RE = re.compile( rb"^(.+)\s+\.\s*$" )
-
-    def _nt_to_nq( self, nt_stream, gz_out, graph_iri_bytes ):
-        """Read N-Triples lines from *nt_stream* and write N-Quads to *gz_out*.
-
-        riot does not support a --graph flag, so we pipe its N-Triples output
-        through this filter: each data line  «s p o .»  becomes  «s p o <g> .».
-        Comment lines and blank lines are silently skipped.
-        """
-        for raw in nt_stream:
-            stripped = raw.strip()
-            if not stripped or stripped.startswith( b"#" ):
-                continue
-            m = self._NT_LINE_RE.match( stripped )
-            if m:
-                gz_out.write( m.group(1) + b" <" + graph_iri_bytes + b"> .\n" )
-
     def _stage_file( self, filename, context_iri, echo = True ):
-        """Convert *filename* to N-Quads with *context_iri* as the graph IRI,
-        compress with gzip, and write to <qleverdir>/input/<stem>_<hash8>.nq.gz.
+        """Stage *filename* for deferred indexing into graph *context_iri*.
 
-        Returns the path **relative to qleverdir** (e.g. "input/foaf_abc12345.nq.gz").
-        Using N-Quads ensures every triple is placed in the named graph at index time.
+        Returns a list of multi_input_json entry dicts (one for the RDF data,
+        one for a tiny void:dataDump N-Triple) to be included in the qlever
+        index command.
 
-        riot is used to parse any RDF format to N-Triples; a lightweight in-process
-        filter then appends the graph IRI to produce N-Quads (riot has no --graph flag).
+        Natively supported formats (.ttl, .nt, ± .gz) are hard-linked (or
+        copied) into qleverdir/input/ as-is and indexed directly.
+        All other formats are converted to N-Triples via riot on the host and
+        written to qleverdir/input/<stem>_<hash8>.nt.
+
+        Named-graph assignment is done through the 'graph' key in
+        multi_input_json — no N-Quads conversion is required.
         """
         input_dir = os.path.join( self.qleverdir, "input" )
         os.makedirs( input_dir, exist_ok = True )
 
-        src = os.path.abspath( filename )
-
-        # Build a short, deterministic suffix from the full source path
-        h8 = hashlib.sha1( src.encode() ).hexdigest()[:8]
-
-        # Strip any compression extension first, then the RDF extension
+        src  = os.path.abspath( filename )
+        h8   = hashlib.sha1( src.encode() ).hexdigest()[:8]
         stem = os.path.basename( src )
         stem = re.sub( r"\.(gz|bz2|xz)$", "", stem, flags = re.IGNORECASE )
         stem = os.path.splitext( stem )[0]
 
-        out_name = f"{stem}_{h8}.nq.gz"
-        out_path = os.path.join( input_dir, out_name )
+        fmt = _qlever_fmt( src )
 
-        if echo:
-            print( colored(
-                f"riot --output=ntriples {src}  # → nquads with graph <{context_iri}> → {out_path}",
-                "cyan"
-            ), flush = True )
+        if fmt is not None:
+            # Natively supported format: hard-link (same fs) or copy into input/
+            is_gz    = src.lower().endswith( ".gz" )
+            ext_full = ".ttl.gz" if (fmt == "ttl" and is_gz) else \
+                       ".nt.gz"  if (fmt == "nt"  and is_gz) else \
+                       f".{fmt}"
+            dest_name = f"{stem}_{h8}{ext_full}"
+            dest_path = os.path.join( input_dir, dest_name )
+            if os.path.lexists( dest_path ):
+                os.remove( dest_path )
+            try:
+                os.link( src, dest_path )
+                report( "hard-link", dest_path )
+            except OSError:
+                shutil.copy2( src, dest_path )
+                report( "copy", dest_path )
+            cmd = f"zcat input/{dest_name}" if is_gz else f"cat input/{dest_name}"
+        else:
+            # Non-native format: convert to N-Triples via riot on the host
+            dest_name = f"{stem}_{h8}.nt"
+            dest_path = os.path.join( input_dir, dest_name )
+            if echo:
+                print( colored( f"riot --output=ntriples {src} > {dest_path}", "cyan" ), flush = True )
+            with open( dest_path, "wb" ) as nt_out:
+                riot = subprocess.run(
+                    ["riot", "--output=ntriples", src],
+                    stdout = nt_out,
+                    stderr = None      # let riot warnings reach the terminal
+                )
+            if riot.returncode != 0:
+                stop_error( f"riot conversion failed for: {src}" )
+            fmt = "nt"
+            cmd = f"cat input/{dest_name}"
+            report( "staged (riot→nt)", dest_path )
 
-        riot = subprocess.Popen(
-            ["riot", "--output=ntriples", src],
-            stdout = subprocess.PIPE,
-            stderr = None        # let riot warnings reach the terminal
+        entries = [
+            { "cmd": cmd, "format": fmt, "graph": context_iri }
+        ]
+
+        # Bake the void:dataDump triple into the index so that no separate
+        # SPARQL INSERT + rebuild-index is needed later.
+        void_name = f"{stem}_{h8}.void.nt"
+        void_path = os.path.join( input_dir, void_name )
+        void_iri  = "http://rdfs.org/ns/void#dataDump"
+        with open( void_path, "w" ) as vf:
+            vf.write( f"<{context_iri}> <{void_iri}> <file://{src}> .\n" )
+        entries.append(
+            { "cmd": f"cat input/{void_name}", "format": "nt", "graph": context_iri }
         )
-        with gzip.open( out_path, "wb" ) as gz_out:
-            self._nt_to_nq( riot.stdout, gz_out, context_iri.encode() )
-        riot.wait()
-        if riot.returncode != 0:
-            stop_error( f"riot conversion failed for: {src}" )
 
-        rel_path = os.path.join( "input", out_name )
-        report( "staged", rel_path )
-        return rel_path
+        report( "staged", f"input/{dest_name}  (+ void triple)" )
+        return entries
 
-    def _patch_qleverfile( self, staged_files ):
-        """Overwrite INPUT_FILES and CAT_INPUT_FILES in the [index] section
-        of the Qleverfile.
+    def _patch_qleverfile( self, entries ):
+        """Write MULTI_INPUT_JSON into qleverdir/Qleverfile.
 
-        All staged files are .nq.gz, so CAT_INPUT_FILES is always
-        'zcat ${INPUT_FILES}'.
+        Also removes INPUT_FILES, CAT_INPUT_FILES and FORMAT if they exist,
+        because qlever requires exactly one of CAT_INPUT_FILES or
+        MULTI_INPUT_JSON in the [index] section.
+
+        Always writes to qleverdir/Qleverfile (the working copy), never to
+        the user's original Qleverfile.
 
         configparser lowercases keys by default; we use RawConfigParser with
         optionxform = str to preserve the uppercase keys that qlever expects.
         """
-        real_path = os.path.realpath( self.qleverfile )
+        dest = os.path.join( self.qleverdir, "Qleverfile" )
         parser = configparser.RawConfigParser()
         parser.optionxform = str          # preserve key case
-        parser.read( real_path )
+        parser.read( dest )
+
         if "index" not in parser:
             parser["index"] = {}
-        parser["index"]["INPUT_FILES"]     = " ".join( staged_files )
-        parser["index"]["CAT_INPUT_FILES"] = "zcat ${INPUT_FILES}"
-        # qlever derives the index format from [data] FORMAT (default: ttl).
-        # All staged files are N-Quads, so we must set it to "nq".
-        if "data" not in parser:
-            parser["data"] = {}
-        parser["data"]["FORMAT"] = "nq"
-        with open( real_path, "w" ) as f:
+
+        # INPUT_FILES is always required by qlever (used for file-size
+        # estimation and existence check, even when MULTI_INPUT_JSON is set).
+        # Extract the file paths from the cmd fields of each entry.
+        file_paths = " ".join( e["cmd"].split()[-1] for e in entries )
+        parser["index"]["INPUT_FILES"] = file_paths
+
+        # CAT_INPUT_FILES is mutually exclusive with MULTI_INPUT_JSON
+        if "CAT_INPUT_FILES" in parser["index"]:
+            parser.remove_option( "index", "CAT_INPUT_FILES" )
+
+        # Remove FORMAT from [data] if set by a previous kgsteward run
+        if "data" in parser and "FORMAT" in parser["data"]:
+            parser.remove_option( "data", "FORMAT" )
+
+        parser["index"]["MULTI_INPUT_JSON"] = json.dumps( entries, separators = (",", ":") )
+
+        with open( dest, "w" ) as f:
             parser.write( f )
-        report( "INPUT_FILES",     " ".join( staged_files ) )
-        report( "CAT_INPUT_FILES", "zcat ${INPUT_FILES}" )
-        report( "[data] FORMAT",   "nq" )
+        report( "INPUT_FILES",     file_paths )
+        report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
     def _finalize_index( self, echo = True ):
-        """Index all pending staged files and start the server.
+        """Build the qlever index from all pending staged files and start the server.
 
         Steps:
-          1. Patch [index] INPUT_FILES in the Qleverfile
-          2. Stop the server if it is currently running
+          1. Write MULTI_INPUT_JSON to qleverdir/Qleverfile
+          2. Stop the server if currently running
           3. Run 'qlever index'
-          4. Start the server  ('qlever start')
-          5. Remove the entire input/ directory (files are now in the index)
+          4. Start the server ('qlever start')
+          5. Remove qleverdir/input/ (the index has absorbed all staged files)
           6. Clear self.pending_files
-          7. If self.pending_updates is non-empty, apply each SPARQL update
-             and then call server_rebuild_index() to persist them
-          8. Clear self.pending_updates
+          7. Apply any queued SPARQL updates (self.pending_updates)
+          8. If updates were applied, call server_rebuild_index() to persist them
+          9. Clear self.pending_updates
+
+        void:dataDump triples are already baked into the staged files by
+        _stage_file(), so they do not appear in pending_updates — step 7/8
+        execute only for real update: section statements.
         """
         if not self.pending_files:
             print_warn( "_finalize_index called with no pending files — nothing to do." )
             return
 
-        # 1. Patch Qleverfile
-        print_task( "Patch Qleverfile INPUT_FILES" )
+        # 1. Patch qleverdir/Qleverfile
+        print_task( "Write MULTI_INPUT_JSON to Qleverfile" )
         self._patch_qleverfile( self.pending_files )
 
         # 2. Stop server if needed
@@ -285,15 +324,14 @@ class QleverClient( GenericClient ):
         # 6. Clear pending files
         self.pending_files = []
 
-        # 7. Apply queued SPARQL updates (if any)
+        # 7–8. Apply and persist real SPARQL updates (if any)
         if self.pending_updates:
             print_task( f"Apply {len(self.pending_updates)} queued SPARQL update(s)" )
             for sparql in self.pending_updates:
                 self._do_sparql_update( sparql, echo = echo )
-            # 8. Persist via rebuild-index
             self.server_rebuild_index( echo = echo )
 
-        # 8. Clear pending updates
+        # 9. Clear pending updates
         self.pending_updates = []
 
     # ------------------------------------------------------------------ #
@@ -303,39 +341,40 @@ class QleverClient( GenericClient ):
     def rewrite_repository( self, _config_file = None, echo = True ):
         """Reset the qlever working directory for a fresh index.
 
-        - Wipes the input/ staging area (if it exists)
-        - Creates a symlink <qleverdir>/Qleverfile → self.qleverfile
-          so 'qlever index / start / stop' can be run from qleverdir
-          without specifying --qleverfile on every call
-        - Resets the pending queues
+        - Wipes qleverdir/input/ (previous staged files)
+        - Copies the user's Qleverfile to qleverdir/Qleverfile so that
+          all subsequent patches stay inside qleverdir and the user's
+          original file is never modified
+        - Resets pending_files and pending_updates
         """
         input_dir = os.path.join( self.qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
             report( "wiped", input_dir )
 
-        # Ensure qleverdir/Qleverfile points to the canonical Qleverfile
-        link_path   = os.path.join( self.qleverdir, "Qleverfile" )
-        target_real = os.path.realpath( self.qleverfile )
-        link_real   = os.path.realpath( link_path ) if os.path.lexists( link_path ) else None
-        if link_real != target_real:
-            if os.path.lexists( link_path ):
-                os.remove( link_path )
-            os.symlink( target_real, link_path )
-            report( "symlink", f"{link_path} → {target_real}" )
+        # Copy user's Qleverfile to qleverdir (only if they differ)
+        user_real = os.path.realpath( self.qleverfile )
+        dest      = os.path.join( self.qleverdir, "Qleverfile" )
+        dest_real = os.path.realpath( dest ) if os.path.lexists( dest ) else None
+        if user_real != dest_real:
+            shutil.copy2( user_real, dest )
+            report( "copied Qleverfile", dest )
 
         self.pending_files   = []
         self.pending_updates = []
 
     def load_from_file( self, filename, context, headers = {}, echo = True ):
-        """Stage *filename* for indexing into graph *context*.
+        """Stage *filename* for deferred indexing into graph *context*.
 
-        Converts the file to N-Quads (with the graph IRI embedded) via riot,
-        compresses to .nq.gz, and records the relative path in self.pending_files.
-        The actual 'qlever index' call is deferred until server_start() is invoked.
+        Files are converted (if necessary) and written to qleverdir/input/.
+        A tiny void:dataDump triple is baked in alongside the data so that
+        no separate SPARQL INSERT + rebuild-index is needed.
+
+        The actual 'qlever index' is deferred until server_start() is called
+        or until the first real SPARQL update arrives.
         """
-        rel = self._stage_file( filename, context, echo = echo )
-        self.pending_files.append( rel )
+        entries = self._stage_file( filename, context, echo = echo )
+        self.pending_files.extend( entries )
 
     # ------------------------------------------------------------------ #
     # SPARQL
@@ -365,7 +404,6 @@ class QleverClient( GenericClient ):
             status_code_ok,
             echo
         )
-        # qlever may return 500 for execution errors
         if r.status_code in [ 400, 500 ] and r.text:
             print_warn( r.text )
             return None
@@ -377,32 +415,43 @@ class QleverClient( GenericClient ):
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
         """Execute a SPARQL update statement.
 
-        Behaviour depends on the current server state:
-          - Server running:  execute immediately via HTTP POST with ACCESS_TOKEN.
-          - Server stopped but files are pending (pre-index phase):
-            queue the statement in self.pending_updates so _finalize_index
-            can apply it once the server is up.
-          - Server stopped and no pending files (unexpected):
-            raise an error.
+        void:dataDump INSERTs are silently skipped because those triples are
+        already baked into the staged N-Quads files by _stage_file(), so no
+        second indexing pass is needed to persist them.
+
+        For all other updates the behaviour depends on the server state:
+          • Server running:   execute immediately via HTTP POST.
+          • Server stopped + pending files (pre-index phase):
+            queue the statement; _finalize_index() will apply it after the
+            server starts and then call server_rebuild_index() once to persist.
+          • Server stopped + no pending files (re-use existing index):
+            restart the server with 'qlever start', then execute.
         """
+        # void:dataDump triples are baked into staged files — skip the INSERT
+        if "void:dataDump" in sparql or "ns/void#dataDump" in sparql:
+            return
+
         if not self.is_running:
             if self.pending_files:
-                # Deferred mode: server not yet started; queue for later
+                # Still in staging phase; queue for after _finalize_index
                 report( "queued update", sparql[:60].replace( "\n", " " ) + "…" )
                 self.pending_updates.append( sparql )
                 return
             else:
-                stop_error( "qlever server is not running and there are no pending files to index." )
+                # Existing index available — just restart the server
+                r = run_system_cmd( self.qlever_cmd + ["start"], echo = echo, cwd = self.qleverdir )
+                if r.returncode != 0:
+                    stop_error( "qlever start failed" )
+                self.is_running = True
+
         self._do_sparql_update( sparql, status_code_ok = status_code_ok, echo = echo )
 
     def _do_sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        """POST a SPARQL update to the qlever server with ACCESS_TOKEN."""
+        """POST a SPARQL update to the running qlever server with ACCESS_TOKEN."""
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
-        headers = {
-            'Content-Type' : 'application/x-www-form-urlencoded'
-        }
-        params = {
+        headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+        params  = {
             'update'       : sparql,
             'access-token' : self.access_token,
         }
@@ -431,10 +480,9 @@ class QleverClient( GenericClient ):
     def drop_context( self, context, echo = True ):
         """No-op for qlever: named graphs are fixed at index time.
 
-        In the deferred-indexing model kgsteward calls drop_context before
-        loading a dataset so that stale data is removed.  For qlever this is
-        handled implicitly: rewrite_repository() wipes the staging area and
-        _finalize_index() builds a fresh index from scratch, so there is
-        nothing to drop at runtime.
+        kgsteward calls drop_context before loading each dataset to remove stale
+        data.  For qlever this is handled at a higher level: rewrite_repository()
+        wipes the staging area and _finalize_index() builds a fresh index from
+        scratch, so there is nothing to drop at runtime.
         """
         pass
