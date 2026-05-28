@@ -105,6 +105,21 @@ class QleverClient( GenericClient ):
             stop_error( f"qlever {args[0]} failed" )
         return r
 
+    def _start_args( self ):
+        """Return argv for ``qlever start`` honouring the current deferred-text-index state.
+
+        qlever auto-derives USE_TEXT_INDEX = yes when TEXT_INDEX != none in the
+        Qleverfile.  With ``--qlever_build_text_indexes`` we have just built
+        the main index with ``--text-index none`` (no text-index files on
+        disk), so the auto-derived ``-t`` flag would make qlever-server crash
+        with ``ERROR opening file "<NAME>.text.vocabulary"`` and then Docker
+        keeps restarting it.  Force ``--use-text-index no`` until the text
+        index is finally built (build_text_index resets the flag).
+        """
+        if self._defer_text_index:
+            return ( "start", "--use-text-index", "no" )
+        return ( "start", )
+
     def _stage_file( self, filename, context_iri, void_iri = None, echo = True ):
         """Copy/convert *filename* into qleverdir/input/ and return multi_input_json entries.
 
@@ -324,7 +339,7 @@ class QleverClient( GenericClient ):
             self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
         else:
             self._qlever( "index", "--overwrite-existing", echo = echo )
-        self._qlever( "start", echo = echo )
+        self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 
         input_dir = os.path.join( self.qleverdir, "input" )
@@ -356,11 +371,11 @@ class QleverClient( GenericClient ):
                     "load_from_file — qlever requires all file data to go through the index."
                 )
             if not self.is_running:
-                self._qlever( "start", echo = echo )
+                self._qlever( *self._start_args(), echo = echo )
                 self.is_running = True
             self._apply_pending_updates( echo = echo )
         else:
-            self._qlever( "start", echo = echo )
+            self._qlever( *self._start_args(), echo = echo )
             self.is_running = True
 
     def server_stop( self, echo = True ):
@@ -408,7 +423,9 @@ class QleverClient( GenericClient ):
             "--overwrite-existing",
             echo = echo,
         )
-        self._qlever( "start", echo = echo )
+        # Text index now on disk — clear the deferral so the restart enables it.
+        self._defer_text_index = False
+        self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 
     # ------------------------------------------------------------------ #
@@ -519,7 +536,7 @@ class QleverClient( GenericClient ):
 
         # 5. Start the server
         print_task( "Start qlever server from the freshly-built index" )
-        self._qlever( "start", echo = echo )
+        self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 
         # 6. Verify named graphs against YAML
