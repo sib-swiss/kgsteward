@@ -180,6 +180,15 @@ def get_user_input():
                "everything except `?x ql:contains-word ...` queries."
     )
     parser.add_argument(
+        '--sparql_update_stats',
+        metavar = 'FILE',
+        help   = "Dump per-update timings to a TSV at session end (one row per "
+                 "sparql_update call, with wall-clock and server-side timings, "
+                 "size, sha1, error if any).  Useful for diagnosing slow updates "
+                 "and for benchmark comparison between backends (run with each "
+                 "backend, then join on sha1_8 to compare per-update timings)."
+    )
+    parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
                "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
@@ -1089,6 +1098,14 @@ INSERT DATA {{
         print_break()
         print_task( "Start qlever server" )
         server.server_start( echo = args.v )
+
+    # Dump per-call sparql_update timings to a TSV, if requested.  Useful for
+    # diagnosing slow updates in a single backend and for benchmark comparison
+    # across backends (run with each, then join on sha1_8 to compare timings).
+    if args.sparql_update_stats and hasattr( server, "dump_sparql_update_stats" ):
+        print_break()
+        print_task( "Dump per-call sparql_update timing stats" )
+        server.dump_sparql_update_stats( args.sparql_update_stats )
 
     #  save_json_schema(  "doc/kgsteward.schema.json" )
 

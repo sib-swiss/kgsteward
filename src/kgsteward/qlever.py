@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 
 from dumper import dump
 from .common import *
@@ -15,6 +16,18 @@ from .generic import GenericClient
 
 # Natively supported qlever formats (without riot conversion), ± .gz
 _QLEVER_NATIVE = { ".ttl": "ttl", ".nt": "nt" }
+
+
+def _first_meaningful_sparql_line( sparql ):
+    """Return the first non-empty, non-comment, non-PREFIX/BASE line — for human ID."""
+    for line in sparql.splitlines():
+        s = line.strip()
+        if not s:                          continue
+        if s.startswith( "#" ):            continue
+        if s.upper().startswith( "PREFIX " ): continue
+        if s.upper().startswith( "BASE " ):   continue
+        return s[:120]
+    return ""
 
 def _qlever_fmt( filename ):
     """Return qlever format token ("ttl"/"nt") or None if riot is needed."""
@@ -72,6 +85,13 @@ class QleverClient( GenericClient ):
         self.qlever_cmd      = ["qlever"]
         self.pending_files   = []   # multi_input_json entries staged for deferred index
         self.pending_updates = []   # SPARQL updates queued pre-index
+        # Per-call timing for sparql_update — appended in _do_sparql_update and
+        # written to a TSV at session end via dump_sparql_update_stats().
+        # Useful both for diagnosing slow updates in a single backend and for
+        # GraphDB-vs-qlever benchmark comparison (same dataset YAML, same .rq
+        # files, run against both backends → diff the TSVs).
+        self.sparql_update_stats = []
+        self._sparql_update_counter = 0
         self.user_text_index = text_index   # original TEXT_INDEX from user's Qleverfile
         # qlever's text index is *always* skipped during per-dataset rebuilds
         # (rebuilding it once per dataset is grossly wasteful).  It is built only
@@ -711,15 +731,82 @@ class QleverClient( GenericClient ):
     def _do_sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
+        self._sparql_update_counter += 1
+        t_start = time.time()
         r = http_call(
             { 'method': 'POST', 'url': self.endpoint_query,
               'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
               'data': { 'update': sparql, 'access-token': self.access_token } },
             status_code_ok, echo
         )
+        elapsed_ms = int( ( time.time() - t_start ) * 1000 )
+
+        # Best-effort extraction of qlever's server-side timing + error.
+        qlever_total_ms = None
+        qlever_error    = None
+        try:
+            body = r.json()
+            if isinstance( body, dict ):
+                t = body.get( "time" )
+                if isinstance( t, dict ):
+                    qlever_total_ms = t.get( "total" )
+                if body.get( "status" ) == "ERROR":
+                    qlever_error = body.get( "exception" )
+                elif isinstance( body.get( "operations" ), list ) and body["operations"]:
+                    op0 = body["operations"][0]
+                    op_t = op0.get( "time" )
+                    if isinstance( op_t, dict ) and qlever_total_ms is None:
+                        qlever_total_ms = op_t.get( "total" )
+        except Exception:
+            pass
+
+        self.sparql_update_stats.append({
+            "n":               self._sparql_update_counter,
+            "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
+            "elapsed_ms":      elapsed_ms,
+            "qlever_total_ms": qlever_total_ms,
+            "http_status":     r.status_code,
+            "size_chars":      len( sparql ),
+            "sha1_8":          hashlib.sha1( sparql.encode() ).hexdigest()[:8],
+            "first_line":      _first_meaningful_sparql_line( sparql ),
+            "error":           ( qlever_error[:200] if qlever_error else "" ),
+        })
+
         if r.status_code != 200 and r.text:
             print_warn( r.text )
         return r
+
+    def dump_sparql_update_stats( self, filepath ):
+        """Write the per-call sparql_update stats to *filepath* as TSV.
+
+        One row per SPARQL update issued via ``_do_sparql_update`` during this
+        session, including:
+
+          - ``n``               : sequence number within the session
+          - ``ts``              : wall-clock timestamp the update started
+          - ``elapsed_ms``      : full round-trip wall-clock (kgsteward side)
+          - ``qlever_total_ms`` : qlever's server-side total time (if reported)
+          - ``http_status``     : HTTP status code
+          - ``size_chars``      : length of the SPARQL string (rough complexity)
+          - ``sha1_8``          : 8-char hash, stable across runs / backends
+          - ``first_line``      : first non-PREFIX/-comment line (human-readable)
+          - ``error``           : truncated qlever exception, if any
+
+        Cross-backend benchmark hint: run kgsteward against GraphDB and qlever
+        with the same YAML config, dump each backend's stats, then join on
+        ``sha1_8`` (or ``n`` if the execution order is deterministic) to compare
+        per-update timings between engines.
+        """
+        if not self.sparql_update_stats:
+            report( "sparql update stats", "(empty — nothing to dump)" )
+            return
+        cols = ["n", "ts", "elapsed_ms", "qlever_total_ms", "http_status",
+                "size_chars", "sha1_8", "first_line", "error"]
+        with open( filepath, "w" ) as f:
+            f.write( "\t".join( cols ) + "\n" )
+            for s in self.sparql_update_stats:
+                f.write( "\t".join( str( s.get( c, "" ) if s.get( c ) is not None else "" ) for c in cols ) + "\n" )
+        report( "dumped sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries)" )
 
     def list_context( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
