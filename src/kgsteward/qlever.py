@@ -52,6 +52,9 @@ class QleverClient( GenericClient ):
         elif system != "native":
             stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'" )
 
+        if not os.path.isdir( qleverdir ):
+            stop_error( f"qleverdir does not exist: {qleverdir}" )
+
         super().__init__( location, None, None )
         self.repository      = repository
         self.qleverfile      = qleverfile
@@ -61,6 +64,13 @@ class QleverClient( GenericClient ):
         self.qlever_cmd      = ["qlever"]
         self.pending_files   = []   # multi_input_json entries staged for deferred index
         self.pending_updates = []   # SPARQL updates queued pre-index
+
+        # Remove any leftover input/ directory from a previous crashed staging phase.
+        # pending_files is always reset above, so orphaned staged files must be wiped.
+        input_dir = os.path.join( qleverdir, "input" )
+        if os.path.isdir( input_dir ):
+            shutil.rmtree( input_dir )
+            print_warn( f"Removed stale input/ from previous run: {input_dir}" )
 
         try:
             http_call( { 'method': 'GET', 'url': location }, [ 200, 404 ], echo = echo )
