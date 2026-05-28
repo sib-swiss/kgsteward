@@ -3,6 +3,8 @@ NAME          = first_steps
 DESCRIPTION   = kgsteward first_steps example
 
 [index]
+# INPUT_FILES and CAT_INPUT_FILES are placeholders only.
+# kgsteward overwrites them with MULTI_INPUT_JSON (per-stream format + graph).
 INPUT_FILES     = *.ttl
 CAT_INPUT_FILES = cat ${INPUT_FILES}
 SETTINGS_JSON   = { "num-triples-per-batch": 1000000 }
@@ -10,6 +12,9 @@ SETTINGS_JSON   = { "num-triples-per-batch": 1000000 }
 [server]
 PORT         = 7019
 HOST_NAME    = localhost
+# ACCESS_TOKEN protects SPARQL update operations (INSERT, DELETE, etc.).
+# It can be overridden from the kgsteward YAML via the access_token field,
+# e.g. access_token: ${QLEVER_ACCESS_TOKEN}
 ACCESS_TOKEN = my_access_token
 
 [runtime]
