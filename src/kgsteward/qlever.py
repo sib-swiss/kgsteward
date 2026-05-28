@@ -272,7 +272,9 @@ class QleverClient( GenericClient ):
         if self.is_running:
             self.server_stop( echo = echo )
 
-        self._qlever( "index", echo = echo )
+        # --overwrite-existing is required when rebuilding an index that
+        # already exists on disk (i.e. every dataset after the first one).
+        self._qlever( "index", "--overwrite-existing", echo = echo )
         self._qlever( "start", echo = echo )
         self.is_running = True
 
