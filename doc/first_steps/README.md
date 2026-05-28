@@ -78,9 +78,8 @@ uv tool install qlever
 brew install jena          # macOS
 # or: apt install jena     # Debian/Ubuntu
 
-# Create a working directory for the qlever index
+# Set the working directory for the qlever index (created automatically if absent)
 export QLEVER_DIR=$HOME/scratch/qlever/first_steps
-mkdir -p $QLEVER_DIR
 
 # Point kgsteward to the provided Qleverfile
 export QLEVER_FILE=$KGSTEWARD_ROOT_DIR/doc/first_steps/Qleverfile
