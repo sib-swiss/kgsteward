@@ -224,21 +224,27 @@ class QleverClient( GenericClient ):
         return entries
 
     def _apply_pending_updates( self, echo = True ):
-        """Execute all queued SPARQL updates; rebuild-index + checkpoint at each sentinel.
+        """Execute all queued SPARQL updates; dump a checkpoint at each sentinel.
 
         ``pending_updates`` is a list of strings (SPARQL updates) interleaved with
-        ``(context_iri,)`` tuples inserted by ``mark_rebuild()``.  Each tuple triggers:
-          1. ``server_rebuild_index`` — persists all preceding in-memory updates, and
-          2. ``dump_checkpoint(context_iri)`` — saves the named graph as a ``.nt.gz`` file.
+        ``(context_iri,)`` tuples inserted by ``mark_rebuild()``.  Each tuple triggers
+        ``dump_checkpoint(context_iri)``, which issues a CONSTRUCT against the running
+        server — the server transparently merges the on-disk index with the in-memory
+        delta produced by the preceding updates, so the dumped ``.nt.gz`` captures the
+        complete post-update state of the graph.
+
+        No explicit ``qlever rebuild-index`` is needed: the next dataset's
+        ``_finalize_index`` rebuilds the on-disk index *from scratch* using every
+        checkpoint + the new staged files, so the delta lives only as long as the
+        current dataset's checkpoint dump.
         """
         if not self.pending_updates:
             return
         n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
-        print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild+checkpoint" )
+        print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset checkpoint" )
         for item in self.pending_updates:
             if isinstance( item, tuple ):
                 context_iri = item[0]
-                self.server_rebuild_index( echo = echo )
                 if context_iri:
                     self.dump_checkpoint( context_iri, echo = echo )
             else:
@@ -438,12 +444,16 @@ class QleverClient( GenericClient ):
                 os.unlink( tmp_path )
 
     def mark_rebuild( self, context_iri = None ):
-        """Insert a rebuild-index+checkpoint sentinel into the pending_updates queue.
+        """Insert a checkpoint sentinel into the pending_updates queue.
 
-        *context_iri* is the named graph to dump as a ``.nt.gz`` checkpoint after the
-        rebuild-index completes.  When ``_apply_pending_updates`` hits this sentinel it
-        calls ``server_rebuild_index`` (persisting all preceding SPARQL updates) and then
-        ``dump_checkpoint``, giving one rebuild-index + one checkpoint per dataset.
+        *context_iri* is the named graph to dump as a ``.nt.gz`` checkpoint after all
+        preceding SPARQL updates for this dataset have been applied.  When
+        ``_apply_pending_updates`` hits the ``(context_iri,)`` tuple it calls
+        ``dump_checkpoint`` — the CONSTRUCT query against the running server returns
+        the on-disk index merged with the in-memory delta, so the checkpoint captures
+        the complete post-update state.  No ``qlever rebuild-index`` is needed because
+        the next ``_finalize_index`` rebuilds the on-disk index from scratch using
+        every checkpoint + the new dataset's staged files.
         """
         self.pending_updates.append( ( context_iri, ) )
 
