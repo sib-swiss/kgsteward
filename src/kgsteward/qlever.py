@@ -1,5 +1,6 @@
 import configparser
 import glob
+import gzip
 import hashlib
 import json
 import os
@@ -178,11 +179,14 @@ class QleverClient( GenericClient ):
         report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
     def _finalize_index( self, echo = True ):
-        """Patch Qleverfile, rebuild index, start server, apply queued updates.
+        """Patch Qleverfile, build index, start server, apply updates, dump checkpoints.
 
-        ``pending_updates`` may contain ``None`` sentinels inserted by ``mark_rebuild()``.
-        Each sentinel triggers a ``rebuild-index`` at that point so that the preceding
-        SPARQL updates are persisted before the next batch of updates is applied.
+        ``pending_updates`` is a sequence of strings (SPARQL updates) interleaved with
+        ``(context_iri,)`` tuples inserted by ``mark_rebuild()``.  Each tuple triggers:
+          1. ``server_rebuild_index`` — persists all preceding in-memory updates, and
+          2. ``dump_checkpoint(context_iri)`` — saves the named graph as a ``.nt.gz`` file.
+        This gives one rebuild-index + one checkpoint per dataset, executed in declared
+        order so that cross-graph SPARQL dependencies are respected.
         """
         if not self.pending_files:
             print_warn( "_finalize_index called with no pending files — nothing to do." )
@@ -209,11 +213,14 @@ class QleverClient( GenericClient ):
         self.pending_files = []
 
         if self.pending_updates:
-            n_updates = sum( 1 for u in self.pending_updates if u is not None )
-            print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild markers" )
+            n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
+            print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild+checkpoint" )
             for item in self.pending_updates:
-                if item is None:
+                if isinstance( item, tuple ):
+                    context_iri = item[0]
                     self.server_rebuild_index( echo = echo )
+                    if context_iri:
+                        self.dump_checkpoint( context_iri, echo = echo )
                 else:
                     self._do_sparql_update( item, echo = echo )
         self.pending_updates = []
@@ -244,11 +251,14 @@ class QleverClient( GenericClient ):
     # ------------------------------------------------------------------ #
 
     def rewrite_repository( self, _config_file = None, echo = True ):
-        """Reset staging area and copy user's Qleverfile into qleverdir."""
+        """Reset staging area, wipe all dataset checkpoints, and copy user's Qleverfile."""
         input_dir = os.path.join( self.qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
             report( "wiped", input_dir )
+        for ckpt in glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ):
+            os.remove( ckpt )
+            report( "wiped checkpoint", os.path.basename( ckpt ) )
         user_real = os.path.realpath( self.qleverfile )
         dest      = os.path.join( self.qleverdir, "Qleverfile" )
         if user_real != ( os.path.realpath( dest ) if os.path.lexists( dest ) else None ):
@@ -256,6 +266,46 @@ class QleverClient( GenericClient ):
             report( "copied Qleverfile", dest )
         self.pending_files   = []
         self.pending_updates = []
+
+    def checkpoint_path( self, context_iri ):
+        """Return the filesystem path for the N-Triples checkpoint of *context_iri*."""
+        h8   = hashlib.sha1( context_iri.encode() ).hexdigest()[:8]
+        safe = re.sub( r"[^a-zA-Z0-9_-]", "_", context_iri.rstrip( "/" ).split( "/" )[-1] )[:40]
+        return os.path.join( self.qleverdir, f"{safe}_{h8}.nt.gz" )
+
+    def has_checkpoint( self, context_iri ):
+        """Return True if a completed checkpoint exists for *context_iri*."""
+        return os.path.isfile( self.checkpoint_path( context_iri ) )
+
+    def stage_checkpoint( self, context_iri ):
+        """Add an existing .nt.gz checkpoint to pending_files so it is included in the next index."""
+        path  = self.checkpoint_path( context_iri )
+        fname = os.path.basename( path )
+        self.pending_files.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri } )
+        report( "checkpoint → staged", fname )
+
+    def dump_checkpoint( self, context_iri, echo = True ):
+        """Query the running server and save the named graph as a compressed N-Triples checkpoint.
+
+        The checkpoint captures the fully-processed state of the dataset (source files +
+        SPARQL updates applied) so that future runs can skip reprocessing and feed the
+        checkpoint directly into ``qlever index`` via ``stage_checkpoint``.
+        """
+        path  = self.checkpoint_path( context_iri )
+        fname = os.path.basename( path )
+        sparql = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
+        if echo:
+            print( colored( f"dump checkpoint → {fname}", "cyan" ), flush = True )
+        r = http_call(
+            { "method": "POST", "url": self.endpoint_query,
+              "headers": { "Accept": "application/n-triples",
+                           "Content-Type": "application/x-www-form-urlencoded" },
+              "data": { "query": sparql } },
+            [ 200 ], echo = False
+        )
+        with gzip.open( path, "wb" ) as f:
+            f.write( r.content )
+        report( "checkpoint saved", fname )
 
     def load_from_file( self, filename, context, headers = {}, echo = True ):
         """Stage *filename* for deferred indexing into graph *context*."""
@@ -282,14 +332,17 @@ class QleverClient( GenericClient ):
             if os.path.exists( tmp_path ):
                 os.unlink( tmp_path )
 
-    def mark_rebuild( self ):
-        """Insert a rebuild-index sentinel into the pending_updates queue.
+    def mark_rebuild( self, context_iri = None ):
+        """Insert a rebuild-index+checkpoint sentinel into the pending_updates queue.
 
-        When ``_finalize_index`` processes the queue it will call ``server_rebuild_index``
-        at each sentinel, persisting the preceding SPARQL updates before continuing.
-        This gives one rebuild-index per dataset that has an ``update:`` section.
+        *context_iri* is the named graph to dump as a ``.nt.gz`` checkpoint after the
+        rebuild-index completes.  When ``_finalize_index`` hits this sentinel it calls
+        ``server_rebuild_index`` (persisting all preceding SPARQL updates) and then
+        ``dump_checkpoint``.  This gives one rebuild-index + one checkpoint per dataset,
+        executed in declared order so that cross-graph SPARQL update dependencies are
+        respected.
         """
-        self.pending_updates.append( None )
+        self.pending_updates.append( ( context_iri, ) )
 
     # ------------------------------------------------------------------ #
     # SPARQL

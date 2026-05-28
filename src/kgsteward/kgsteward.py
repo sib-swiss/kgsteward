@@ -494,11 +494,20 @@ def main():
             else :
                 raise stop_error( "Invalid name: " + name )
     elif args.C :
-        config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
-        for name in rdf_graph_all :
-            target = get_target( config, name )
-            if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
-                rdf_graph_to_update.add( name )
+        if config["server"]["brand"] == "qlever" and not server.is_running :
+            # qlever server is stopped (e.g. after a crash). The SPARQL status query
+            # would return all-EMPTY, which is meaningless. Use .nt.gz checkpoints as the
+            # source of truth instead: datasets without a checkpoint need (re)processing.
+            print_task( "qlever server stopped — using checkpoints to determine update set" )
+            for name in rdf_graph_all :
+                if not server.has_checkpoint( name2context[ name ] ) :
+                    rdf_graph_to_update.add( name )
+        else :
+            config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
+            for name in rdf_graph_all :
+                target = get_target( config, name )
+                if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
+                    rdf_graph_to_update.add( name )
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
@@ -509,13 +518,21 @@ def main():
     
     for target in config["dataset"] :
 
-        name = target["name"]
+        name    = target["name"]
+        context = name2context[ name ]
+
         if not name in rdf_graph_to_update :
+            # Dataset is up-to-date — nothing to reprocess.
+            # For qlever: stage its checkpoint so it is included in the rebuilt index.
+            if config["server"]["brand"] == "qlever" :
+                if server.has_checkpoint( context ) :
+                    server.stage_checkpoint( context )
+                elif server.has_index :
+                    print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
             continue
 
         print_break()
         print_task( "Update dataset record: " + name )
-        context = name2context[ name ]
         server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
@@ -628,10 +645,6 @@ INSERT DATA {{
                         sparql = sparql.replace( key, replace[ key ])
                     for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
                         server.sparql_update( s, echo = args.v )
-            # For qlever: queue a rebuild-index marker so this dataset's updates are
-            # persisted as a discrete step when _finalize_index runs post-loop.
-            if config["server"]["brand"] == "qlever":
-                server.mark_rebuild()
         if "special" in target:
             for key in target["special"]:
                 if key == "sib_swiss_void":
@@ -659,6 +672,11 @@ INSERT DATA {{
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
+        # For qlever: queue a rebuild-index + checkpoint dump for this dataset.
+        # Placed after update_dataset_info so the checkpoint captures everything
+        # (file data, SPARQL updates, special metadata, and kgsteward provenance).
+        if config["server"]["brand"] == "qlever" :
+            server.mark_rebuild( context )
 
     # --------------------------------------------------------- #
     # For qlever: finalise the index after all datasets staged
