@@ -198,10 +198,8 @@ class QleverClient( GenericClient ):
         if self.is_running:
             self.server_stop( echo = echo )
 
-        print_task( "Run qlever index" )
         self._qlever( "index", echo = echo )
 
-        print_task( "Start qlever server" )
         self._qlever( "start", echo = echo )
         self.is_running = True
 
@@ -242,7 +240,6 @@ class QleverClient( GenericClient ):
 
     def server_rebuild_index( self, echo = True ):
         """Persist in-memory SPARQL updates by rebuilding the qlever index."""
-        print_task( "Rebuild qlever index to persist SPARQL updates" )
         self._qlever( "rebuild-index", "--restart-when-finished", echo = echo )
         self.is_running = True
 
@@ -318,7 +315,15 @@ class QleverClient( GenericClient ):
         This is the correct approach for qlever because a SPARQL LOAD cannot be deferred —
         the local file server may stop before the index is eventually built.
         """
-        suffix = os.path.splitext( url.split( "?" )[0].split( "/" )[-1] )[1] or ".nt"
+        basename = url.split( "?" )[0].split( "/" )[-1]
+        _name, _ext = os.path.splitext( basename )
+        if _ext.lower() in ( ".gz", ".bz2", ".xz" ):
+            # Preserve compound extensions such as .ttl.gz, .nt.gz, .rdf.xz
+            _, _inner = os.path.splitext( _name )
+            suffix = ( _inner + _ext ) if _inner else _ext
+        else:
+            suffix = _ext
+        suffix = suffix or ".nt"
         with tempfile.NamedTemporaryFile( delete = False, suffix = suffix ) as tmp:
             tmp_path = tmp.name
         try:
@@ -378,7 +383,6 @@ class QleverClient( GenericClient ):
         if "void:dataDump" in sparql or "ns/void#dataDump" in sparql:
             return
         if not self.is_running:
-            report( "queued update", sparql[:60].replace( "\n", " " ) + "…" )
             self.pending_updates.append( sparql )
             return
         self._do_sparql_update( sparql, status_code_ok = status_code_ok, echo = echo )
