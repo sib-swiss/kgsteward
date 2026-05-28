@@ -390,6 +390,11 @@ class QleverClient( GenericClient ):
         Both the ``.nt.gz`` data file and its ``.nt.gz.json`` sidecar are removed so
         that ``_collect_checkpoint_entries`` no longer includes stale data and
         ``has_checkpoint`` returns False.
+
+        Not called by the normal kgsteward processing loop (which keeps the old
+        checkpoint as a transactional fallback) — retained as a public API for
+        explicit administrative use, e.g. forcibly dropping a dataset from the
+        managed set without going through the full update path.
         """
         path    = self.checkpoint_path( context_iri )
         sidecar = path + ".json"
@@ -397,6 +402,39 @@ class QleverClient( GenericClient ):
             if os.path.isfile( fn ):
                 os.remove( fn )
                 report( "invalidated checkpoint", os.path.basename( fn ) )
+
+    def dump_all_named_graphs_as_checkpoints( self, echo = True ):
+        """Dump every named graph in the running server as an ``.nt.gz`` checkpoint.
+
+        Use case — *adopting* an externally-built qlever index.  A common workflow
+        is to build the initial index once from a large ``.nq.gz`` dump (much
+        faster than loading dataset-by-dataset through kgsteward).  That index
+        has no checkpoint files on disk, so the next kgsteward-triggered rebuild
+        — adding a new dataset, updating an existing one — would lose all the
+        bulk-loaded data, because ``_finalize_index`` rebuilds from the
+        checkpoint set only.
+
+        Running this method once after a bulk load captures every named graph
+        present in the server as a ``.nt.gz`` + sidecar pair, so the subsequent
+        ``_finalize_index`` calls include all of it.  No mutation of the graphs
+        themselves: ``kgsteward:Dataset`` metadata is NOT injected here.  If the
+        adopted graphs already carry that metadata (because the original dump
+        included it), subsequent ``-C`` runs will recognise them as managed; if
+        not, they survive as "orphan but preserved" checkpoints — the data is
+        kept across rebuilds even though no YAML dataset claims them.
+
+        Returns the sorted list of dumped graph IRIs.
+        """
+        if not self.is_running:
+            stop_error( "qlever server must be running to dump checkpoints" )
+        graphs = sorted( self.list_context( echo = False ) )
+        if not graphs:
+            print_warn( "No named graphs found in qlever server — nothing to dump" )
+            return []
+        for g in graphs:
+            print_task( f"Dump checkpoint for graph: {g}" )
+            self.dump_checkpoint( g, echo = echo )
+        return graphs
 
     def dump_checkpoint( self, context_iri, echo = True ):
         """Query the running server and save the named graph as a compressed N-Triples checkpoint.

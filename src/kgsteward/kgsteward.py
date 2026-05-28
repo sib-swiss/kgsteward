@@ -159,6 +159,15 @@ def get_user_input():
         help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
     )
     parser.add_argument(
+        '--qlever_dump_checkpoints',
+        action = 'store_true',
+        help = "(qlever only) Dump every named graph in the running qlever server as a "
+               ".nt.gz checkpoint.  Use this once to 'adopt' an externally-built qlever "
+               "index (e.g. one bulk-loaded from a big .nq.gz dump) into kgsteward's "
+               "per-dataset checkpoint architecture.  After this, all named graphs are "
+               "preserved across subsequent index rebuilds triggered by kgsteward."
+    )
+    parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
                "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
@@ -463,12 +472,41 @@ def main():
              server.rewrite_repository()
 
     if args.fuseki_compress_tbd2: # FIXME: check that index type is really TDB2 (and not TDB)
-        if config["server"]["brand"] == "fuseki": 
+        if config["server"]["brand"] == "fuseki":
             print_break()
             print_task( "Launch TDB2 compression in the. It may delay execution of next statements" )
             server.fuseki_compress_tdb2()
         else:
             print_warn( "Option --fuseki_compress_tbd2 not supported for server brand: " + config["server"]["brand"] )
+
+    # --------------------------------------------------------- #
+    # qlever-only: adopt an externally-built index by dumping
+    # every named graph as a checkpoint.  Placed AFTER -I so a
+    # combined "-I --qlever_dump_checkpoints" re-creates the
+    # checkpoints (against the still-running server) that -I just
+    # wiped, and BEFORE the update-set determination so that the
+    # freshly-created checkpoints inform has_checkpoint() in -C
+    # stopped-server mode.
+    # --------------------------------------------------------- #
+
+    if args.qlever_dump_checkpoints:
+        if config["server"]["brand"] != "qlever":
+            stop_error( "--qlever_dump_checkpoints is only valid for the qlever backend" )
+        print_break()
+        print_task( "Adopt running qlever index: dump named graphs as checkpoints" )
+        dumped = server.dump_all_named_graphs_as_checkpoints( echo = args.v )
+        report( "checkpoints created", len( dumped ) )
+        for g in dumped:
+            if g in context2name:
+                report( " → matched dataset", context2name[g] )
+            else:
+                print_warn( f"Graph adopted but no matching dataset in YAML: {g}" )
+        # Datasets in YAML that the server doesn't have — surfaced so the user
+        # knows what is missing from the bulk dump and would have to be loaded
+        # separately (e.g. with a follow-up -C run).
+        for name in sorted( name2context ):
+            if name2context[name] not in dumped:
+                print_warn( f"Dataset '{name}' has no data in the qlever server (no checkpoint created)" )
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
