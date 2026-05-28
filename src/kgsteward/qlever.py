@@ -39,12 +39,12 @@ def parse_qleverfile( qleverfile ):
 
 class QleverClient( GenericClient ):
 
-    def __init__( self, qleverfile, qleverdir, echo = True ):
+    def __init__( self, qleverfile, qleverdir, access_token = None, echo = True ):
         for tool in ("qlever", "riot"):
             if shutil.which( tool ) is None:
                 stop_error( f"{tool} not found on PATH" )
 
-        location, repository, system, access_token = parse_qleverfile( qleverfile )
+        location, repository, system, access_token_from_file = parse_qleverfile( qleverfile )
 
         if system in ( "docker", "podman" ):
             if run_system_cmd( [system, "info"], echo = echo, capture_output = True ).returncode != 0:
@@ -60,7 +60,7 @@ class QleverClient( GenericClient ):
         self.qleverfile      = qleverfile
         self.qleverdir       = qleverdir
         self.system          = system
-        self.access_token    = access_token
+        self.access_token    = access_token if access_token is not None else access_token_from_file
         self.qlever_cmd      = ["qlever"]
         self.pending_files   = []   # multi_input_json entries staged for deferred index
         self.pending_updates = []   # SPARQL updates queued pre-index

@@ -430,6 +430,7 @@ def main():
             server = QleverClient(
                 replace_env_var( config["server"]["qleverfile"] ),
                 replace_env_var( config["server"]["qleverdir"] ),
+                access_token = replace_env_var( config["server"]["access_token"] ) if config["server"].get( "access_token" ) else None,
                 echo = args.v
             )
         except Exception as e:

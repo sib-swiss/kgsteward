@@ -1,8 +1,9 @@
 version: kgsteward_yaml_3
 server:
-  brand      : qlever
-  qleverfile : ${QLEVER_FILE}   # path to Qleverfile (see doc/first_steps/Qleverfile)
-  qleverdir  : ${QLEVER_DIR}    # working directory for the qlever index
+  brand        : qlever
+  qleverfile   : ${QLEVER_FILE}         # path to Qleverfile (see doc/first_steps/Qleverfile)
+  qleverdir    : ${QLEVER_DIR}          # working directory for the qlever index
+  access_token : ${QLEVER_ACCESS_TOKEN} # optional: overrides ACCESS_TOKEN in Qleverfile
 context_base_IRI: http://example.org/context/
 file_loader:
   method: file_store

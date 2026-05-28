@@ -164,13 +164,12 @@ class RDF4JConf( BaseModel ):
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
-class QleverConf( BaseModel ): # Nota Bene: qlever is currently read-only,  access_token, file_server_port are useless
+class QleverConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
-    brand             : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe(  "server_brand" ))
-    qleverfile        : str = Field( title = "Qleverfile path", description = "Path to the Qleverfile (may be a symlink). location, repository and other settings are read from that file." )
-    qleverdir         : str = Field( title = "Qlever working directory", description = "Working directory from which qlever CLI commands are run." )
-    # access_token      : str = Field( title = "Qlever access token", description = "Qlever access token is mandatory to write the repsoitory" )
-    # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
+    brand        : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe( "server_brand" ))
+    qleverfile   : str = Field( title = "Qleverfile path", description = "Path to the Qleverfile. location, repository and other settings are read from that file." )
+    qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory from which qlever CLI commands are run." )
+    access_token : Optional[ str ] = Field( None, title = "Qlever access token", description = "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile." )
 
 class SpecialEnum( str, Enum ):
     sib_swiss_void   = 'sib_swiss_void'
