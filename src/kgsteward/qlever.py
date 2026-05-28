@@ -24,7 +24,7 @@ def _qlever_fmt( filename ):
 
 
 def parse_qleverfile( qleverfile ):
-    """Read a Qleverfile and return (location, repository, system, access_token)."""
+    """Read a Qleverfile and return (location, repository, system, access_token, text_index)."""
     real_path = os.path.realpath( qleverfile )
     if not os.path.isfile( real_path ):
         stop_error( "Qleverfile not found: " + qleverfile )
@@ -37,7 +37,8 @@ def parse_qleverfile( qleverfile ):
     port         = parser.get( "server",  "PORT",         fallback = "7019" )
     system       = parser.get( "runtime", "SYSTEM",       fallback = "docker" )
     access_token = parser.get( "server",  "ACCESS_TOKEN", fallback = "" )
-    return f"http://{host}:{port}", repository, system, access_token
+    text_index   = parser.get( "index",   "TEXT_INDEX",   fallback = "none" )
+    return f"http://{host}:{port}", repository, system, access_token, text_index
 
 
 class QleverClient( GenericClient ):
@@ -47,7 +48,7 @@ class QleverClient( GenericClient ):
             if shutil.which( tool ) is None:
                 stop_error( f"{tool} not found on PATH" )
 
-        location, repository, system, access_token_from_file = parse_qleverfile( qleverfile )
+        location, repository, system, access_token_from_file, text_index = parse_qleverfile( qleverfile )
 
         if system in ( "docker", "podman" ):
             if run_system_cmd( [system, "info"], echo = echo, capture_output = True ).returncode != 0:
@@ -71,6 +72,8 @@ class QleverClient( GenericClient ):
         self.qlever_cmd      = ["qlever"]
         self.pending_files   = []   # multi_input_json entries staged for deferred index
         self.pending_updates = []   # SPARQL updates queued pre-index
+        self.user_text_index = text_index   # original TEXT_INDEX from user's Qleverfile
+        self._defer_text_index = False      # toggled by defer_text_index_to_session_end()
 
         # Remove any leftover input/ directory from a previous crashed staging phase.
         # pending_files is always reset above, so orphaned staged files must be wiped.
@@ -308,7 +311,19 @@ class QleverClient( GenericClient ):
 
         # --overwrite-existing is required when rebuilding an index that
         # already exists on disk (i.e. every dataset after the first one).
-        self._qlever( "index", "--overwrite-existing", echo = echo )
+        # When --qlever_build_text_indexes is in effect we override the
+        # Qleverfile's TEXT_INDEX with `none` so the slow text-index step is
+        # skipped for every per-dataset rebuild; it is built once at the
+        # session end via build_text_index().  Any stale text.* files left
+        # over from a previous non-deferred run are wiped so the running
+        # server doesn't serve a mismatched text index.
+        if self._defer_text_index:
+            for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
+                os.remove( f )
+                report( "wiped stale text index", os.path.basename( f ) )
+            self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
+        else:
+            self._qlever( "index", "--overwrite-existing", echo = echo )
         self._qlever( "start", echo = echo )
         self.is_running = True
 
@@ -355,6 +370,45 @@ class QleverClient( GenericClient ):
     def server_rebuild_index( self, echo = True ):
         """Persist in-memory SPARQL updates by rebuilding the qlever index."""
         self._qlever( "rebuild-index", "--restart-when-finished", echo = echo )
+        self.is_running = True
+
+    def defer_text_index_to_session_end( self ):
+        """Skip text-index building during every per-dataset rebuild this session.
+
+        After this is called, ``_finalize_index`` invokes ``qlever index`` with
+        ``--text-index none``, so the (potentially very expensive) text-index
+        construction is skipped on every per-dataset rebuild.  Call
+        ``build_text_index`` at the very end of the session to build it once
+        over the final state — typically much faster than building it N times
+        for N datasets.
+        """
+        self._defer_text_index = True
+        report( "deferred", "text-index build to session end (--qlever_build_text_indexes)" )
+
+    def build_text_index( self, echo = True ):
+        """Build the text index once over the existing on-disk index.
+
+        Reads the original ``TEXT_INDEX`` setting from the user's Qleverfile
+        (captured at ``__init__`` time as ``self.user_text_index``).  If that
+        value is ``none``, this is a no-op — there is nothing to build.
+
+        Otherwise the server is stopped (so qlever-index can write the text
+        files without contention), ``qlever add-text-index --text-index <user>
+        --overwrite-existing`` runs, and the server is restarted so it picks
+        up the newly-written text index.
+        """
+        if not self.user_text_index or self.user_text_index.lower() == "none":
+            print_warn( "user's Qleverfile has TEXT_INDEX = none — nothing to build" )
+            return
+        if self.is_running:
+            self.server_stop( echo = echo )
+        self._qlever(
+            "add-text-index",
+            "--text-index", self.user_text_index,
+            "--overwrite-existing",
+            echo = echo,
+        )
+        self._qlever( "start", echo = echo )
         self.is_running = True
 
     # ------------------------------------------------------------------ #

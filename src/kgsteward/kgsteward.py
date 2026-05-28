@@ -170,6 +170,16 @@ def get_user_input():
                "bootstrapped from the bulk dump and normal -C/-d operations work as usual."
     )
     parser.add_argument(
+        '--qlever_build_text_indexes',
+        action = 'store_true',
+        help = "(qlever only) Skip text-index building during per-dataset rebuilds, then "
+               "build it once at the end of the session via `qlever add-text-index`.  "
+               "Without this flag, qlever index re-builds the text index for EVERY dataset "
+               "(N rebuilds for N datasets); with it, the text index is built exactly once "
+               "over the final state.  Saves substantial time on multi-dataset builds where "
+               "TEXT_INDEX is set to from_text_records_and_literals or from_literals."
+    )
+    parser.add_argument(
         '--sib_swiss_editor',
         help = "Document and save all queries and prefix declarations in a single Turtle file, ready to be retrived by the sib-swiss editor (https://github.com/sib-swiss/sparql-editor). "
                "Note that the <SIB_SWISS_EDITOR> file is not uploaded directly to the store. "
@@ -504,6 +514,17 @@ def main():
         report( "checkpoints created", len( dumped ) )
 
     # --------------------------------------------------------- #
+    # qlever-only: defer text-index building to the session end.
+    # Must come BEFORE the dataset processing loop so the first
+    # _finalize_index already sees the deferral flag set.
+    # --------------------------------------------------------- #
+
+    if args.qlever_build_text_indexes:
+        if config["server"]["brand"] != "qlever":
+            stop_error( "--qlever_build_text_indexes is only valid for the qlever backend" )
+        server.defer_text_index_to_session_end()
+
+    # --------------------------------------------------------- #
     # Establish the list of contexts to update
     # --------------------------------------------------------- #
 
@@ -740,6 +761,15 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     if config["server"]["brand"] == "qlever" and ( server.pending_files or server.pending_updates ) :
         server.server_start( echo = args.v )
+
+    # --------------------------------------------------------- #
+    # For qlever: build the text index once at the session end,
+    # if deferral was requested via --qlever_build_text_indexes.
+    # --------------------------------------------------------- #
+    if args.qlever_build_text_indexes and config["server"]["brand"] == "qlever":
+        print_break()
+        print_task( "Build qlever text index (deferred from per-dataset rebuilds)" )
+        server.build_text_index( echo = args.v )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
