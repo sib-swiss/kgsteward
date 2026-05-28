@@ -733,10 +733,23 @@ class QleverClient( GenericClient ):
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         self._sparql_update_counter += 1
         t_start = time.time()
+        # Updates from kgsteward (large INSERT/DELETE WHERE, multi-step graph
+        # computations, etc.) routinely exceed the per-query timeout set by
+        # TIMEOUT in the Qleverfile — and that timeout is sensible for
+        # interactive queries, not bulk ingestion.  Per-request override
+        # ``timeout=`` is honoured by qlever above the server default ONLY when
+        # an access token is supplied (and ours always is).  qlever has no
+        # "unlimited" value; 999999s (~11.6 days) is effectively never going
+        # to be reached in a session and is well above any plausible single
+        # update's runtime.
         r = http_call(
             { 'method': 'POST', 'url': self.endpoint_query,
               'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
-              'data': { 'update': sparql, 'access-token': self.access_token } },
+              'data': {
+                  'update':       sparql,
+                  'access-token': self.access_token,
+                  'timeout':      '999999s',
+              } },
             status_code_ok, echo
         )
         elapsed_ms = int( ( time.time() - t_start ) * 1000 )
