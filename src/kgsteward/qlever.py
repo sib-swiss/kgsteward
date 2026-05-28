@@ -609,11 +609,24 @@ class QleverClient( GenericClient ):
         with tempfile.NamedTemporaryFile( delete = False, suffix = suffix ) as tmp:
             tmp_path = tmp.name
         try:
+            # --connect-timeout 30 : give up if no TCP handshake in 30s.
+            # --speed-time 60 --speed-limit 1024 : abort if the transfer
+            #     stays under 1 KB/s for 60 consecutive seconds.  This catches
+            #     the "upstream throttled us to a trickle" failure mode
+            #     (otherwise curl hangs forever on a half-dead connection).
+            # --retry 3 --retry-delay 5 : transient blip → quick retry.
+            curl_cmd = [
+                "curl", "-L",
+                "--connect-timeout", "30",
+                "--speed-time", "60", "--speed-limit", "1024",
+                "--retry", "3", "--retry-delay", "5",
+                "-o", tmp_path, url,
+            ]
             if echo:
-                print( colored( f"curl -L {url} -o {tmp_path}", "cyan" ), flush = True )
-            r = subprocess.run( ["curl", "-L", "-o", tmp_path, url] )
+                print( colored( " ".join( curl_cmd ), "cyan" ), flush = True )
+            r = subprocess.run( curl_cmd )
             if r.returncode != 0:
-                stop_error( f"curl download failed for: {url}" )
+                stop_error( f"curl download failed for: {url}  (exit {r.returncode})" )
             self.pending_files.extend( self._stage_file( tmp_path, context, void_iri = url, echo = echo ) )
         finally:
             if os.path.exists( tmp_path ):
