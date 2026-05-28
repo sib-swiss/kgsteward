@@ -1,4 +1,5 @@
 import configparser
+import glob
 import hashlib
 import json
 import os
@@ -82,6 +83,11 @@ class QleverClient( GenericClient ):
         except:
             self.is_running = False
         report( "qlever server", "running" if self.is_running else "stopped" )
+
+    @property
+    def has_index( self ):
+        """True if a qlever index exists in qleverdir (i.e. indexing has been run at least once)."""
+        return bool( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.index.*" ) ) )
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -249,6 +255,8 @@ class QleverClient( GenericClient ):
         return [ self.repository ]
 
     def sparql_query( self, sparql, status_code_ok = [ 200, 400, 500 ], echo = True, timeout = None ):
+        if not self.is_running:
+            return None
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         r = http_call(
@@ -293,6 +301,8 @@ class QleverClient( GenericClient ):
 
     def list_context( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
+        if r is None:
+            return set()
         return { rec["g"]["value"] for rec in r.json()["results"]["bindings"] if "g" in rec }
 
     def drop_context( self, context, echo = True ):
