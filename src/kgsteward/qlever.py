@@ -515,10 +515,14 @@ class QleverClient( GenericClient ):
         return { rec["g"]["value"] for rec in r.json()["results"]["bindings"] if "g" in rec }
 
     def drop_context( self, context, echo = True ):
-        # DROP GRAPH is not yet supported by qlever; use DELETE WHERE instead.
-        # If the server is not running, the graph will be absent from the rebuilt index anyway.
-        if self.is_running:
-            self.sparql_update(
-                f"DELETE WHERE {{ GRAPH <{context}> {{ ?s ?p ?o }} }}",
-                echo = echo
-            )
+        """No-op for qlever — checkpoint invalidation + index rebuild handle removal.
+
+        In the per-dataset architecture, ``kgsteward`` calls ``invalidate_checkpoint``
+        immediately before ``drop_context`` for the dataset being reprocessed.  The next
+        ``_finalize_index`` then rebuilds the on-disk index from scratch using every
+        remaining checkpoint + the freshly-staged files — the old graph is simply not
+        included.  No SPARQL DELETE is needed, and sending one is actively harmful: a
+        ``DELETE WHERE { GRAPH <ctx> { ?s ?p ?o } }`` on a large graph (tens of millions
+        of triples) can crash the qlever server with a ``RemoteDisconnected``.
+        """
+        report( "drop_context", f"no-op for qlever (will be excluded from next index rebuild): {context}" )
