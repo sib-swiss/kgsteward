@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 
 from dumper import dump
 from .common import *
@@ -100,8 +101,12 @@ class QleverClient( GenericClient ):
             stop_error( f"qlever {args[0]} failed" )
         return r
 
-    def _stage_file( self, filename, context_iri, echo = True ):
-        """Copy/convert *filename* into qleverdir/input/ and return multi_input_json entries."""
+    def _stage_file( self, filename, context_iri, void_iri = None, echo = True ):
+        """Copy/convert *filename* into qleverdir/input/ and return multi_input_json entries.
+
+        *void_iri* overrides the IRI recorded in the void:dataDump triple (defaults to file://<src>).
+        Pass the original URL when staging a downloaded file so provenance points to the source.
+        """
         input_dir = os.path.join( self.qleverdir, "input" )
         os.makedirs( input_dir, exist_ok = True )
 
@@ -135,10 +140,11 @@ class QleverClient( GenericClient ):
             report( "staged (riot→nt)", dest_path )
 
         # Bake void:dataDump triple into the index (avoids a separate INSERT + rebuild)
+        actual_void_iri = void_iri if void_iri is not None else f"file://{src}"
         void_name = f"{stem}_{h8}.void.nt"
         void_path = os.path.join( input_dir, void_name )
         with open( void_path, "w" ) as vf:
-            vf.write( f"<{context_iri}> <http://rdfs.org/ns/void#dataDump> <file://{src}> .\n" )
+            vf.write( f"<{context_iri}> <http://rdfs.org/ns/void#dataDump> <{actual_void_iri}> .\n" )
 
         report( "staged", f"input/{dest_name}  (+ void triple)" )
         return [
@@ -148,7 +154,10 @@ class QleverClient( GenericClient ):
 
     def _patch_qleverfile( self, entries ):
         """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile."""
-        dest   = os.path.join( self.qleverdir, "Qleverfile" )
+        dest = os.path.join( self.qleverdir, "Qleverfile" )
+        if not os.path.lexists( dest ):
+            shutil.copy2( os.path.realpath( self.qleverfile ), dest )
+            report( "copied Qleverfile", dest )
         parser = configparser.RawConfigParser()
         parser.optionxform = str    # preserve uppercase keys
         parser.read( dest )
@@ -169,7 +178,12 @@ class QleverClient( GenericClient ):
         report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
     def _finalize_index( self, echo = True ):
-        """Patch Qleverfile, rebuild index, start server, apply queued updates."""
+        """Patch Qleverfile, rebuild index, start server, apply queued updates.
+
+        ``pending_updates`` may contain ``None`` sentinels inserted by ``mark_rebuild()``.
+        Each sentinel triggers a ``rebuild-index`` at that point so that the preceding
+        SPARQL updates are persisted before the next batch of updates is applied.
+        """
         if not self.pending_files:
             print_warn( "_finalize_index called with no pending files — nothing to do." )
             return
@@ -195,10 +209,13 @@ class QleverClient( GenericClient ):
         self.pending_files = []
 
         if self.pending_updates:
-            print_task( f"Apply {len(self.pending_updates)} queued SPARQL update(s)" )
-            for sparql in self.pending_updates:
-                self._do_sparql_update( sparql, echo = echo )
-            self.server_rebuild_index( echo = echo )
+            n_updates = sum( 1 for u in self.pending_updates if u is not None )
+            print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild markers" )
+            for item in self.pending_updates:
+                if item is None:
+                    self.server_rebuild_index( echo = echo )
+                else:
+                    self._do_sparql_update( item, echo = echo )
         self.pending_updates = []
 
     # ------------------------------------------------------------------ #
@@ -244,6 +261,36 @@ class QleverClient( GenericClient ):
         """Stage *filename* for deferred indexing into graph *context*."""
         self.pending_files.extend( self._stage_file( filename, context, echo = echo ) )
 
+    def load_url_as_file( self, url, context, echo = True ):
+        """Download *url* immediately and stage it for deferred indexing into graph *context*.
+
+        The void:dataDump triple records the original *url* (not the local temp path).
+        This is the correct approach for qlever because a SPARQL LOAD cannot be deferred —
+        the local file server may stop before the index is eventually built.
+        """
+        suffix = os.path.splitext( url.split( "?" )[0].split( "/" )[-1] )[1] or ".nt"
+        with tempfile.NamedTemporaryFile( delete = False, suffix = suffix ) as tmp:
+            tmp_path = tmp.name
+        try:
+            if echo:
+                print( colored( f"curl -L {url} -o {tmp_path}", "cyan" ), flush = True )
+            r = subprocess.run( ["curl", "-L", "-o", tmp_path, url] )
+            if r.returncode != 0:
+                stop_error( f"curl download failed for: {url}" )
+            self.pending_files.extend( self._stage_file( tmp_path, context, void_iri = url, echo = echo ) )
+        finally:
+            if os.path.exists( tmp_path ):
+                os.unlink( tmp_path )
+
+    def mark_rebuild( self ):
+        """Insert a rebuild-index sentinel into the pending_updates queue.
+
+        When ``_finalize_index`` processes the queue it will call ``server_rebuild_index``
+        at each sentinel, persisting the preceding SPARQL updates before continuing.
+        This gives one rebuild-index per dataset that has an ``update:`` section.
+        """
+        self.pending_updates.append( None )
+
     # ------------------------------------------------------------------ #
     # SPARQL
     # ------------------------------------------------------------------ #
@@ -273,17 +320,14 @@ class QleverClient( GenericClient ):
         return r
 
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        """Execute a SPARQL update; queue it if indexing is not yet complete."""
+        """Execute a SPARQL update; queue it if the server is not yet running."""
         # void:dataDump triples are already baked into staged files — skip
         if "void:dataDump" in sparql or "ns/void#dataDump" in sparql:
             return
         if not self.is_running:
-            if self.pending_files:
-                report( "queued update", sparql[:60].replace( "\n", " " ) + "…" )
-                self.pending_updates.append( sparql )
-                return
-            self._qlever( "start", echo = echo )
-            self.is_running = True
+            report( "queued update", sparql[:60].replace( "\n", " " ) + "…" )
+            self.pending_updates.append( sparql )
+            return
         self._do_sparql_update( sparql, status_code_ok = status_code_ok, echo = echo )
 
     def _do_sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):

@@ -541,8 +541,12 @@ def main():
                     subprocess.run( cmd )
                     server.load_from_file_using_riot( filename, context, echo = args.v )
                 else: # direct sparql_load
-                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                    if config["server"]["brand"] == "qlever":
+                        # qlever cannot defer LOAD — download immediately and stage for indexing
+                        server.load_url_as_file( path, context, echo = args.v )
+                    else:
+                        server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
+                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <{path}>
@@ -624,9 +628,10 @@ INSERT DATA {{
                         sparql = sparql.replace( key, replace[ key ])
                     for s in split_sparql_update( sparql): # split on ";" to execute one statement at a time
                         server.sparql_update( s, echo = args.v )
-            # Persist SPARQL updates for qlever (rebuild-index makes them durable)
-            if config["server"]["brand"] == "qlever" and server.is_running:
-                server.server_rebuild_index( echo = args.v )
+            # For qlever: queue a rebuild-index marker so this dataset's updates are
+            # persisted as a discrete step when _finalize_index runs post-loop.
+            if config["server"]["brand"] == "qlever":
+                server.mark_rebuild()
         if "special" in target:
             for key in target["special"]:
                 if key == "sib_swiss_void":
