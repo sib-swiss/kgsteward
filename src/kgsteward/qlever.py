@@ -198,16 +198,25 @@ class QleverClient( GenericClient ):
         report( "INPUT_FILES",      file_paths )
         report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
-    def _collect_checkpoint_entries( self ):
+    def _collect_checkpoint_entries( self, exclude_iris = None ):
         """Return MULTI_INPUT_JSON entries for all completed checkpoints.
 
         Reads ``*.nt.gz.json`` sidecar files in qleverdir.  Each sidecar records the
         named-graph IRI so its checkpoint can be fed directly into ``qlever index`` via
         MULTI_INPUT_JSON — no re-downloading or re-converting of source files required.
         The sidecar's presence is an atomic completeness marker: ``dump_checkpoint``
-        writes the ``.nt.gz`` data file first, then the sidecar; a crash between the
-        two writes leaves an orphaned ``.nt.gz`` that is simply ignored here.
+        writes the ``.nt.gz`` data file first (via a temporary file + ``os.replace``),
+        then the sidecar; a crash between the two writes leaves an orphaned ``.nt.gz``
+        that is simply ignored here.
+
+        *exclude_iris* is an optional iterable of context IRIs to skip.  ``_finalize_index``
+        passes the set of IRIs present in ``pending_files`` so that a dataset being
+        re-processed is not loaded from its stale checkpoint at the same time its fresh
+        files are being indexed — which would either duplicate the graph or mix old and
+        new triples.  The stale checkpoint stays on disk and is overwritten atomically by
+        the subsequent ``dump_checkpoint``.
         """
+        exclude = set( exclude_iris ) if exclude_iris else set()
         entries = []
         for sidecar in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
             try:
@@ -219,6 +228,9 @@ class QleverClient( GenericClient ):
                 continue
             nt_gz = sidecar[ :-5 ]   # strip ".json" → the .nt.gz path
             fname = os.path.basename( nt_gz )
+            if context_iri in exclude:
+                report( "checkpoint superseded by pending data", fname )
+                continue
             entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri } )
             report( "checkpoint → index", fname )
         return entries
@@ -265,7 +277,10 @@ class QleverClient( GenericClient ):
              ``server_rebuild_index`` + ``dump_checkpoint`` to persist the dataset
              immediately before moving on to the next one.
         """
-        checkpoint_entries = self._collect_checkpoint_entries()
+        # Datasets being re-processed have their fresh files in pending_files; their
+        # stale checkpoints must be excluded so we don't load old + new for the same graph.
+        pending_iris = { e["graph"] for e in self.pending_files }
+        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris )
         all_entries = checkpoint_entries + self.pending_files
 
         if not all_entries:
@@ -387,14 +402,21 @@ class QleverClient( GenericClient ):
         """Query the running server and save the named graph as a compressed N-Triples checkpoint.
 
         Writes ``<safe>_<h8>.nt.gz`` (the data) and ``<safe>_<h8>.nt.gz.json`` (sidecar
-        recording the graph IRI).  The sidecar is written *after* the data file so its
-        presence acts as an atomic completeness marker — a crash between the two writes
-        leaves no sidecar and the partial ``.nt.gz`` is ignored on the next run.
+        recording the graph IRI).  Two-step atomic write:
+
+          1. Dump to ``<path>.tmp``, then ``os.replace(tmp, path)`` — guarantees the
+             ``.nt.gz`` is either the OLD content or the NEW content, never partial.
+          2. Write the sidecar last; its presence is the completeness marker.
+
+        This makes checkpointing transactional: until the new dump completes, the OLD
+        checkpoint remains on disk as a fallback.  A crash mid-processing therefore
+        cannot leave a previously-checkpointed dataset un-checkpointed.
         """
-        path    = self.checkpoint_path( context_iri )
-        fname   = os.path.basename( path )
-        sidecar = path + ".json"
-        sparql  = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
+        path     = self.checkpoint_path( context_iri )
+        fname    = os.path.basename( path )
+        sidecar  = path + ".json"
+        tmp_path = path + ".tmp"
+        sparql   = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
         if echo:
             print( colored( f"dump checkpoint → {fname}", "cyan" ), flush = True )
         r = http_call(
@@ -404,8 +426,9 @@ class QleverClient( GenericClient ):
               "data": { "query": sparql } },
             [ 200 ], echo = False
         )
-        with gzip.open( path, "wb" ) as f:
+        with gzip.open( tmp_path, "wb" ) as f:
             f.write( r.content )
+        os.replace( tmp_path, path )    # atomic on POSIX
         with open( sidecar, "w" ) as f:
             json.dump( { "graph": context_iri }, f )
         report( "checkpoint saved", fname )

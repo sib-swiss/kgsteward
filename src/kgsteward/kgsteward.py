@@ -533,11 +533,13 @@ def main():
 
         print_break()
         print_task( "Update dataset record: " + name )
-        # For qlever: remove the stale checkpoint before reprocessing so that
-        # _collect_checkpoint_entries no longer includes the old data and
-        # has_checkpoint returns False for this dataset.
-        if config["server"]["brand"] == "qlever" :
-            server.invalidate_checkpoint( context )
+        # For qlever: do NOT delete the old checkpoint here.  It stays on disk as a
+        # last-known-good fallback and is excluded from the next index rebuild because
+        # this dataset's context will be present in pending_files (see
+        # _collect_checkpoint_entries' exclude_iris parameter).  dump_checkpoint
+        # atomically replaces the .nt.gz at the end of processing, so a crash anywhere
+        # in between leaves the OLD checkpoint intact rather than losing both old and new.
+        # drop_context is a no-op for qlever (see qlever.py docstring).
         server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
