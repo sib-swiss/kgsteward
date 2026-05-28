@@ -159,16 +159,29 @@ class QleverClient( GenericClient ):
             { "cmd": f"cat input/{void_name}",      "format": "nt", "graph": context_iri },
         ]
 
-    def _patch_qleverfile( self, entries ):
-        """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile.
+    def _ensure_host_name_localhost( self ):
+        """Make sure [server] HOST_NAME = localhost is set in qleverdir/Qleverfile.
 
-        Also ensures ``HOST_NAME = localhost`` is set in ``[server]``.  Without
-        this, the qlever CLI falls back to ``socket.gethostname()`` as the host
-        for its liveness check (``/ping``), which is usually a non-loopback
-        name that does *not* route to the Docker-mapped port on localhost.  The
-        server then appears unreachable to the CLI even though it is running
-        fine, causing ``qlever start`` to spin in its alive-polling loop forever.
+        Without this, the qlever CLI falls back to ``socket.gethostname()`` for
+        its alive-check (``/ping``), which doesn't route to the Docker-mapped
+        port on 127.0.0.1, and ``qlever start`` then spins forever.
         """
+        dest = os.path.join( self.qleverdir, "Qleverfile" )
+        if not os.path.lexists( dest ):
+            return
+        parser = configparser.RawConfigParser()
+        parser.optionxform = str
+        parser.read( dest )
+        if "server" not in parser:
+            parser["server"] = {}
+        if parser["server"].get( "HOST_NAME" ) != "localhost":
+            parser["server"]["HOST_NAME"] = "localhost"
+            with open( dest, "w" ) as f:
+                parser.write( f )
+            report( "forced", "[server] HOST_NAME = localhost" )
+
+    def _patch_qleverfile( self, entries ):
+        """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile."""
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         if not os.path.lexists( dest ):
             shutil.copy2( os.path.realpath( self.qleverfile ), dest )
@@ -403,38 +416,86 @@ class QleverClient( GenericClient ):
                 os.remove( fn )
                 report( "invalidated checkpoint", os.path.basename( fn ) )
 
-    def dump_all_named_graphs_as_checkpoints( self, echo = True ):
-        """Dump every named graph in the running server as an ``.nt.gz`` checkpoint.
+    def upload_quad_and_dump_checkpoints( self, name2context, echo = True ):
+        """Bootstrap a qlever index from a quad dump, verify it, and dump checkpoints.
 
-        Use case — *adopting* an externally-built qlever index.  A common workflow
-        is to build the initial index once from a large ``.nq.gz`` dump (much
-        faster than loading dataset-by-dataset through kgsteward).  That index
-        has no checkpoint files on disk, so the next kgsteward-triggered rebuild
-        — adding a new dataset, updating an existing one — would lose all the
-        bulk-loaded data, because ``_finalize_index`` rebuilds from the
-        checkpoint set only.
+        Single end-to-end "adoption" operation.  Use case: the user has a big
+        ``.nq.gz`` (or any qlever-loadable) dump produced outside kgsteward and
+        wants to bring its content under kgsteward management.  Doing the bulk
+        load with ``qlever index`` is *much* faster than ingesting dataset-by-
+        dataset through kgsteward, so we let qlever do it natively and then
+        capture the result as per-graph checkpoints.
 
-        Running this method once after a bulk load captures every named graph
-        present in the server as a ``.nt.gz`` + sidecar pair, so the subsequent
-        ``_finalize_index`` calls include all of it.  No mutation of the graphs
-        themselves: ``kgsteward:Dataset`` metadata is NOT injected here.  If the
-        adopted graphs already carry that metadata (because the original dump
-        included it), subsequent ``-C`` runs will recognise them as managed; if
-        not, they survive as "orphan but preserved" checkpoints — the data is
-        kept across rebuilds even though no YAML dataset claims them.
+        Steps:
+
+          1. Stop the server if running.
+          2. ``rewrite_repository`` — wipes ``input/``, all ``.nt.gz`` checkpoints
+             and ``.nt.gz.json`` sidecars, and restores the user's original
+             Qleverfile (overwriting any MULTI_INPUT_JSON-patched version).
+          3. Force ``HOST_NAME = localhost`` so the CLI alive-check works.
+          4. ``qlever index --overwrite-existing`` — builds from the user's
+             configured ``INPUT_FILES`` / ``CAT_INPUT_FILES``.
+          5. ``qlever start``.
+          6. Verify: compare the named graphs found in the running server
+             against the YAML dataset contexts.  Report mismatches both ways
+             (graph in dump but not in YAML; dataset in YAML but no data in
+             dump).
+          7. Dump every named graph as an ``.nt.gz`` + sidecar checkpoint.
+
+        After step 7, kgsteward's per-dataset architecture is fully bootstrapped:
+        all subsequent ``_finalize_index`` rebuilds will include this data, and
+        ``-C`` / ``-d`` work as usual.
 
         Returns the sorted list of dumped graph IRIs.
         """
-        if not self.is_running:
-            stop_error( "qlever server must be running to dump checkpoints" )
-        graphs = sorted( self.list_context( echo = False ) )
-        if not graphs:
-            print_warn( "No named graphs found in qlever server — nothing to dump" )
-            return []
-        for g in graphs:
-            print_task( f"Dump checkpoint for graph: {g}" )
+        # 1. Stop server
+        if self.is_running:
+            self.server_stop( echo = echo )
+
+        # 2. Reset to the user's Qleverfile (also wipes old checkpoints + input/)
+        print_task( "Reset qleverdir to user's Qleverfile (wipe checkpoints, input/)" )
+        self.rewrite_repository( echo = echo )
+
+        # 3. HOST_NAME=localhost — needed for the CLI alive-check loop
+        self._ensure_host_name_localhost()
+
+        # 4. Build the qlever index from the quad dump
+        print_task( "Build qlever index from the configured INPUT_FILES (bulk load)" )
+        self._qlever( "index", "--overwrite-existing", echo = echo )
+
+        # 5. Start the server
+        print_task( "Start qlever server from the freshly-built index" )
+        self._qlever( "start", echo = echo )
+        self.is_running = True
+
+        # 6. Verify named graphs against YAML
+        print_task( "Verify graphs in the loaded index against the YAML datasets" )
+        graphs_in_server = self.list_context( echo = False )
+        if not graphs_in_server:
+            stop_error( "No named graphs found in the loaded index — refusing to proceed.\n"
+                        "Check INPUT_FILES / CAT_INPUT_FILES in the Qleverfile and that the dump "
+                        "contains quads (e.g. .nq, .nq.gz, .trig)." )
+
+        contexts_in_yaml = set( name2context.values() )
+        matched = sorted( graphs_in_server & contexts_in_yaml )
+        orphan  = sorted( graphs_in_server - contexts_in_yaml )
+        missing = sorted( contexts_in_yaml - graphs_in_server )
+
+        for g in matched:
+            name = next( n for n, c in name2context.items() if c == g )
+            report( "matched", f"{name} ← {g}" )
+        for g in orphan:
+            print_warn( f"Graph in dump but no matching dataset in YAML: {g}  (kept as orphan-but-preserved checkpoint)" )
+        for c in missing:
+            name = next( n for n, x in name2context.items() if x == c )
+            print_warn( f"Dataset '{name}' in YAML but no data found in the loaded index ({c})" )
+
+        # 7. Dump checkpoints for all named graphs
+        print_task( f"Dump {len( graphs_in_server )} named graph(s) as checkpoints" )
+        for g in sorted( graphs_in_server ):
             self.dump_checkpoint( g, echo = echo )
-        return graphs
+
+        return sorted( graphs_in_server )
 
     def dump_checkpoint( self, context_iri, echo = True ):
         """Query the running server and save the named graph as a compressed N-Triples checkpoint.

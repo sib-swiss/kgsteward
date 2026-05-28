@@ -159,13 +159,15 @@ def get_user_input():
         help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
     )
     parser.add_argument(
-        '--qlever_dump_checkpoints',
+        '--qlever_upload_quad_and_dump_checkpoints',
         action = 'store_true',
-        help = "(qlever only) Dump every named graph in the running qlever server as a "
-               ".nt.gz checkpoint.  Use this once to 'adopt' an externally-built qlever "
-               "index (e.g. one bulk-loaded from a big .nq.gz dump) into kgsteward's "
-               "per-dataset checkpoint architecture.  After this, all named graphs are "
-               "preserved across subsequent index rebuilds triggered by kgsteward."
+        help = "(qlever only) One-shot bootstrap: (i) wipe the qleverdir and restore the "
+               "user's Qleverfile, (ii) build the index with `qlever index` from the "
+               "configured INPUT_FILES (typically a big .nq.gz dump), (iii) start the "
+               "server, (iv) verify that the named graphs in the loaded index match the "
+               "YAML datasets, (v) dump every named graph as an .nt.gz + sidecar checkpoint.  "
+               "After this, kgsteward's per-dataset checkpoint architecture is fully "
+               "bootstrapped from the bulk dump and normal -C/-d operations work as usual."
     )
     parser.add_argument(
         '--sib_swiss_editor',
@@ -480,33 +482,26 @@ def main():
             print_warn( "Option --fuseki_compress_tbd2 not supported for server brand: " + config["server"]["brand"] )
 
     # --------------------------------------------------------- #
-    # qlever-only: adopt an externally-built index by dumping
-    # every named graph as a checkpoint.  Placed AFTER -I so a
-    # combined "-I --qlever_dump_checkpoints" re-creates the
-    # checkpoints (against the still-running server) that -I just
-    # wiped, and BEFORE the update-set determination so that the
-    # freshly-created checkpoints inform has_checkpoint() in -C
-    # stopped-server mode.
+    # qlever-only: bootstrap from a bulk quad dump.
+    # (i)   reset to the user's Qleverfile;
+    # (ii)  qlever index --overwrite-existing  from INPUT_FILES;
+    # (iii) qlever start;
+    # (iv)  verify named graphs in loaded index vs YAML datasets;
+    # (v)   dump every named graph as a .nt.gz + sidecar checkpoint.
+    #
+    # Placed AFTER -I (it does the equivalent reset anyway, so an
+    # explicit -I is redundant but harmless), and BEFORE the
+    # update-set determination so the freshly-created checkpoints
+    # inform has_checkpoint() in -C stopped-server fallback mode.
     # --------------------------------------------------------- #
 
-    if args.qlever_dump_checkpoints:
+    if args.qlever_upload_quad_and_dump_checkpoints:
         if config["server"]["brand"] != "qlever":
-            stop_error( "--qlever_dump_checkpoints is only valid for the qlever backend" )
+            stop_error( "--qlever_upload_quad_and_dump_checkpoints is only valid for the qlever backend" )
         print_break()
-        print_task( "Adopt running qlever index: dump named graphs as checkpoints" )
-        dumped = server.dump_all_named_graphs_as_checkpoints( echo = args.v )
+        print_task( "Bootstrap qlever from quad dump and capture checkpoints" )
+        dumped = server.upload_quad_and_dump_checkpoints( name2context, echo = args.v )
         report( "checkpoints created", len( dumped ) )
-        for g in dumped:
-            if g in context2name:
-                report( " → matched dataset", context2name[g] )
-            else:
-                print_warn( f"Graph adopted but no matching dataset in YAML: {g}" )
-        # Datasets in YAML that the server doesn't have — surfaced so the user
-        # knows what is missing from the bulk dump and would have to be loaded
-        # separately (e.g. with a follow-up -C run).
-        for name in sorted( name2context ):
-            if name2context[name] not in dumped:
-                print_warn( f"Dataset '{name}' has no data in the qlever server (no checkpoint created)" )
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
