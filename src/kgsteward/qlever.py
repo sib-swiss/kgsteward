@@ -160,7 +160,15 @@ class QleverClient( GenericClient ):
         ]
 
     def _patch_qleverfile( self, entries ):
-        """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile."""
+        """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile.
+
+        Also ensures ``HOST_NAME = localhost`` is set in ``[server]``.  Without
+        this, the qlever CLI falls back to ``socket.gethostname()`` as the host
+        for its liveness check (``/ping``), which is usually a non-loopback
+        name that does *not* route to the Docker-mapped port on localhost.  The
+        server then appears unreachable to the CLI even though it is running
+        fine, causing ``qlever start`` to spin in its alive-polling loop forever.
+        """
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         if not os.path.lexists( dest ):
             shutil.copy2( os.path.realpath( self.qleverfile ), dest )
@@ -178,6 +186,12 @@ class QleverClient( GenericClient ):
         file_paths = " ".join( e["cmd"].split()[-1] for e in entries )
         parser["index"]["INPUT_FILES"]      = file_paths
         parser["index"]["MULTI_INPUT_JSON"] = json.dumps( entries, separators = (",", ":") )
+
+        # Guarantee that the qlever CLI probes localhost, not socket.gethostname()
+        if "server" not in parser:
+            parser["server"] = {}
+        if "HOST_NAME" not in parser["server"]:
+            parser["server"]["HOST_NAME"] = "localhost"
 
         with open( dest, "w" ) as f:
             parser.write( f )
