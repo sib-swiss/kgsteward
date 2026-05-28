@@ -523,16 +523,21 @@ def main():
 
         if not name in rdf_graph_to_update :
             # Dataset is up-to-date — nothing to reprocess.
-            # For qlever: stage its checkpoint so it is included in the rebuilt index.
+            # For qlever: checkpoints are auto-collected by _finalize_index via .nt.gz.json
+            # sidecars, so no explicit staging is needed here.  Warn if a checkpoint is
+            # missing for a dataset that would otherwise be silently dropped from the index.
             if config["server"]["brand"] == "qlever" :
-                if server.has_checkpoint( context ) :
-                    server.stage_checkpoint( context )
-                elif server.has_index :
+                if not server.has_checkpoint( context ) and server.has_index :
                     print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
             continue
 
         print_break()
         print_task( "Update dataset record: " + name )
+        # For qlever: remove the stale checkpoint before reprocessing so that
+        # _collect_checkpoint_entries no longer includes the old data and
+        # has_checkpoint returns False for this dataset.
+        if config["server"]["brand"] == "qlever" :
+            server.invalidate_checkpoint( context )
         server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
@@ -672,16 +677,21 @@ INSERT DATA {{
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
-        # For qlever: queue a rebuild-index + checkpoint dump for this dataset.
-        # Placed after update_dataset_info so the checkpoint captures everything
-        # (file data, SPARQL updates, special metadata, and kgsteward provenance).
+        # For qlever: immediately finalize the index and checkpoint this dataset,
+        # mimicking the GraphDB driver's per-dataset persistence model.
+        # mark_rebuild queues the rebuild+checkpoint sentinel; server_start triggers
+        # _finalize_index (which auto-includes all existing checkpoints + the newly
+        # staged files), applies the queued SPARQL updates, rebuilds the persistent
+        # index, and dumps the checkpoint — all before moving to the next dataset.
         if config["server"]["brand"] == "qlever" :
             server.mark_rebuild( context )
+            server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #
-    # For qlever: finalise the index after all datasets staged
+    # For qlever: safety net — flush any staged data not yet finalized
+    # (normally server_start is called per-dataset inside the loop above)
     # --------------------------------------------------------- #
-    if config["server"]["brand"] == "qlever" and server.pending_files:
+    if config["server"]["brand"] == "qlever" and ( server.pending_files or server.pending_updates ) :
         server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #

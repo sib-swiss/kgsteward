@@ -107,6 +107,10 @@ class QleverClient( GenericClient ):
 
         *void_iri* overrides the IRI recorded in the void:dataDump triple (defaults to file://<src>).
         Pass the original URL when staging a downloaded file so provenance points to the source.
+
+        riot is invoked with ``--set jdk.xml.maxGeneralEntitySizeLimit=0`` to lift the
+        JDK default cap on XML general entity sizes, which can be exceeded by large
+        RDF/XML ontologies (e.g. OWL files with many datatype declarations).
         """
         input_dir = os.path.join( self.qleverdir, "input" )
         os.makedirs( input_dir, exist_ok = True )
@@ -131,10 +135,12 @@ class QleverClient( GenericClient ):
         else:
             dest_name = f"{stem}_{h8}.nt"
             dest_path = os.path.join( input_dir, dest_name )
+            riot_cmd  = [ "riot", "--set", "jdk.xml.maxGeneralEntitySizeLimit=0",
+                          "--output=ntriples", src ]
             if echo:
-                print( colored( f"riot --output=ntriples {src} > {dest_path}", "cyan" ), flush = True )
+                print( colored( " ".join( riot_cmd ) + f" > {dest_path}", "cyan" ), flush = True )
             with open( dest_path, "wb" ) as nt_out:
-                riot = subprocess.run( ["riot", "--output=ntriples", src], stdout = nt_out )
+                riot = subprocess.run( riot_cmd, stdout = nt_out )
             if riot.returncode != 0:
                 stop_error( f"riot conversion failed for: {src}" )
             fmt, cmd = "nt", f"cat input/{dest_name}"
@@ -170,7 +176,7 @@ class QleverClient( GenericClient ):
             parser.remove_option( "data", "FORMAT" )
 
         file_paths = " ".join( e["cmd"].split()[-1] for e in entries )
-        parser["index"]["INPUT_FILES"]     = file_paths
+        parser["index"]["INPUT_FILES"]      = file_paths
         parser["index"]["MULTI_INPUT_JSON"] = json.dumps( entries, separators = (",", ":") )
 
         with open( dest, "w" ) as f:
@@ -178,28 +184,81 @@ class QleverClient( GenericClient ):
         report( "INPUT_FILES",      file_paths )
         report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
-    def _finalize_index( self, echo = True ):
-        """Patch Qleverfile, build index, start server, apply updates, dump checkpoints.
+    def _collect_checkpoint_entries( self ):
+        """Return MULTI_INPUT_JSON entries for all completed checkpoints.
 
-        ``pending_updates`` is a sequence of strings (SPARQL updates) interleaved with
+        Reads ``*.nt.gz.json`` sidecar files in qleverdir.  Each sidecar records the
+        named-graph IRI so its checkpoint can be fed directly into ``qlever index`` via
+        MULTI_INPUT_JSON — no re-downloading or re-converting of source files required.
+        The sidecar's presence is an atomic completeness marker: ``dump_checkpoint``
+        writes the ``.nt.gz`` data file first, then the sidecar; a crash between the
+        two writes leaves an orphaned ``.nt.gz`` that is simply ignored here.
+        """
+        entries = []
+        for sidecar in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
+            try:
+                with open( sidecar ) as f:
+                    meta = json.load( f )
+                context_iri = meta["graph"]
+            except Exception as e:
+                print_warn( f"Skipping unreadable checkpoint sidecar {sidecar}: {e}" )
+                continue
+            nt_gz = sidecar[ :-5 ]   # strip ".json" → the .nt.gz path
+            fname = os.path.basename( nt_gz )
+            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri } )
+            report( "checkpoint → index", fname )
+        return entries
+
+    def _apply_pending_updates( self, echo = True ):
+        """Execute all queued SPARQL updates; rebuild-index + checkpoint at each sentinel.
+
+        ``pending_updates`` is a list of strings (SPARQL updates) interleaved with
         ``(context_iri,)`` tuples inserted by ``mark_rebuild()``.  Each tuple triggers:
           1. ``server_rebuild_index`` — persists all preceding in-memory updates, and
           2. ``dump_checkpoint(context_iri)`` — saves the named graph as a ``.nt.gz`` file.
-        This gives one rebuild-index + one checkpoint per dataset, executed in declared
-        order so that cross-graph SPARQL dependencies are respected.
         """
-        if not self.pending_files:
-            print_warn( "_finalize_index called with no pending files — nothing to do." )
+        if not self.pending_updates:
+            return
+        n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
+        print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild+checkpoint" )
+        for item in self.pending_updates:
+            if isinstance( item, tuple ):
+                context_iri = item[0]
+                self.server_rebuild_index( echo = echo )
+                if context_iri:
+                    self.dump_checkpoint( context_iri, echo = echo )
+            else:
+                self._do_sparql_update( item, echo = echo )
+        self.pending_updates = []
+
+    def _finalize_index( self, echo = True ):
+        """Auto-collect checkpoints, patch Qleverfile, build index, start server, apply updates.
+
+        Implements per-dataset sequential persistence — the same model as the GraphDB driver:
+
+          1. All completed ``.nt.gz`` checkpoints are auto-included (via ``.nt.gz.json``
+             sidecars) so the rebuilt index always contains the full dataset history.
+          2. The newly staged ``pending_files`` (for the current dataset) are appended.
+          3. ``qlever index`` is rebuilt from scratch, then the server is started.
+          4. ``_apply_pending_updates`` executes queued SPARQL updates and, for each
+             ``(context_iri,)`` sentinel produced by ``mark_rebuild()``, calls
+             ``server_rebuild_index`` + ``dump_checkpoint`` to persist the dataset
+             immediately before moving on to the next one.
+        """
+        checkpoint_entries = self._collect_checkpoint_entries()
+        all_entries = checkpoint_entries + self.pending_files
+
+        if not all_entries:
+            print_warn( "_finalize_index called with no files (no pending files, no checkpoints) — nothing to do." )
             return
 
         print_task( "Write MULTI_INPUT_JSON to Qleverfile" )
-        self._patch_qleverfile( self.pending_files )
+        self._patch_qleverfile( all_entries )
 
         if self.is_running:
             self.server_stop( echo = echo )
 
         self._qlever( "index", echo = echo )
-
         self._qlever( "start", echo = echo )
         self.is_running = True
 
@@ -210,18 +269,7 @@ class QleverClient( GenericClient ):
 
         self.pending_files = []
 
-        if self.pending_updates:
-            n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
-            print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset rebuild+checkpoint" )
-            for item in self.pending_updates:
-                if isinstance( item, tuple ):
-                    context_iri = item[0]
-                    self.server_rebuild_index( echo = echo )
-                    if context_iri:
-                        self.dump_checkpoint( context_iri, echo = echo )
-                else:
-                    self._do_sparql_update( item, echo = echo )
-        self.pending_updates = []
+        self._apply_pending_updates( echo = echo )
 
     # ------------------------------------------------------------------ #
     # Server lifecycle
@@ -230,6 +278,13 @@ class QleverClient( GenericClient ):
     def server_start( self, echo = True ):
         if self.pending_files:
             self._finalize_index( echo = echo )
+        elif self.pending_updates:
+            # Updates only (no new files to stage): start from the existing index,
+            # then apply the queued SPARQL updates + rebuild+checkpoint markers.
+            if not self.is_running:
+                self._qlever( "start", echo = echo )
+                self.is_running = True
+            self._apply_pending_updates( echo = echo )
         else:
             self._qlever( "start", echo = echo )
             self.is_running = True
@@ -256,6 +311,9 @@ class QleverClient( GenericClient ):
         for ckpt in glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ):
             os.remove( ckpt )
             report( "wiped checkpoint", os.path.basename( ckpt ) )
+        for sidecar in glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ):
+            os.remove( sidecar )
+            report( "wiped checkpoint sidecar", os.path.basename( sidecar ) )
         user_real = os.path.realpath( self.qleverfile )
         dest      = os.path.join( self.qleverdir, "Qleverfile" )
         if user_real != ( os.path.realpath( dest ) if os.path.lexists( dest ) else None ):
@@ -271,26 +329,41 @@ class QleverClient( GenericClient ):
         return os.path.join( self.qleverdir, f"{safe}_{h8}.nt.gz" )
 
     def has_checkpoint( self, context_iri ):
-        """Return True if a completed checkpoint exists for *context_iri*."""
-        return os.path.isfile( self.checkpoint_path( context_iri ) )
+        """Return True if a *completed* checkpoint exists for *context_iri*.
 
-    def stage_checkpoint( self, context_iri ):
-        """Add an existing .nt.gz checkpoint to pending_files so it is included in the next index."""
-        path  = self.checkpoint_path( context_iri )
-        fname = os.path.basename( path )
-        self.pending_files.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri } )
-        report( "checkpoint → staged", fname )
+        A checkpoint is considered complete only when its ``.nt.gz.json`` sidecar is
+        present.  ``dump_checkpoint`` writes the ``.nt.gz`` data file first and the
+        sidecar last, so the sidecar acts as an atomic completeness marker that
+        survives crashes and partial writes mid-dump.
+        """
+        return os.path.isfile( self.checkpoint_path( context_iri ) + ".json" )
+
+    def invalidate_checkpoint( self, context_iri ):
+        """Remove the checkpoint files for *context_iri* to force reprocessing.
+
+        Both the ``.nt.gz`` data file and its ``.nt.gz.json`` sidecar are removed so
+        that ``_collect_checkpoint_entries`` no longer includes stale data and
+        ``has_checkpoint`` returns False.
+        """
+        path    = self.checkpoint_path( context_iri )
+        sidecar = path + ".json"
+        for fn in ( path, sidecar ):
+            if os.path.isfile( fn ):
+                os.remove( fn )
+                report( "invalidated checkpoint", os.path.basename( fn ) )
 
     def dump_checkpoint( self, context_iri, echo = True ):
         """Query the running server and save the named graph as a compressed N-Triples checkpoint.
 
-        The checkpoint captures the fully-processed state of the dataset (source files +
-        SPARQL updates applied) so that future runs can skip reprocessing and feed the
-        checkpoint directly into ``qlever index`` via ``stage_checkpoint``.
+        Writes ``<safe>_<h8>.nt.gz`` (the data) and ``<safe>_<h8>.nt.gz.json`` (sidecar
+        recording the graph IRI).  The sidecar is written *after* the data file so its
+        presence acts as an atomic completeness marker — a crash between the two writes
+        leaves no sidecar and the partial ``.nt.gz`` is ignored on the next run.
         """
-        path  = self.checkpoint_path( context_iri )
-        fname = os.path.basename( path )
-        sparql = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
+        path    = self.checkpoint_path( context_iri )
+        fname   = os.path.basename( path )
+        sidecar = path + ".json"
+        sparql  = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
         if echo:
             print( colored( f"dump checkpoint → {fname}", "cyan" ), flush = True )
         r = http_call(
@@ -302,6 +375,8 @@ class QleverClient( GenericClient ):
         )
         with gzip.open( path, "wb" ) as f:
             f.write( r.content )
+        with open( sidecar, "w" ) as f:
+            json.dump( { "graph": context_iri }, f )
         report( "checkpoint saved", fname )
 
     def load_from_file( self, filename, context, headers = {}, echo = True ):
@@ -341,11 +416,9 @@ class QleverClient( GenericClient ):
         """Insert a rebuild-index+checkpoint sentinel into the pending_updates queue.
 
         *context_iri* is the named graph to dump as a ``.nt.gz`` checkpoint after the
-        rebuild-index completes.  When ``_finalize_index`` hits this sentinel it calls
-        ``server_rebuild_index`` (persisting all preceding SPARQL updates) and then
-        ``dump_checkpoint``.  This gives one rebuild-index + one checkpoint per dataset,
-        executed in declared order so that cross-graph SPARQL update dependencies are
-        respected.
+        rebuild-index completes.  When ``_apply_pending_updates`` hits this sentinel it
+        calls ``server_rebuild_index`` (persisting all preceding SPARQL updates) and then
+        ``dump_checkpoint``, giving one rebuild-index + one checkpoint per dataset.
         """
         self.pending_updates.append( ( context_iri, ) )
 
