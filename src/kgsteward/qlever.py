@@ -54,6 +54,10 @@ class QleverClient( GenericClient ):
 
         if not os.path.isdir( qleverdir ):
             stop_error( f"qleverdir does not exist: {qleverdir}" )
+        real_qf = os.path.realpath( qleverfile )
+        real_qd = os.path.realpath( qleverdir )
+        if os.path.commonpath( [ real_qf, real_qd ] ) == real_qd:
+            stop_error( f"qleverfile must not be located inside qleverdir: {qleverfile}" )
 
         super().__init__( location, None, None )
         self.repository      = repository

@@ -45,9 +45,10 @@ IMAGE  = docker.io/adfreiburg/qlever:latest
 
 @pytest.fixture( scope = "module" )
 def qlever_workdir( tmp_path_factory ):
-    """Create a temporary qleverdir with a Qleverfile; stop qlever on teardown."""
+    """Create a temporary qleverdir and a separate Qleverfile; stop qlever on teardown."""
+    confdir    = str( tmp_path_factory.mktemp( "qlever_conf" ))
     workdir    = str( tmp_path_factory.mktemp( "qlever_workdir" ))
-    qleverfile = os.path.join( workdir, "Qleverfile" )
+    qleverfile = os.path.join( confdir, "Qleverfile" )
     with open( qleverfile, "w" ) as f:
         f.write( QLEVERFILE_TEMPLATE )
 
@@ -59,6 +60,7 @@ def qlever_workdir( tmp_path_factory ):
     # Teardown: stop qlever server if it is still running
     subprocess.run( ["qlever", "stop"], cwd = workdir, capture_output = True )
     shutil.rmtree( workdir, ignore_errors = True )
+    shutil.rmtree( confdir, ignore_errors = True )
 
 # ─── tests ───────────────────────────────────────────────────────────────────
 
