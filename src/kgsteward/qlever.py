@@ -281,6 +281,15 @@ class QleverClient( GenericClient ):
         elif self.pending_updates:
             # Updates only (no new files to stage): start from the existing index,
             # then apply the queued SPARQL updates + rebuild+checkpoint markers.
+            # Guard: if no index exists there is nothing to start from — this indicates
+            # that file loading was accidentally routed through sparql_update (pending_updates)
+            # instead of load_from_file (pending_files).
+            if not self.has_index:
+                stop_error(
+                    "qlever server_start: pending SPARQL updates but no index exists.\n"
+                    "This usually means a file was loaded via sparql_update instead of "
+                    "load_from_file — qlever requires all file data to go through the index."
+                )
             if not self.is_running:
                 self._qlever( "start", echo = echo )
                 self.is_running = True

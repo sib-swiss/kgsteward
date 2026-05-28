@@ -576,31 +576,43 @@ INSERT DATA {{
 }}""", echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
-                fs = LocalFileServer( port = config["file_loader"][ "port" ] )
-                for path in target["file"] :
-                    for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
-                        if not os.path.isfile( dir + "/" + fn ):
-                            stop_error( "File not found: " + dir + "/" + fn )
-                        fs.expose( dir ) # cache already exposed directory
-                        if not is_running_in_a_container:
-                            try:
-                                path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
+                if config["server"]["brand"] == "qlever":
+                    # qlever uses a static index and does not support SPARQL LOAD.
+                    # Stage files directly into the deferred index build instead.
+                    # void:dataDump is baked into the staged files by _stage_file — no
+                    # explicit INSERT needed here.
+                    for path in target["file"] :
+                        for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                            filename = dir + "/" + fn
+                            if not os.path.isfile( filename ):
+                                stop_error( "File not found: " + filename )
+                            server.load_from_file( filename, context, echo = args.v )
+                else:
+                    fs = LocalFileServer( port = config["file_loader"][ "port" ] )
+                    for path in target["file"] :
+                        for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
+                            if not os.path.isfile( dir + "/" + fn ):
+                                stop_error( "File not found: " + dir + "/" + fn )
+                            fs.expose( dir ) # cache already exposed directory
+                            if not is_running_in_a_container:
+                                try:
+                                    path = "http://localhost:" + str( config["file_loader"][ "port" ] ) + "/" + fn
+                                    server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
+                                except Exception as e:
+                                    is_running_in_a_container = True # new guess
+                                    print_warn( "Maybe the server is running in a container => let's try again!" )
+                            if is_running_in_a_container:
+                                # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
+                                path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
                                 server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                            except Exception as e:
-                                is_running_in_a_container = True # new guess 
-                                print_warn( "Maybe the server is running in a container => let's try again!" )
-                        if is_running_in_a_container:
-                            # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
-                            path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
-                            server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                        filename = dir + "/" + fn
-                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
+                            filename = dir + "/" + fn
+                            server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
 INSERT DATA {{
     GRAPH <{context}> {{
         <{context}> void:dataDump <file://{filename}>
     }}
 }}""", echo = args.v )
-                fs.terminate()
+                    fs.terminate()
             else: # config["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
