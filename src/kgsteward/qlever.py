@@ -52,7 +52,8 @@ class QleverClient( GenericClient ):
         elif system != "native":
             stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'" )
 
-        os.makedirs( qleverdir, exist_ok = True )
+        if not os.path.isdir( qleverdir ):
+            stop_error( f"qleverdir does not exist: {qleverdir}" )
 
         super().__init__( location, None, None )
         self.repository      = repository
