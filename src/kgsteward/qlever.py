@@ -73,7 +73,13 @@ class QleverClient( GenericClient ):
         self.pending_files   = []   # multi_input_json entries staged for deferred index
         self.pending_updates = []   # SPARQL updates queued pre-index
         self.user_text_index = text_index   # original TEXT_INDEX from user's Qleverfile
-        self._defer_text_index = False      # toggled by defer_text_index_to_session_end()
+        # qlever's text index is *always* skipped during per-dataset rebuilds
+        # (rebuilding it once per dataset is grossly wasteful).  It is built only
+        # when the user explicitly invokes --qlever_build_text_indexes, which
+        # calls build_text_index() once at the end of the session.  This flag
+        # tracks whether such a fresh text index is now on disk and the server
+        # should load it; any subsequent _finalize_index invalidates it.
+        self._has_current_text_index = False
 
         # Remove any leftover input/ directory from a previous crashed staging phase.
         # pending_files is always reset above, so orphaned staged files must be wiped.
@@ -106,19 +112,20 @@ class QleverClient( GenericClient ):
         return r
 
     def _start_args( self ):
-        """Return argv for ``qlever start`` honouring the current deferred-text-index state.
+        """Return argv for ``qlever start`` honouring text-index state.
 
         qlever auto-derives USE_TEXT_INDEX = yes when TEXT_INDEX != none in the
-        Qleverfile.  With ``--qlever_build_text_indexes`` we have just built
-        the main index with ``--text-index none`` (no text-index files on
-        disk), so the auto-derived ``-t`` flag would make qlever-server crash
-        with ``ERROR opening file "<NAME>.text.vocabulary"`` and then Docker
-        keeps restarting it.  Force ``--use-text-index no`` until the text
-        index is finally built (build_text_index resets the flag).
+        Qleverfile.  Per-dataset rebuilds never produce text-index files (we
+        always pass ``--text-index none`` to ``qlever index`` and wipe any
+        stale ``<NAME>.text.*`` from prior runs), so the auto-derived ``-t``
+        flag would make qlever-server crash with ``ERROR opening file
+        "<NAME>.text.vocabulary"`` and then Docker (--restart=unless-stopped)
+        spins it into an endless restart loop.  Force ``--use-text-index no``
+        unless build_text_index() has just produced a fresh text index.
         """
-        if self._defer_text_index:
-            return ( "start", "--use-text-index", "no" )
-        return ( "start", )
+        if self._has_current_text_index:
+            return ( "start", )
+        return ( "start", "--use-text-index", "no" )
 
     def _stage_file( self, filename, context_iri, void_iri = None, echo = True ):
         """Copy/convert *filename* into qleverdir/input/ and return multi_input_json entries.
@@ -326,19 +333,19 @@ class QleverClient( GenericClient ):
 
         # --overwrite-existing is required when rebuilding an index that
         # already exists on disk (i.e. every dataset after the first one).
-        # When --qlever_build_text_indexes is in effect we override the
-        # Qleverfile's TEXT_INDEX with `none` so the slow text-index step is
-        # skipped for every per-dataset rebuild; it is built once at the
-        # session end via build_text_index().  Any stale text.* files left
-        # over from a previous non-deferred run are wiped so the running
-        # server doesn't serve a mismatched text index.
-        if self._defer_text_index:
-            for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
-                os.remove( f )
-                report( "wiped stale text index", os.path.basename( f ) )
-            self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
-        else:
-            self._qlever( "index", "--overwrite-existing", echo = echo )
+        # The text index is *always* skipped during per-dataset rebuilds —
+        # rebuilding it once per dataset is grossly wasteful and qlever-index
+        # rebuilds it from scratch anyway.  Users who want a text index opt in
+        # with --qlever_build_text_indexes, which calls build_text_index()
+        # once at the end of the session.  Any stale <NAME>.text.* files left
+        # over from a previous build_text_index are wiped here so the next
+        # server restart can't try to load text that doesn't match the new
+        # main index.
+        for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
+            os.remove( f )
+            report( "wiped stale text index", os.path.basename( f ) )
+        self._has_current_text_index = False
+        self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
         self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 
@@ -387,30 +394,21 @@ class QleverClient( GenericClient ):
         self._qlever( "rebuild-index", "--restart-when-finished", echo = echo )
         self.is_running = True
 
-    def defer_text_index_to_session_end( self ):
-        """Skip text-index building during every per-dataset rebuild this session.
-
-        After this is called, ``_finalize_index`` invokes ``qlever index`` with
-        ``--text-index none``, so the (potentially very expensive) text-index
-        construction is skipped on every per-dataset rebuild.  Call
-        ``build_text_index`` at the very end of the session to build it once
-        over the final state — typically much faster than building it N times
-        for N datasets.
-        """
-        self._defer_text_index = True
-        report( "deferred", "text-index build to session end (--qlever_build_text_indexes)" )
-
     def build_text_index( self, echo = True ):
         """Build the text index once over the existing on-disk index.
 
-        Reads the original ``TEXT_INDEX`` setting from the user's Qleverfile
-        (captured at ``__init__`` time as ``self.user_text_index``).  If that
-        value is ``none``, this is a no-op — there is nothing to build.
+        The text index is *opt-in*: per-dataset rebuilds never produce it
+        (rebuilding once per dataset is wasteful), so calling this method is
+        the only way to get a text index from kgsteward.  Reads the original
+        ``TEXT_INDEX`` value from the user's Qleverfile (captured at
+        ``__init__`` time as ``self.user_text_index``).  If that value is
+        ``none``, this is a no-op — there is nothing to build.
 
         Otherwise the server is stopped (so qlever-index can write the text
-        files without contention), ``qlever add-text-index --text-index <user>
-        --overwrite-existing`` runs, and the server is restarted so it picks
-        up the newly-written text index.
+        files without contention), ``qlever add-text-index --text-index
+        <user> --overwrite-existing`` runs, ``_has_current_text_index`` is
+        flipped to True (so the subsequent server start does load the text
+        index), and the server is restarted.
         """
         if not self.user_text_index or self.user_text_index.lower() == "none":
             print_warn( "user's Qleverfile has TEXT_INDEX = none — nothing to build" )
@@ -423,8 +421,8 @@ class QleverClient( GenericClient ):
             "--overwrite-existing",
             echo = echo,
         )
-        # Text index now on disk — clear the deferral so the restart enables it.
-        self._defer_text_index = False
+        # Text index now on disk — let the restart load it.
+        self._has_current_text_index = True
         self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 

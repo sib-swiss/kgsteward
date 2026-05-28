@@ -172,12 +172,12 @@ def get_user_input():
     parser.add_argument(
         '--qlever_build_text_indexes',
         action = 'store_true',
-        help = "(qlever only) Skip text-index building during per-dataset rebuilds, then "
-               "build it once at the end of the session via `qlever add-text-index`.  "
-               "Without this flag, qlever index re-builds the text index for EVERY dataset "
-               "(N rebuilds for N datasets); with it, the text index is built exactly once "
-               "over the final state.  Saves substantial time on multi-dataset builds where "
-               "TEXT_INDEX is set to from_text_records_and_literals or from_literals."
+        help = "(qlever only) Build the qlever text index once at the end of the session, "
+               "using the TEXT_INDEX value from the Qleverfile.  Per-dataset rebuilds always "
+               "skip the text index (rebuilding it N times for N datasets is wasteful), so "
+               "this flag is the only way to get a text index from kgsteward.  Without it, "
+               "the text index is simply absent — the main triple index works fine for "
+               "everything except `?x ql:contains-word ...` queries."
     )
     parser.add_argument(
         '--sib_swiss_editor',
@@ -513,16 +513,11 @@ def main():
         dumped = server.upload_quad_and_dump_checkpoints( name2context, echo = args.v )
         report( "checkpoints created", len( dumped ) )
 
-    # --------------------------------------------------------- #
-    # qlever-only: defer text-index building to the session end.
-    # Must come BEFORE the dataset processing loop so the first
-    # _finalize_index already sees the deferral flag set.
-    # --------------------------------------------------------- #
-
-    if args.qlever_build_text_indexes:
-        if config["server"]["brand"] != "qlever":
-            stop_error( "--qlever_build_text_indexes is only valid for the qlever backend" )
-        server.defer_text_index_to_session_end()
+    if args.qlever_build_text_indexes and config["server"]["brand"] != "qlever":
+        stop_error( "--qlever_build_text_indexes is only valid for the qlever backend" )
+    # (No early action needed — per-dataset rebuilds *always* skip the text
+    # index now; --qlever_build_text_indexes only triggers the one-shot
+    # build_text_index() call at the session end.)
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
