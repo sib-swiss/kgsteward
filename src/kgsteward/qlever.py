@@ -341,9 +341,18 @@ class QleverClient( GenericClient ):
         # over from a previous build_text_index are wiped here so the next
         # server restart can't try to load text that doesn't match the new
         # main index.
-        for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
+        stale_text_files = glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) )
+        for f in stale_text_files:
             os.remove( f )
             report( "wiped stale text index", os.path.basename( f ) )
+        if self.user_text_index and self.user_text_index.lower() != "none":
+            extra = " ; wiped " + str( len( stale_text_files ) ) + " stale text-index file(s)" if stale_text_files else ""
+            print_warn(
+                "Qleverfile has TEXT_INDEX = " + self.user_text_index
+                + " but per-dataset rebuild will skip it (`qlever index --text-index none`)"
+                + extra
+                + ". Pass --qlever_build_text_indexes to (re)build it once at the session end."
+            )
         self._has_current_text_index = False
         self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
         self._qlever( *self._start_args(), echo = echo )
