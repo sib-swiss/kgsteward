@@ -401,28 +401,6 @@ class QleverClient( GenericClient ):
         # data was never loaded into the index).
         self._abort_if_index_log_has_error()
         self._qlever( *self._start_args(), echo = echo )
-
-    def _abort_if_index_log_has_error( self ):
-        """Scan ``<repository>.index-log.txt`` for ERROR lines and stop_error if any."""
-        log_path = os.path.join( self.qleverdir, f"{self.repository}.index-log.txt" )
-        if not os.path.isfile( log_path ):
-            return
-        with open( log_path, errors = "replace" ) as f:
-            log_text = f.read()
-        # qlever-index logs at INFO/ERROR level, e.g.
-        # "2026-... - ERROR: Creating the index for QLever failed ..."
-        bad = [ line for line in log_text.splitlines() if " - ERROR:" in line ]
-        if bad:
-            print_warn( "qlever index reported ERROR(s) — refusing to proceed:" )
-            for line in bad[:5]:
-                print_warn( "  " + line.strip() )
-            stop_error(
-                "qlever index failed (silent in exit code due to internal tee pipe). "
-                "Inspect " + log_path + " for full details; "
-                "after fixing the input, manually remove any empty "
-                "<dataset>_<hash>.nt.gz / .nt.gz.json checkpoints created by previous "
-                "runs before re-running."
-            )
         self.is_running = True
 
         input_dir = os.path.join( self.qleverdir, "input" )
@@ -433,6 +411,35 @@ class QleverClient( GenericClient ):
         self.pending_files = []
 
         self._apply_pending_updates( echo = echo )
+
+    def _abort_if_index_log_has_error( self ):
+        """Scan ``<repository>.index-log.txt`` for ERROR lines and stop_error if any.
+
+        qlever-index runs as `qlever-index ... | tee <log>` inside the
+        container, and the pipe masks qlever-index's non-zero exit on parse
+        errors / runtime exceptions (bash's pipefail isn't set), so the
+        wrapper sees exit 0 even when the build aborted halfway through.
+        Inspect the log file directly and fail loudly — otherwise the next
+        dump_checkpoint silently produces an empty .nt.gz for the dataset.
+        """
+        log_path = os.path.join( self.qleverdir, f"{self.repository}.index-log.txt" )
+        if not os.path.isfile( log_path ):
+            return
+        with open( log_path, errors = "replace" ) as f:
+            log_text = f.read()
+        bad = [ line for line in log_text.splitlines() if " - ERROR:" in line ]
+        if not bad:
+            return
+        print_warn( "qlever index reported ERROR(s) — refusing to proceed:" )
+        for line in bad[:5]:
+            print_warn( "  " + line.strip() )
+        stop_error(
+            "qlever index failed (silent in exit code due to internal tee pipe). "
+            "Inspect " + log_path + " for full details; "
+            "after fixing the input, manually remove any empty "
+            "<dataset>_<hash>.nt.gz / .nt.gz.json checkpoints created by previous "
+            "runs before re-running."
+        )
 
     # ------------------------------------------------------------------ #
     # Server lifecycle
