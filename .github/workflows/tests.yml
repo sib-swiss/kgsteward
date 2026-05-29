@@ -17,9 +17,17 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install qlever and riot
+        # `jena` is no longer a Debian/Ubuntu apt package -- pull the
+        # Apache Jena binary tarball directly and put its `bin/` on PATH.
+        # Java (already on ubuntu-latest) is the only runtime dependency.
+        env:
+          JENA_VERSION: "5.0.0"
         run: |
           uv tool install qlever
-          sudo apt-get install -y jena
+          curl -fsSL -o jena.tar.gz \
+            "https://archive.apache.org/dist/jena/binaries/apache-jena-${JENA_VERSION}.tar.gz"
+          tar xf jena.tar.gz
+          echo "$PWD/apache-jena-${JENA_VERSION}/bin" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: uv run pytest
