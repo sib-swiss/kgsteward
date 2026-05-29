@@ -214,10 +214,17 @@ class QleverClient( GenericClient ):
         with open( void_path, "w" ) as vf:
             vf.write( f"<{context_iri}> <http://rdfs.org/ns/void#dataDump> <{actual_void_iri}> .\n" )
 
+        # ``"parallel": true`` is set per-input on every entry — with
+        # MULTI_INPUT_JSON, the top-level PARALLEL_PARSING in the Qleverfile
+        # does NOT propagate, parallelism is decided per stream.  qlever's
+        # docs: "recommended for large files, but requires that all prefix
+        # declarations are at the beginning of the file", which is the case
+        # for every input format kgsteward produces (.nt, .nt.gz, .ttl from
+        # riot, void.nt) and for the .nt.gz checkpoints.
         report( "staged", f"input/{dest_name}  (+ void triple)" )
         return [
-            { "cmd": cmd,                           "format": fmt,  "graph": context_iri },
-            { "cmd": f"cat input/{void_name}",      "format": "nt", "graph": context_iri },
+            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": True },
+            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": True },
         ]
 
     def _ensure_host_name_localhost( self ):
@@ -242,11 +249,19 @@ class QleverClient( GenericClient ):
             report( "forced", "[server] HOST_NAME = localhost" )
 
     def _patch_qleverfile( self, entries ):
-        """Write MULTI_INPUT_JSON (and INPUT_FILES) into qleverdir/Qleverfile."""
+        """Refresh qleverdir/Qleverfile from the user's source, then patch it.
+
+        Always re-copy the user's Qleverfile each time so any tuning changes
+        (SETTINGS_JSON, STXXL_MEMORY, PARALLEL_PARSING, TEXT_INDEX, …) take
+        effect on the next per-dataset rebuild — previously we only copied
+        when qleverdir/Qleverfile was *missing*, which meant edits to the
+        source after the first run were silently ignored.  The patch below
+        then overrides only the keys we own (MULTI_INPUT_JSON, INPUT_FILES,
+        HOST_NAME), leaving everything else from the user's source intact.
+        """
         dest = os.path.join( self.qleverdir, "Qleverfile" )
-        if not os.path.lexists( dest ):
-            shutil.copy2( os.path.realpath( self.qleverfile ), dest )
-            report( "copied Qleverfile", dest )
+        shutil.copy2( os.path.realpath( self.qleverfile ), dest )
+        report( "synced Qleverfile from user source", dest )
         parser = configparser.RawConfigParser()
         parser.optionxform = str    # preserve uppercase keys
         parser.read( dest )
@@ -305,7 +320,7 @@ class QleverClient( GenericClient ):
             if context_iri in exclude:
                 report( "checkpoint superseded by pending data", fname )
                 continue
-            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri } )
+            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": True } )
             report( "checkpoint → index", fname )
         return entries
 
