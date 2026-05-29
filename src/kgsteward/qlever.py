@@ -237,7 +237,7 @@ class QleverClient( GenericClient ):
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         if not os.path.lexists( dest ):
             return
-        parser = configparser.RawConfigParser()
+        parser = configparser.RawConfigParser( inline_comment_prefixes = ('#',) )
         parser.optionxform = str
         parser.read( dest )
         if "server" not in parser:
@@ -262,7 +262,14 @@ class QleverClient( GenericClient ):
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         shutil.copy2( os.path.realpath( self.qleverfile ), dest )
         report( "synced Qleverfile from user source", dest )
-        parser = configparser.RawConfigParser()
+        # inline_comment_prefixes=('#',) strips trailing `# ...` from every
+        # value.  qlever-control's own parser does NOT strip them and would
+        # otherwise emit them into the docker command (e.g.
+        # `--stxxl-memory 2G       # adjust upward...` which bash then
+        # truncates at the `#`, dropping any `2>&1 | tee ...` redirection
+        # that followed).  Re-writing the file below propagates the cleaned
+        # values back to disk.
+        parser = configparser.RawConfigParser( inline_comment_prefixes = ('#',) )
         parser.optionxform = str    # preserve uppercase keys
         parser.read( dest )
 
