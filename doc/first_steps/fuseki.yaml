@@ -6,7 +6,7 @@ server:
   repository       : first_steps
 context_base_IRI: http://example.org/context/
 file_loader:
-  method: riot_store
+  method: riot_chunk_store
 url_loader:
   method: sparql_load
 dataset: !include dataset.yaml

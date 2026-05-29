@@ -11,7 +11,7 @@ from .generic import GenericClient
 
 class FusekiClient( GenericClient ):
 
-    def __init__( self, location, repository, config_file, username = None, password = None  ):
+    def __init__( self, location, repository, config_file, username = None, password = None, echo = True ):
         g = rdflib.Graph()
         try:
             g.parse( config_file )
@@ -67,6 +67,17 @@ WHERE{
         print( self.endpoint_query )
         print( self.endpoint_update )
         print( self.endpoint_store )
+
+    def list_repository( self ):
+        """Return the list of known repositories.
+
+        Trivial implementation: the FusekiClient is constructed against a
+        single named dataset (see __init__), and the server's config TTL
+        declared a fuseki:Service for it, so we just return that one name.
+        kgsteward's only consumer (the `repo in server.list_repository()`
+        check in main()) is satisfied by this.
+        """
+        return [ self.repository ]
 
     def rewrite_repository( self, server_config_filename ) :
         self.sparql_update( "DROP ALL")

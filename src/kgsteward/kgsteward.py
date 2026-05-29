@@ -450,7 +450,10 @@ def main():
             server = FusekiClient(
                 replace_env_var( config["server"]["location"] ),
                 replace_env_var( config["server"]["repository"] ),
-                replace_env_var( config["server"]["server_config"] ),
+                # Resolve server_config relative to the YAML directory so
+                # rdflib.Graph().parse() in FusekiClient doesn't try to
+                # open a bare filename against the process CWD.
+                update_path( config["server"]["server_config"], config["kgsteward_yaml_directory"] ),
                 echo = args.v
             )
         except Exception as e:
