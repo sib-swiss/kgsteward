@@ -153,9 +153,13 @@ class QleverClient( GenericClient ):
         *void_iri* overrides the IRI recorded in the void:dataDump triple (defaults to file://<src>).
         Pass the original URL when staging a downloaded file so provenance points to the source.
 
-        riot is invoked with ``--set jdk.xml.maxGeneralEntitySizeLimit=0`` to lift the
-        JDK default cap on XML general entity sizes, which can be exceeded by large
-        RDF/XML ontologies (e.g. OWL files with many datatype declarations).
+        When riot is invoked (for RDF/XML, OWL, etc. that qlever can't parse natively),
+        the subprocess gets ``JAVA_TOOL_OPTIONS=-Djdk.xml.maxGeneralEntitySizeLimit=0``
+        in its environment so that the JDK XML parser doesn't reject long literals /
+        long entity contents.  The default JDK cap (100 000 chars) is hit by e.g.
+        the RHEA ontology's RDF/XML descriptions.  We previously used ``riot --set
+        jdk.xml.maxGeneralEntitySizeLimit=0`` which is wrong — ``--set`` sets ARQ
+        context, not a JVM system property — so the cap was silently still in effect.
         """
         input_dir = os.path.join( self.qleverdir, "input" )
         os.makedirs( input_dir, exist_ok = True )
@@ -180,12 +184,24 @@ class QleverClient( GenericClient ):
         else:
             dest_name = f"{stem}_{h8}.nt"
             dest_path = os.path.join( input_dir, dest_name )
-            riot_cmd  = [ "riot", "--set", "jdk.xml.maxGeneralEntitySizeLimit=0",
-                          "--output=ntriples", src ]
+            riot_cmd  = [ "riot", "--output=ntriples", src ]
+            # JVM system property must be set via env (-D), NOT via riot's
+            # --set (which only sets ARQ context).  Lifts the 100 000-char
+            # default cap on XML general entity sizes that otherwise rejects
+            # long literals in RDF/XML ontologies such as RHEA / ChEBI / GO.
+            riot_env = os.environ.copy()
+            extra    = "-Djdk.xml.maxGeneralEntitySizeLimit=0"
+            riot_env["JAVA_TOOL_OPTIONS"] = (
+                ( riot_env.get( "JAVA_TOOL_OPTIONS", "" ) + " " + extra ).strip()
+            )
             if echo:
-                print( colored( " ".join( riot_cmd ) + f" > {dest_path}", "cyan" ), flush = True )
+                print( colored(
+                    f"JAVA_TOOL_OPTIONS=\"{riot_env['JAVA_TOOL_OPTIONS']}\" "
+                    + " ".join( riot_cmd ) + f" > {dest_path}",
+                    "cyan",
+                ), flush = True )
             with open( dest_path, "wb" ) as nt_out:
-                riot = subprocess.run( riot_cmd, stdout = nt_out )
+                riot = subprocess.run( riot_cmd, stdout = nt_out, env = riot_env )
             if riot.returncode != 0:
                 stop_error( f"riot conversion failed for: {src}" )
             fmt, cmd = "nt", f"cat input/{dest_name}"
