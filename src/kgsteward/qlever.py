@@ -223,8 +223,8 @@ class QleverClient( GenericClient ):
         # riot, void.nt) and for the .nt.gz checkpoints.
         report( "staged", f"input/{dest_name}  (+ void triple)" )
         return [
-            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": True },
-            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": True },
+            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": "true" },
+            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": "true" },
         ]
 
     def _ensure_host_name_localhost( self ):
@@ -320,7 +320,7 @@ class QleverClient( GenericClient ):
             if context_iri in exclude:
                 report( "checkpoint superseded by pending data", fname )
                 continue
-            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": True } )
+            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": "true" } )
             report( "checkpoint → index", fname )
         return entries
 
