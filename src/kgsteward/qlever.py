@@ -154,12 +154,18 @@ class QleverClient( GenericClient ):
         Pass the original URL when staging a downloaded file so provenance points to the source.
 
         When riot is invoked (for RDF/XML, OWL, etc. that qlever can't parse natively),
-        the subprocess gets ``JAVA_TOOL_OPTIONS=-Djdk.xml.maxGeneralEntitySizeLimit=0``
-        in its environment so that the JDK XML parser doesn't reject long literals /
-        long entity contents.  The default JDK cap (100 000 chars) is hit by e.g.
-        the RHEA ontology's RDF/XML descriptions.  We previously used ``riot --set
-        jdk.xml.maxGeneralEntitySizeLimit=0`` which is wrong — ``--set`` sets ARQ
-        context, not a JVM system property — so the cap was silently still in effect.
+        the subprocess gets several ``-D`` JDK XML limits set to 0 in its environment
+        via ``JAVA_TOOL_OPTIONS``.  The default JDK caps (typically 100 000) trip on
+        long literals / accumulated entity content in big RDF/XML ontologies such as
+        RHEA / ChEBI / GO.  The known JAXP error codes and the env flags needed:
+
+          JAXP00010003  ↔  jdk.xml.maxGeneralEntitySizeLimit=0
+          JAXP00010004  ↔  jdk.xml.totalEntitySizeLimit=0
+          (others as encountered)
+
+        We previously used ``riot --set jdk.xml.maxGeneralEntitySizeLimit=0`` which is
+        wrong — ``--set`` sets ARQ context, not a JVM system property — so the caps
+        were silently still in effect.
         """
         input_dir = os.path.join( self.qleverdir, "input" )
         os.makedirs( input_dir, exist_ok = True )
@@ -185,12 +191,22 @@ class QleverClient( GenericClient ):
             dest_name = f"{stem}_{h8}.nt"
             dest_path = os.path.join( input_dir, dest_name )
             riot_cmd  = [ "riot", "--output=ntriples", src ]
-            # JVM system property must be set via env (-D), NOT via riot's
-            # --set (which only sets ARQ context).  Lifts the 100 000-char
-            # default cap on XML general entity sizes that otherwise rejects
-            # long literals in RDF/XML ontologies such as RHEA / ChEBI / GO.
+            # JVM system properties must be set via env (-D), NOT via riot's
+            # --set (which only sets ARQ context).  These lift the default JDK
+            # XML parser caps that would otherwise reject long literals or
+            # accumulated entity content in big RDF/XML ontologies (RHEA,
+            # ChEBI, GO).  All limits set to 0 = unlimited.  Add more here
+            # if a future ontology trips another JAXP00010xxx code.
             riot_env = os.environ.copy()
-            extra    = "-Djdk.xml.maxGeneralEntitySizeLimit=0"
+            jdk_xml_limits = [
+                "-Djdk.xml.maxGeneralEntitySizeLimit=0",   # JAXP00010003
+                "-Djdk.xml.totalEntitySizeLimit=0",        # JAXP00010004
+                "-Djdk.xml.entityExpansionLimit=0",        # JAXP00010001
+                "-Djdk.xml.maxParameterEntitySizeLimit=0", # JAXP00010002
+                "-Djdk.xml.elementAttributeLimit=0",
+                "-Djdk.xml.maxElementDepth=0",
+            ]
+            extra    = " ".join( jdk_xml_limits )
             riot_env["JAVA_TOOL_OPTIONS"] = (
                 ( riot_env.get( "JAVA_TOOL_OPTIONS", "" ) + " " + extra ).strip()
             )
