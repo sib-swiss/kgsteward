@@ -391,7 +391,38 @@ class QleverClient( GenericClient ):
             )
         self._has_current_text_index = False
         self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
+        # Defensive: qlever-index runs as `qlever-index ... | tee <log>` inside
+        # the container, and the pipe masks qlever-index's non-zero exit on
+        # parse errors / runtime exceptions.  Bash's pipefail isn't set, so
+        # the wrapper sees exit 0 even when the index build aborted halfway
+        # through.  Inspect the log file directly and fail loudly if any
+        # ERROR line is present — otherwise the next dump_checkpoint will
+        # silently produce an empty .nt.gz for the dataset (since the new
+        # data was never loaded into the index).
+        self._abort_if_index_log_has_error()
         self._qlever( *self._start_args(), echo = echo )
+
+    def _abort_if_index_log_has_error( self ):
+        """Scan ``<repository>.index-log.txt`` for ERROR lines and stop_error if any."""
+        log_path = os.path.join( self.qleverdir, f"{self.repository}.index-log.txt" )
+        if not os.path.isfile( log_path ):
+            return
+        with open( log_path, errors = "replace" ) as f:
+            log_text = f.read()
+        # qlever-index logs at INFO/ERROR level, e.g.
+        # "2026-... - ERROR: Creating the index for QLever failed ..."
+        bad = [ line for line in log_text.splitlines() if " - ERROR:" in line ]
+        if bad:
+            print_warn( "qlever index reported ERROR(s) — refusing to proceed:" )
+            for line in bad[:5]:
+                print_warn( "  " + line.strip() )
+            stop_error(
+                "qlever index failed (silent in exit code due to internal tee pipe). "
+                "Inspect " + log_path + " for full details; "
+                "after fixing the input, manually remove any empty "
+                "<dataset>_<hash>.nt.gz / .nt.gz.json checkpoints created by previous "
+                "runs before re-running."
+            )
         self.is_running = True
 
         input_dir = os.path.join( self.qleverdir, "input" )
