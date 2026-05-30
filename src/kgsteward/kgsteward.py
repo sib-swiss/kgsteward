@@ -454,7 +454,9 @@ def main():
                 # rdflib.Graph().parse() in FusekiClient doesn't try to
                 # open a bare filename against the process CWD.
                 update_path( config["server"]["server_config"], config["kgsteward_yaml_directory"] ),
-                echo = args.v
+                username = username,
+                password = password,
+                echo = args.v,
             )
         except Exception as e:
             stop_error( "Failed to connect to Fuseki server: " + str( e ))

@@ -154,6 +154,9 @@ class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_fuseki" ))
+    server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
+    username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
+    password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
