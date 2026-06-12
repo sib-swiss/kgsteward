@@ -114,6 +114,18 @@ INSERT DATA{{
 }}""" )
     return sparql
 
+def escape_sparql_long_string( text ):
+    """Escape text for safe embedding in a SPARQL long-string literal (\"\"\"...\"\"\").
+
+    The query/comment text is pasted into an INSERT DATA statement that the
+    target store parses; without escaping, a backslash inside the literal is
+    treated as an escape introducer, so an authored "\\\\" is decoded back to
+    "\\". Escape backslash first (so we do not double-escape our own additions),
+    then double-quotes (to prevent an accidental \"\"\" or trailing-quote from
+    terminating the literal early).
+    """
+    return text.replace( "\\", "\\\\" ).replace( '"', '\\"' )
+
 def make_query_description( context, filenames ):
     sparql = []
     seen = {}
@@ -144,8 +156,8 @@ INSERT DATA{
     GRAPH <""" + context + """> { 
         <""" + iri + """> a sh:SPARQLExecutable, sh:SPARQLSelectExecutable ;
             rdfs:label \"""" + name.replace( "_", " " ) + """\" ;
-            rdfs:comment \"\"\"""" + "\n".join( comment ) + """\"\"\" ;
-            sh:select \"\"\"""" + "\n".join( query ) + """\"\"\" .            
+            rdfs:comment \"\"\"""" + escape_sparql_long_string( "\n".join( comment )) + """\"\"\" ;
+            sh:select \"\"\"""" + escape_sparql_long_string( "\n".join( query )) + """\"\"\" .
     }
 }""" )
         if more_ttl:
