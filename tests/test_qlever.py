@@ -95,6 +95,112 @@ def test_index_rdf_file( qlever_workdir ):
     print( f"\nfoaf.rdf indexed: {n} triples; checkpoint saved" )
 
 
+def test_update_dataset_info_idempotent( qlever_workdir, monkeypatch ):
+    """update_dataset_info must converge to EXACTLY ONE kgsteward:Dataset metadata
+    set, no matter how many times it runs or what stale state it starts from.
+
+    Regression for the pept_cluster bug: the old INSERT-only form left 8 metadata
+    triples (2 stacked sets) after two -C runs.  The DELETE-then-INSERT form must
+    collapse any prior metadata -- including a duplicate stacked state -- into a
+    single fresh set.  This also exercises the combined DELETE/INSERT/OPTIONAL
+    update against a live qlever server (qlever is spec-strict, so a passing run
+    here is the real proof the rewritten SPARQL is accepted).
+
+    Runs against the server left up by test_index_rdf_file (foaf graph + its
+    void:dataDump triple already present under ctx).
+    """
+    from src.kgsteward import kgsteward as kg
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+    ctx        = "http://example.org/context/foaf_ontology"
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+    assert client.is_running, "Server must be running (depends on test_index_rdf_file)"
+
+    # Wire the module globals update_dataset_info reads; stub the heavy checksum
+    # computation (file reads + HTTP HEAD) with a fixed value.
+    name = "foaf"
+    kg.name2context[ name ] = ctx
+    config = { "dataset": [ { "name": name, "context": ctx } ] }
+    monkeypatch.setattr( kg, "get_sha256", lambda *a, **k: "deadbeef" )
+
+    # One kgsteward:checksum triple == one metadata set (checksum is the
+    # per-set fingerprint; rdf:type would de-dup across sets).
+    def n_sets():
+        r = client.sparql_query(
+            "PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>\n"
+            f"SELECT ( COUNT(*) AS ?n ) WHERE {{ GRAPH <{ctx}> {{ <{ctx}> kgsteward:checksum ?o }} }}",
+            echo = False,
+        )
+        return int( r.json()["results"]["bindings"][0]["n"]["value"] )
+
+    def stamp():
+        kg.update_dataset_info( client, config, name, echo = True )  # queues the update
+        client.server_start( echo = True )                          # flushes it live
+
+    assert n_sets() == 0, "fresh foaf graph should carry no kgsteward:Dataset metadata"
+
+    stamp()
+    assert n_sets() == 1, f"first stamp should leave exactly one metadata set, got {n_sets()}"
+
+    stamp()
+    assert n_sets() == 1, f"re-stamp must not accumulate metadata, got {n_sets()}"
+
+    # Simulate the pept_cluster bug: inject a second, distinct metadata set.
+    client._do_sparql_update(
+        "PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>\n"
+        "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n"
+        f"INSERT DATA {{ GRAPH <{ctx}> {{ <{ctx}> a kgsteward:Dataset ; "
+        "kgsteward:triples 999 ; "
+        "kgsteward:modified \"2000-01-01T00:00:00\"^^xsd:dateTime ; "
+        "kgsteward:checksum \"stale\" . }}",
+        echo = True,
+    )
+    assert n_sets() == 2, f"sanity: expected a duplicate stacked set, got {n_sets()}"
+
+    stamp()
+    assert n_sets() == 1, f"DELETE-then-INSERT must collapse duplicates to one set, got {n_sets()}"
+
+    print( "\nupdate_dataset_info idempotent: 0 -> 1 -> 1 -> (dup=2) -> 1 metadata set(s)" )
+
+
+def test_sparql_update_connection_drop_is_reported( qlever_workdir, monkeypatch ):
+    """A server crash mid-update (RemoteDisconnected) must surface as a clear
+    stop_error, not a raw ConnectionError traceback.
+
+    Regression for finding #4: qlever-server OOM-crashes on a heavy INSERT/DELETE
+    materialization, slamming the socket shut.  _do_sparql_update must catch the
+    requests.exceptions.ConnectionError, mark the server not-running, record a
+    CONNECTION_LOST stats row, and stop_error (sys.exit) with actionable guidance
+    -- never let the raw traceback escape.  http_call is monkeypatched so this
+    test does not depend on actually OOM-killing a real server.
+    """
+    import requests
+    from src.kgsteward import qlever as qmod
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+
+    def boom( *a, **k ):
+        raise requests.exceptions.ConnectionError(
+            "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        )
+    monkeypatch.setattr( qmod, "http_call", boom )
+
+    n_before = len( client.sparql_update_stats )
+    with pytest.raises( SystemExit ):
+        client._do_sparql_update(
+            "INSERT DATA { GRAPH <http://x/g> { <http://x/s> <http://x/p> <http://x/o> } }",
+            echo = True,
+        )
+    assert client.is_running is False, "client must mark server stopped after a connection drop"
+    assert len( client.sparql_update_stats ) == n_before + 1, "crash should append one stats row"
+    assert client.sparql_update_stats[-1]["http_status"] == "CONNECTION_LOST"
+    print( "\nconnection drop mid-update -> clean stop_error + CONNECTION_LOST stats row" )
+
+
 def test_drop_context_is_noop_and_invalidate_clears_checkpoint( qlever_workdir ):
     """drop_context is intentionally a no-op for qlever — verify its documented
     semantics, and that invalidate_checkpoint is the real removal path.
@@ -133,3 +239,94 @@ def test_drop_context_is_noop_and_invalidate_clears_checkpoint( qlever_workdir )
     client.invalidate_checkpoint( ctx )
     assert not client.has_checkpoint( ctx ), "checkpoint should be gone after invalidate"
     print( f"\ndrop_context no-op (data stays at {n_after_noop} triples) + checkpoint invalidated" )
+
+
+def test_scoped_index_then_complete_index( qlever_workdir ):
+    """index_scope restricts an incremental rebuild to a subset of checkpoints
+    (partial index); complete_index() reassembles ALL checkpoints (full index).
+
+    Build three independent graphs A, B, C, each with its own checkpoint.  Then
+    rebuild with index_scope = {A, B}: the served index must contain A and B but
+    NOT C — even though C's checkpoint stays on disk.  Finally complete_index()
+    rebuilds from every checkpoint, so C becomes queryable again.
+
+    Self-contained: starts from a clean rewrite_repository, so it does not
+    depend on (and is not depended on by) the foaf graph the earlier tests use.
+    Placed just before the wipe test, which it leaves a fresh index for.
+    """
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+    foaf_rdf   = os.path.join( env["KGSTEWARD_ROOT_DIR"], "doc/first_steps/foaf.rdf" )
+    assert os.path.isfile( foaf_rdf ), f"Test data not found: {foaf_rdf}"
+
+    ctxA = "http://example.org/context/scope_A"
+    ctxB = "http://example.org/context/scope_B"
+    ctxC = "http://example.org/context/scope_C"
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+    client.rewrite_repository( echo = True )   # clean slate
+
+    # Build an unscoped checkpoint for each graph (same source bytes, distinct
+    # graph IRI is all we need to tell them apart in the index).
+    for ctx in ( ctxA, ctxB, ctxC ):
+        client.load_from_file( foaf_rdf, ctx, echo = True )
+        client.mark_rebuild( ctx )
+        client.server_start( echo = True )     # _finalize_index (scope None) + dump
+        assert client.has_checkpoint( ctx ), f"checkpoint should exist for {ctx}"
+
+    def graphs_in_index():
+        r = client.sparql_query( "SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }", echo = False )
+        return { b["g"]["value"] for b in r.json()["results"]["bindings"] }
+
+    assert { ctxA, ctxB, ctxC } <= graphs_in_index(), "all three graphs present after unscoped builds"
+
+    # Scoped rebuild: restrict to {A, B}.  Re-stage A so pending_files is
+    # non-empty and server_start triggers _finalize_index under the scope.
+    client.index_scope = { ctxA, ctxB }
+    client.load_from_file( foaf_rdf, ctxA, echo = True )
+    client.mark_rebuild( ctxA )
+    client.server_start( echo = True )
+
+    g = graphs_in_index()
+    assert ctxA in g and ctxB in g, f"scoped index must keep A and B; got {sorted(g)}"
+    assert ctxC not in g, f"scoped index must EXCLUDE out-of-scope C; got {sorted(g)}"
+    assert client.has_checkpoint( ctxC ), "C's checkpoint must remain on disk, only excluded from the index"
+
+    # complete_index ignores index_scope and reassembles every checkpoint.
+    client.complete_index( echo = True )
+    g = graphs_in_index()
+    assert { ctxA, ctxB, ctxC } <= g, f"complete_index must restore all graphs; got {sorted(g)}"
+    print( "\nscoped rebuild excluded C; complete_index restored A, B, C" )
+
+
+def test_rewrite_repository_full_wipe( qlever_workdir ):
+    """rewrite_repository must wipe EVERYTHING qlever or kgsteward owns.
+
+    Runs last in the module so we can verify against the populated state
+    that test_index_rdf_file produced.  After the call the qleverdir
+    should contain nothing but the freshly-copied Qleverfile, and the
+    server should be stopped.
+    """
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+
+    # Sanity: prior tests left an on-disk index behind.
+    files_before = set( os.listdir( qleverdir ) )
+    assert any( f.startswith( "first_steps.index." ) for f in files_before ), (
+        f"sanity: expected first_steps.index.* before wipe; got {sorted(files_before)}"
+    )
+
+    client.rewrite_repository( echo = True )
+
+    files_after = set( os.listdir( qleverdir ) )
+    assert files_after == { "Qleverfile" }, (
+        f"rewrite_repository left junk behind: {sorted(files_after - {'Qleverfile'})}"
+    )
+    assert not client.is_running, "Server should be stopped after rewrite_repository"
+    print( f"\nrewrite_repository: {len(files_before)} files → {len(files_after)} (only Qleverfile remains)" )

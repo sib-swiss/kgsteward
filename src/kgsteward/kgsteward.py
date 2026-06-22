@@ -189,14 +189,15 @@ def get_user_input():
                "bootstrapped from the bulk dump and normal -C/-d operations work as usual."
     )
     parser.add_argument(
-        '--qlever_build_text_indexes',
+        '--qlever_complete',
         action = 'store_true',
-        help = "(qlever only) Build the qlever text index once at the end of the session, "
-               "using the TEXT_INDEX value from the Qleverfile.  Per-dataset rebuilds always "
-               "skip the text index (rebuilding it N times for N datasets is wasteful), so "
-               "this flag is the only way to get a text index from kgsteward.  Without it, "
-               "the text index is simply absent — the main triple index works fine for "
-               "everything except `?x ql:contains-word ...` queries."
+        help = "(qlever only) At the end of the session, assemble the COMPLETE index from "
+               "all on-disk checkpoints and build the text index if TEXT_INDEX is set in the "
+               "Qleverfile.  Incremental runs (-C/-d) only rebuild the dependency closure of "
+               "the datasets they touch, so the served index may be partial; --qlever_complete "
+               "is the only run that guarantees a complete, queryable, text-indexed server. "
+               "Without it the text index is absent (the main triple index works fine for "
+               "everything except `?x ql:contains-word ...` queries)."
     )
     parser.add_argument(
         '--sparql_update_stats',
@@ -380,11 +381,26 @@ WHERE{
     return config
 
 def update_dataset_info( server, config, name, echo = True ) :
+    """Re-stamp the kgsteward:Dataset metadata for *name*.
+
+    Issued as a single DELETE-then-INSERT update so that calling this twice
+    against the same context replaces the metadata cleanly instead of
+    accumulating duplicate sets (the previous INSERT-only form left pept_cluster
+    with 8 metadata triples = 2 stacked sets after two -C runs).
+    """
     context = name2context[ name ]
     sha256 = get_sha256( config, name, echo = echo )
     server.sparql_update( f"""
 PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>
 
+DELETE {{
+    GRAPH <{context}> {{
+        <{context}> a kgsteward:Dataset ;
+            kgsteward:triples  ?old_c   ;
+            kgsteward:modified ?old_t   ;
+            kgsteward:checksum ?old_sha .
+    }}
+}}
 INSERT {{
     GRAPH <{context}> {{
         <{context}> a kgsteward:Dataset ;
@@ -394,12 +410,20 @@ INSERT {{
     }}
 }}
 WHERE {{
-    GRAPH <{context}> {{
+    OPTIONAL {{
+        GRAPH <{context}> {{
+            <{context}> a kgsteward:Dataset ;
+                kgsteward:triples  ?old_c   ;
+                kgsteward:modified ?old_t   ;
+                kgsteward:checksum ?old_sha .
+        }}
+    }}
+    {{
         SELECT
             ( COUNT( * ) AS ?c )
             ( NOW() AS ?now )
         WHERE {{
-            ?s ?p ?o
+            GRAPH <{context}> {{ ?s ?p ?o }}
         }}
     }}
 }}
@@ -546,11 +570,10 @@ def main():
         dumped = server.upload_quad_and_dump_checkpoints( name2context, echo = args.v )
         report( "checkpoints created", len( dumped ) )
 
-    if args.qlever_build_text_indexes and config["server"]["brand"] != "qlever":
-        stop_error( "--qlever_build_text_indexes is only valid for the qlever backend" )
-    # (No early action needed — per-dataset rebuilds *always* skip the text
-    # index now; --qlever_build_text_indexes only triggers the one-shot
-    # build_text_index() call at the session end.)
+    if args.qlever_complete and config["server"]["brand"] != "qlever":
+        stop_error( "--qlever_complete is only valid for the qlever backend" )
+    # (No early action needed — --qlever_complete only triggers the one-shot
+    # complete_index() call at the session end.)
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
@@ -586,6 +609,36 @@ def main():
                 target = get_target( config, name )
                 if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
                     rdf_graph_to_update.add( name )
+
+    # --------------------------------------------------------- #
+    # For qlever: restrict incremental index rebuilds to the dependency
+    # closure of the datasets being processed (the update set plus all
+    # their transitive parents).  Untouched, unrelated datasets keep their
+    # checkpoints on disk but are left out of the rebuilt index -- so the
+    # served index may be partial until a --qlever_complete run reassembles
+    # everything.  This avoids re-reading every checkpoint on each rebuild.
+    # --------------------------------------------------------- #
+    if config["server"]["brand"] == "qlever" and rdf_graph_to_update :
+        parents_of = { t["name"]: list( t.get( "parent", [] ) or [] ) for t in config["dataset"] }
+        scope = set()
+        stack = list( rdf_graph_to_update )
+        while stack :
+            n = stack.pop()
+            if n in scope :
+                continue
+            scope.add( n )
+            stack.extend( parents_of.get( n, [] ) )
+        # A required parent that is NOT being processed this run must already
+        # have a checkpoint, otherwise the scoped index would silently miss
+        # data that the updates query.
+        for n in scope :
+            if n not in rdf_graph_to_update and not server.has_checkpoint( name2context[ n ] ) :
+                stop_error(
+                    "Dataset '" + n + "' is a required parent in the dependency scope but has "
+                    "no checkpoint. Include it in the run (e.g. add it to -d) or build it first."
+                )
+        server.index_scope = { name2context[ n ] for n in scope }
+        report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
@@ -787,13 +840,13 @@ INSERT DATA {{
         server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #
-    # For qlever: build the text index once at the session end,
-    # if deferral was requested via --qlever_build_text_indexes.
+    # For qlever: assemble the complete index from all checkpoints
+    # (plus the text index, if configured) when --qlever_complete is set.
     # --------------------------------------------------------- #
-    if args.qlever_build_text_indexes and config["server"]["brand"] == "qlever":
+    if args.qlever_complete and config["server"]["brand"] == "qlever":
         print_break()
-        print_task( "Build qlever text index (deferred from per-dataset rebuilds)" )
-        server.build_text_index( echo = args.v )
+        print_task( "Assemble complete qlever index (all checkpoints + text index)" )
+        server.complete_index( echo = args.v )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -817,12 +870,38 @@ INSERT DATA {{
             
 
     # --------------------------------------------------------- #
-    # Force update dataset info
+    # Force update dataset info -- re-stamp the kgsteward:Dataset
+    # metadata (triples count, modified, checksum) for every dataset
+    # WITHOUT reloading the source data.  Useful when checkpoints exist
+    # but their metadata is missing or stale (e.g. checkpoints produced
+    # by a kgsteward version that had the metadata-loss bug, or after a
+    # bulk adoption via --qlever_upload_quad_and_dump_checkpoints).
+    #
+    # For qlever, each refresh also queues a mark_rebuild sentinel so
+    # the final server_start flushes all the INSERTs against the
+    # running index AND dumps a fresh .nt.gz for every refreshed
+    # context -- otherwise the in-memory metadata would be lost at the
+    # next index rebuild.
     # --------------------------------------------------------- #
 
     if args.U :
+        is_qlever = config["server"]["brand"] == "qlever"
         for target in config["dataset"] :
-            update_dataset_info( target )
+            name = target["name"]
+            if is_qlever and not server.has_checkpoint( name2context[ name ] ):
+                # Nothing to re-stamp -- the data isn't in any checkpoint, so
+                # any metadata we insert would be wiped by the next rebuild.
+                print_warn( f"-U: skipping '{name}' (no checkpoint on disk)" )
+                continue
+            print_break()
+            print_task( "Refresh dataset info: " + name )
+            update_dataset_info( server, config, name, echo = args.v )
+            if is_qlever:
+                server.mark_rebuild( name2context[ name ] )
+        if is_qlever and server.pending_updates:
+            print_break()
+            print_task( "Flush metadata updates and re-dump checkpoints" )
+            server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #
     # Run all validation tests

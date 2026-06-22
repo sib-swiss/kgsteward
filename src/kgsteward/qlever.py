@@ -51,8 +51,8 @@ checkpoint intact.
 ``--text-index none`` (rebuilding a multi-GB text index N times for N
 datasets is wasteful), and ``qlever start`` is invoked with
 ``--use-text-index no`` so the server doesn't try to load text files
-that aren't there.  ``build_text_index()`` runs ``qlever add-text-index``
-once at session end iff ``--qlever_build_text_indexes`` was passed.
+that aren't there.  ``complete_index()`` runs ``qlever add-text-index``
+once at session end iff ``--qlever_complete`` was passed.
 
 **Update timeout disabled.**  Every ``sparql_update`` sends
 ``timeout=999999s`` along with the access token, overriding the
@@ -72,6 +72,7 @@ import hashlib
 import json
 import os
 import re
+import requests
 import shutil
 import subprocess
 import tempfile
@@ -118,6 +119,34 @@ def _qlever_fmt( filename ):
     name = filename.lower()
     if name.endswith( ".gz" ): name = name[ :-3 ]
     return _QLEVER_NATIVE.get( os.path.splitext( name )[1] )
+
+
+def _ttl_has_multiline_literal( path ):
+    """Cheap scan: does *path* (.ttl or .ttl.gz) contain a triple-quoted literal?
+
+    qlever's parallel parser splits on newlines and chokes on ``\"\"\"...\"\"\"``
+    or ``'''...'''`` literals with::
+
+        Parse error at byte position N: Found a multiline string literal
+        with the parallel parser. This is not supported.
+
+    Scanning the file once at staging time is much cheaper than retrying the
+    full index build after a parser crash, and lets us safely keep
+    ``parallel: true`` for the vast majority of TTL inputs that have no such
+    literals (or only carry them in comments -- a false positive there just
+    falls back to sequential parsing, the data still loads correctly).
+    """
+    opener = gzip.open if path.lower().endswith( ".gz" ) else open
+    with opener( path, "rb" ) as f:
+        carry = b""
+        while True:
+            buf = f.read( 1 << 20 )   # 1 MiB
+            if not buf:
+                return False
+            window = carry + buf
+            if b'"""' in window or b"'''" in window:
+                return True
+            carry = buf[-2:]   # so a triple-quote straddling a 1 MiB boundary still matches
 
 
 def parse_qleverfile( qleverfile ):
@@ -183,6 +212,11 @@ class QleverClient( GenericClient ):
         # SPARQL updates queued for the next _apply_pending_updates flush;
         # may include (context_iri,) sentinels from mark_rebuild().
         self.pending_updates = []
+        # Optional set of context IRIs that incremental _finalize_index rebuilds
+        # are restricted to (the dependency closure of the datasets being
+        # processed).  None means "include every checkpoint" (the full index).
+        # complete_index() ignores this and always assembles all checkpoints.
+        self.index_scope     = None
         # True iff build_text_index() has just produced a current text index
         # on disk and the next server start should load it.  _finalize_index
         # always resets this to False.
@@ -369,20 +403,32 @@ class QleverClient( GenericClient ):
         with open( void_path, "w" ) as vf:
             vf.write( f"<{context_iri}> <http://rdfs.org/ns/void#dataDump> <{actual_void_iri}> .\n" )
 
+        # ``"parallel"`` is set per-input (top-level PARALLEL_PARSING does NOT
+        # propagate through MULTI_INPUT_JSON) and must be the string "true"
+        # or "false" (qlever-control compares with == "true").
+        #
+        # parallel="true" is unsafe for .ttl files containing triple-quoted
+        # multiline string literals -- a single scan via _ttl_has_multiline_literal
+        # picks them out at staging time so most TTL files still parse in
+        # parallel.  .nt cannot have them by spec; riot-converted files come out
+        # as .nt; the void file we emit ourselves is single-line .nt -- all safe.
+        if fmt == "ttl" and _ttl_has_multiline_literal( src ):
+            data_parallel = "false"
+            report( "multiline literal", f"disabling parallel parsing for {os.path.basename(src)}" )
+        else:
+            data_parallel = "true"
+
         report( "staged", f"input/{dest_name}  (+ void triple)" )
-        # ``"parallel": "true"`` is set per-input — with MULTI_INPUT_JSON,
-        # top-level PARALLEL_PARSING does NOT propagate.  Must be the string
-        # "true", not the Python boolean (qlever-control compares == "true").
         return [
-            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": "true" },
-            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": "true" },
+            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": data_parallel },
+            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": "true"        },
         ]
 
     # ------------------------------------------------------------------ #
     # Index lifecycle
     # ------------------------------------------------------------------ #
 
-    def _collect_checkpoint_entries( self, exclude_iris = None ):
+    def _collect_checkpoint_entries( self, exclude_iris = None, include_iris = None ):
         """MULTI_INPUT_JSON entries for every completed checkpoint in qleverdir.
 
         Reads ``*.nt.gz.json`` sidecar files (the atomic completeness marker),
@@ -393,8 +439,13 @@ class QleverClient( GenericClient ):
         are already in ``pending_files``).  The stale checkpoint stays on
         disk and is overwritten atomically by the subsequent
         ``dump_checkpoint``.
+
+        *include_iris*: optional set of context IRIs to restrict to (the
+        dependency-closure scope of an incremental run).  ``None`` means no
+        restriction — every checkpoint is included (the full index).
         """
         exclude = set( exclude_iris ) if exclude_iris else set()
+        include = set( include_iris ) if include_iris is not None else None
         entries = []
         for sidecar in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
             try:
@@ -407,6 +458,9 @@ class QleverClient( GenericClient ):
             fname = os.path.basename( sidecar[ :-5 ] )   # strip ".json"
             if context_iri in exclude:
                 report( "checkpoint superseded by pending data", fname )
+                continue
+            if include is not None and context_iri not in include:
+                report( "checkpoint outside index scope (skipped)", fname )
                 continue
             entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": "true" } )
             report( "checkpoint → index", fname )
@@ -449,7 +503,9 @@ class QleverClient( GenericClient ):
         # stale checkpoints must be excluded so we don't load old + new for
         # the same graph.
         pending_iris       = { e["graph"] for e in self.pending_files }
-        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris )
+        # Restrict to the dependency-closure scope of this run (if set); the
+        # pending files (the dataset(s) being processed) are always included.
+        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris, include_iris = self.index_scope )
         all_entries        = checkpoint_entries + self.pending_files
 
         if not all_entries:
@@ -476,7 +532,7 @@ class QleverClient( GenericClient ):
                 "Qleverfile has TEXT_INDEX = " + self.user_text_index
                 + " but per-dataset rebuild will skip it (`qlever index --text-index none`)"
                 + extra
-                + ". Pass --qlever_build_text_indexes to (re)build it once at the session end."
+                + ". Pass --qlever_complete to (re)build it once at the session end."
             )
         self._has_current_text_index = False
 
@@ -575,6 +631,38 @@ class QleverClient( GenericClient ):
         )
         # Text index now on disk — restart so the server loads it.
         self._has_current_text_index = True
+        self._qlever( *self._start_args(), echo = echo )
+        self.is_running = True
+
+    def complete_index( self, echo = True ):
+        """Assemble the complete index from ALL checkpoints, plus the text index.
+
+        Unlike the incremental ``_finalize_index`` (which may be restricted to a
+        dependency-closure ``index_scope`` and always skips the text index),
+        this ignores ``index_scope``, includes *every* on-disk checkpoint, and
+        -- if the user's Qleverfile sets ``TEXT_INDEX`` -- builds the text index
+        too.  This is the only path that guarantees a complete, queryable,
+        text-indexed server.
+        """
+        entries = self._collect_checkpoint_entries()   # all checkpoints, full scope
+        if not entries:
+            stop_error( "--qlever_complete: no checkpoints found to assemble into an index." )
+        print_task( "Assemble complete qlever index from all checkpoints" )
+        self._patch_qleverfile( entries )
+        if self.is_running:
+            self.server_stop( echo = echo )
+        # Wipe stale text-index files so they cannot mismatch the rebuilt main index.
+        for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
+            os.remove( f )
+            report( "wiped stale text index", os.path.basename( f ) )
+        self._has_current_text_index = False
+        self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
+        self._abort_if_index_log_has_error()
+        if self.user_text_index and self.user_text_index.lower() != "none":
+            self._qlever( "add-text-index", "--text-index", self.user_text_index, "--overwrite-existing", echo = echo )
+            self._has_current_text_index = True
+        else:
+            print_warn( "Qleverfile has TEXT_INDEX = none — building complete index without a text index" )
         self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
 
@@ -700,17 +788,59 @@ class QleverClient( GenericClient ):
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         self._sparql_update_counter += 1
+        sha = hashlib.sha1( sparql.encode() ).hexdigest()[:8]
         t_start = time.time()
-        r = http_call(
-            { 'method': 'POST', 'url': self.endpoint_query,
-              'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
-              'data': {
-                  'update':       sparql,
-                  'access-token': self.access_token,
-                  'timeout':      '999999s',
-              } },
-            status_code_ok, echo,
-        )
+        try:
+            r = http_call(
+                { 'method': 'POST', 'url': self.endpoint_query,
+                  'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  'data': {
+                      'update':       sparql,
+                      'access-token': self.access_token,
+                      'timeout':      '999999s',
+                  } },
+                status_code_ok, echo,
+            )
+        except requests.exceptions.ConnectionError as exc:
+            # The server slammed the socket shut without sending an HTTP response.
+            # This is NOT a SPARQL error -- those come back as HTTP 200 with a
+            # body status of "ERROR".  It means the qlever-server *process* died
+            # mid-update, almost always an out-of-memory kill while materializing
+            # the INSERT/DELETE result.  MEMORY_FOR_QUERIES bounds queries, NOT
+            # update materialization, so lowering it does not prevent this.
+            #
+            # A retry is unsafe: qlever updates live in an in-memory delta, so a
+            # crash (and the docker auto-restart that follows) discards the delta
+            # from THIS dataset's earlier updates too -- replaying just this one
+            # against the restarted server would build inconsistent data.  Fail
+            # loudly instead; transactional checkpoints keep prior datasets safe.
+            self.is_running = False
+            self.sparql_update_stats.append( {
+                "n":               self._sparql_update_counter,
+                "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
+                "elapsed_ms":      int( ( time.time() - t_start ) * 1000 ),
+                "qlever_total_ms": None,
+                "http_status":     "CONNECTION_LOST",
+                "size_chars":      len( sparql ),
+                "sha1_8":          sha,
+                "first_line":      _first_meaningful_sparql_line( sparql ),
+                "error":           "server closed connection mid-update (likely OOM crash)",
+            } )
+            stop_error(
+                "qlever server closed the connection without responding while applying "
+                f"SPARQL update #{self._sparql_update_counter} "
+                f"(sha1 {sha}, {len( sparql )} chars):\n"
+                f"    {_first_meaningful_sparql_line( sparql )}\n"
+                "The server process crashed mid-update -- this is a hard crash, not a SPARQL "
+                "error, and is almost always an out-of-memory kill: the INSERT/DELETE result "
+                "materialization exceeded available RAM.  Note MEMORY_FOR_QUERIES limits queries, "
+                "NOT update materialization, so lowering it does not help.\n"
+                "  -> give Docker more RAM, or split/simplify this update so its intermediate "
+                "result is smaller;\n"
+                "  -> checkpoints are transactional, so already-loaded datasets are intact; this "
+                "dataset has no checkpoint and will be reprocessed on the next run.\n"
+                f"  -> underlying error: {exc}"
+            )
         elapsed_ms = int( ( time.time() - t_start ) * 1000 )
 
         # Best-effort extraction of qlever's server-side timing + error.
@@ -738,7 +868,7 @@ class QleverClient( GenericClient ):
             "qlever_total_ms": qlever_total_ms,
             "http_status":     r.status_code,
             "size_chars":      len( sparql ),
-            "sha1_8":          hashlib.sha1( sparql.encode() ).hexdigest()[:8],
+            "sha1_8":          sha,
             "first_line":      _first_meaningful_sparql_line( sparql ),
             "error":           ( qlever_error[:200] if qlever_error else "" ),
         } )
@@ -859,29 +989,75 @@ class QleverClient( GenericClient ):
     # ------------------------------------------------------------------ #
 
     def rewrite_repository( self, _server_config_filename = None, echo = True ):
-        """Wipe the qleverdir state (input/, checkpoints, sidecars) and re-copy the user's Qleverfile.
+        """Full reset of qleverdir: stop server, wipe everything kgsteward and qlever own, restore Qleverfile.
 
-        *_server_config_filename* is part of the cross-backend ``rewrite_repository``
-        signature (GraphDB etc. use it for their own config file); qlever has no
-        such config file, so the argument is accepted and ignored.
+        After this returns the qleverdir contains only the freshly-copied
+        Qleverfile.  The next ``_finalize_index`` rebuilds the index from
+        scratch -- which, immediately after ``-I``, means rebuilding from
+        whatever new datasets get staged (no checkpoints survived).
+
+        What gets removed:
+
+          - the running server (Docker container or native process)
+          - ``input/``                           transient staging area
+          - ``*.nt.gz``                          kgsteward checkpoints
+          - ``*.nt.gz.json``                     atomic-completion sidecars
+          - ``<NAME>.index.*``                   main index permutations
+          - ``<NAME>.internal.index.*``          ql:has-pattern internal index
+          - ``<NAME>.text.*``                    optional text index files
+          - ``<NAME>.vocabulary.*``              external on-disk vocabulary
+          - ``<NAME>.meta-data.json``            server bootstrap metadata
+          - ``<NAME>.settings.json``             parsed SETTINGS_JSON
+          - ``<NAME>.index-log.txt``             last index build log
+          - ``<NAME>.server-log.txt``            last server start log
+          - ``previous.*`` / ``rebuild.*``       leftover rebuild-index snapshots
+
+        *_server_config_filename* is accepted for cross-backend signature
+        parity (GraphDB et al. recreate the repository from a config file);
+        qlever has nothing equivalent, so the argument is ignored.
         """
+        if self.is_running:
+            self.server_stop( echo = echo )
+
+        # Transient staging area
         input_dir = os.path.join( self.qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
             report( "wiped", input_dir )
-        for ckpt in glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ):
-            os.remove( ckpt )
-            report( "wiped checkpoint", os.path.basename( ckpt ) )
-        for sidecar in glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ):
-            os.remove( sidecar )
-            report( "wiped checkpoint sidecar", os.path.basename( sidecar ) )
+
+        # kgsteward-managed checkpoints + their atomic-completion sidecars
+        for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ) ):
+            os.remove( path )
+            report( "wiped checkpoint", os.path.basename( path ) )
+        for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
+            os.remove( path )
+            report( "wiped checkpoint sidecar", os.path.basename( path ) )
+
+        # On-disk qlever index for this repository (everything named <NAME>.*)
+        for path in sorted( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.*" ) ) ):
+            os.remove( path )
+            report( "wiped index file", os.path.basename( path ) )
+
+        # Leftover snapshot directories from a prior `qlever rebuild-index`
+        for path in sorted(
+            glob.glob( os.path.join( self.qleverdir, "previous.*" ) )
+            + glob.glob( os.path.join( self.qleverdir, "rebuild.*" ) )
+        ):
+            if os.path.isdir( path ):
+                shutil.rmtree( path )
+                report( "wiped rebuild dir", os.path.basename( path ) )
+
+        # Restore the user's Qleverfile (verbatim -- _patch_qleverfile will
+        # re-sync + patch when the next _finalize_index runs).
         user_real = os.path.realpath( self.qleverfile )
         dest      = os.path.join( self.qleverdir, "Qleverfile" )
         if user_real != ( os.path.realpath( dest ) if os.path.lexists( dest ) else None ):
             shutil.copy2( user_real, dest )
             report( "copied Qleverfile", dest )
-        self.pending_files   = []
-        self.pending_updates = []
+
+        self.pending_files           = []
+        self.pending_updates         = []
+        self._has_current_text_index = False
 
     def upload_quad_and_dump_checkpoints( self, name2context, echo = True ):
         """Bootstrap a qlever index from a quad dump, verify it, dump per-graph checkpoints.
