@@ -65,8 +65,14 @@ cmd_base = [
     "kgsteward doc/first_steps/graphdb.yaml -Q -v", # validate Queries 
     "rm -rf /tmp/first_steps",
     "mkdir -p /tmp/first_steps",
-    "kgsteward doc/first_steps/graphdb.yaml -x /tmp/first_steps -v", # Serialize query results for testing
-    "diff -r doc/first_steps/ref /tmp/first_steps"
+    "kgsteward doc/first_steps/graphdb.yaml --dump_all_select --dump_dir /tmp/first_steps -v", # Serialize all query results for testing
+    "diff -r doc/first_steps/ref /tmp/first_steps",
+    "rm -rf /tmp/first_steps_ds",
+    "mkdir -p /tmp/first_steps_ds",
+    "kgsteward doc/first_steps/graphdb.yaml --dump_all_dataset --dump_dir /tmp/first_steps_ds -v", # Dump all dataset contents
+    "ls /tmp/first_steps_ds/foaf_data.tsv", # --dump_all_dataset produced the expected file
+    "kgsteward doc/first_steps/graphdb.yaml --dump_dataset foaf_ontology,update_data --dump_dir /tmp/first_steps_ds -v", # Dump a subset by name
+    "ls /tmp/first_steps_ds/update_data.tsv" # --dump_dataset produced the expected file
 ]
 
 cmd_graphdb = [
@@ -84,3 +90,12 @@ def test_run_cmd_graphdb( triplestore , cmd):
     print(res.stdout)
     print(res.stderr)
     assert res.returncode == 0, f"Command failed found:\\n{res.stdout}\\n{res.stderr}"
+
+def test_dump_unknown_dataset_name_errors( triplestore ):
+    """--dump_dataset with an unknown name must abort and report it."""
+    cmd = "kgsteward doc/first_steps/graphdb.yaml --dump_dataset does_not_exist --dump_dir /tmp -v"
+    res = run_cmd( cmd.split( " " ), env )
+    print(res.stdout)
+    print(res.stderr)
+    assert res.returncode != 0, "expected non-zero exit on unknown dataset name"
+    assert "Unknown dataset name(s): does_not_exist" in ( res.stdout + res.stderr )

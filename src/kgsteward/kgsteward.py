@@ -94,20 +94,39 @@ def get_user_input():
         help   = "Run all SPARQL queries. It might be combined with --timeout."
     )
     parser.add_argument(
-        '-x',
-        help   = "Dump all query results in TSV format to dir <X>. "
-                 "Sorting of results is enforced, irrespective of the SPARQL queries. "
-                 "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
-                 "Using this service is useful for debugging, but not meant to retrieve data. " 
-                 "It is possibly slow and memory hungry." 
+        '--dump_dir',
+        metavar = 'DIR',
+        help   = "Output directory for dumps. Required whenever any --dump_* flag is given; "
+                 "must already exist. Each unit is written as DIR/<name>.tsv."
     )
     parser.add_argument(
-        '-y',
-        help   = "Dump all context data in TSV format to dir <Y>. "                 
-                 "Sorting of results is enforced, irrespective of the SPARQL queries. "
-                 "The results are amended to facilitate the comparison of different server output, e.g. using diff. "
-                 "Using this service is useful for debugging, but not meant to retrieve data. " 
-                 "It is possibly slow and memory hungry." 
+        '--dump_all_dataset',
+        action = 'store_true',
+        help   = "Dump the contents of ALL datasets, one sorted TSV per dataset, into --dump_dir. "
+                 "Sorting is enforced irrespective of triple order so dumps from different servers "
+                 "can be compared with diff. Useful for debugging, not meant to retrieve data; "
+                 "possibly slow and memory hungry. Mutually exclusive with --dump_dataset."
+    )
+    parser.add_argument(
+        '--dump_dataset',
+        metavar = 'NAMES',
+        help   = "As --dump_all_dataset, but limited to a comma-separated list of dataset names "
+                 "(e.g. --dump_dataset SLR_test,RHEA_MNet). Unknown names are an error. "
+                 "Mutually exclusive with --dump_all_dataset."
+    )
+    parser.add_argument(
+        '--dump_all_select',
+        action = 'store_true',
+        help   = "Run ALL configured SPARQL SELECT queries and dump each result as a sorted TSV "
+                 "into --dump_dir. Same sorting/comparison semantics as --dump_all_dataset. "
+                 "Mutually exclusive with --dump_select."
+    )
+    parser.add_argument(
+        '--dump_select',
+        metavar = 'NAMES',
+        help   = "As --dump_all_select, but limited to a comma-separated list of query names "
+                 "(the query-file basenames, e.g. --dump_select all_triples_stable). "
+                 "Unknown names are an error. Mutually exclusive with --dump_all_select."
     )
     parser.add_argument(
         '-v',
@@ -551,11 +570,7 @@ def main():
     if args.D :
         rdf_graph_to_update = rdf_graph_all
     elif args.d : # status not checked here
-        for name in args.d.split( "," ) :
-            if name in rdf_graph_all :
-                rdf_graph_to_update.add( name )
-            else :
-                raise stop_error( "Invalid name: " + name )
+        rdf_graph_to_update.update( resolve_names( args.d, rdf_graph_all, "dataset" ))
     elif args.C :
         if config["server"]["brand"] == "qlever" and not server.is_running :
             # qlever server is stopped (e.g. after a crash). The SPARQL status query
@@ -1002,49 +1017,57 @@ INSERT DATA {{
     #     )
     #     sys.exit( 0 )
         
-    if args.x:
+    # --------------------------------------------------------- #
+    # Dump dataset contents and/or SELECT query results as sorted
+    # TSV into --dump_dir, for debugging and cross-server diffing.
+    # --------------------------------------------------------- #
+
+    if any([ args.dump_all_dataset, args.dump_dataset, args.dump_all_select, args.dump_select ]):
+        if not args.dump_dir:
+            stop_error( "--dump_dir is required for any --dump_* option" )
+        if not os.path.isdir( args.dump_dir ):
+            stop_error( "Not a directory: " + args.dump_dir )
+
+    # Datasets (formerly -y)
+    if args.dump_all_dataset or args.dump_dataset:
+        if args.dump_all_dataset and args.dump_dataset:
+            stop_error( "Use either --dump_all_dataset or --dump_dataset, not both" )
+        by_name = { d["name"]: d for d in config["dataset"] }
+        names   = list( by_name ) if args.dump_all_dataset else resolve_names( args.dump_dataset, by_name, "dataset" )
         print_break()
-        print_task( "Serialize query results" )     
+        print_task( "Dump dataset contents in TSV format" )
+        for name in names:
+            print_break()
+            header, rows = server.dump_context( by_name[name]["context"], echo = args.v )
+            write_sorted_tsv( args.dump_dir, name, header, rows )
+
+    # SELECT queries (formerly -x)
+    if args.dump_all_select or args.dump_select:
+        if args.dump_all_select and args.dump_select:
+            stop_error( "Use either --dump_all_select or --dump_select, not both" )
         if "queries" not in config:
-            stop_error( "There are no 'queries' key in config! ")
-        print_break()
-        print_task( "Dump all query results in TSV format" )
-        if not os.path.isdir( args.x ):
-            stop_error( "Not a directory: " + args.x )
-        for record in config["queries"] :
+            stop_error( "There are no 'queries' key in config!" )
+        catalog = {} # query name (file basename) -> file path
+        for record in config["queries"]:
             for path in record["file"]:
                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                     filename = dir + "/" + fn
-                    print_break()
-                    report( "read file", filename )
-                    name    = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                    with open( filename ) as file:
-                        sparql = file.read()
-                    r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
-                    if r is not None: # no timeout, i.e. the data are here
-                        header, rows = sparql_result_to_table( r )
-                        out_path =  args.x + "/" + name + ".tsv"
-                        report( "write file", out_path )
-                        with open( out_path, "w", encoding="utf-8" ) as f:
-                            f.write( "\t".join( header ) + "\n" )
-                            for row in sorted( rows ):
-                                f.write( "\t".join( map( str, row )) + "\n" )
-                    else:
-                        print_warn( "Timeout while executing query: " + filename )
-                        report( "write file", "skipped" )
-    if args.y:
+                    catalog[ re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename ) ] = filename
+        names = list( catalog ) if args.dump_all_select else resolve_names( args.dump_select, catalog, "query" )
         print_break()
-        print_task( "Dump all contexts in TSV format" )
-        if not os.path.isdir( args.y ):
-            stop_error( "Not a directory: " + args.y )
-        for item in config["dataset"]:
+        print_task( "Dump SELECT query results in TSV format" )
+        for name in names:
             print_break()
-            header, rows = server.dump_context( item["context"], echo = args.v )
-            out_path =  args.y + "/" +  item["name"] + ".tsv"
-            report( "write file", out_path )
-            with open( out_path, "w", encoding="utf-8"  ) as f:
-                for row in sorted( rows ):
-                    f.write( "\t".join( map( str, row )) + "\n" )
+            report( "read file", catalog[name] )
+            with open( catalog[name] ) as file:
+                sparql = file.read()
+            r = server.sparql_query( sparql, echo = args.v, timeout = args.timeout )
+            if r is None: # timeout
+                print_warn( "Timeout while executing query: " + catalog[name] )
+                report( "write file", "skipped" )
+                continue
+            header, rows = sparql_result_to_table( r )
+            write_sorted_tsv( args.dump_dir, name, header, rows )
 
     # --------------------------------------------------------- #
     # Turn free access ON

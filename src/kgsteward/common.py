@@ -200,6 +200,33 @@ def run_system_cmd( cmd, echo = True, **kwargs ):
         print( colored( cmd_str, "cyan" ), flush = True )
     return subprocess.run( cmd, **kwargs )
 
+def write_sorted_tsv( out_dir, name, header, rows ):
+    """Write (header, rows) as a sorted TSV to <out_dir>/<name>.tsv.
+
+    Sorting is enforced irrespective of the source order so that dumps from
+    different servers can be compared with diff. The header line is always
+    written, making the output self-describing.
+    """
+    out_path = os.path.join( out_dir, name + ".tsv" )
+    report( "write file", out_path )
+    with open( out_path, "w", encoding="utf-8" ) as f:
+        f.write( "\t".join( header ) + "\n" )
+        for row in sorted( rows ):
+            f.write( "\t".join( map( str, row )) + "\n" )
+
+def resolve_names( arg, catalog, kind ):
+    """Split a comma-separated CLI selection and validate it against a catalog.
+
+    <catalog> is any membership-testable container of valid names (set, dict
+    keys, list). Returns the requested names in order; aborts with stop_error
+    listing every name that is not in <catalog>.
+    """
+    wanted  = [ n.strip() for n in arg.split( "," ) if n.strip() ]
+    missing = [ n for n in wanted if n not in catalog ]
+    if missing:
+        stop_error( "Unknown " + kind + " name(s): " + ", ".join( missing ))
+    return wanted
+
 def print_break():
     print( '# ----------------------------------------------------------------------------')
 
