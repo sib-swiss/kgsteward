@@ -95,6 +95,44 @@ def test_index_rdf_file( qlever_workdir ):
     print( f"\nfoaf.rdf indexed: {n} triples; checkpoint saved" )
 
 
+def test_checkpoint_sha256_currency( qlever_workdir ):
+    """has_checkpoint is currency-aware: the sha256 recorded in the sidecar must
+    match the one supplied, so the stopped-server -C resume can tell an
+    up-to-date checkpoint from a stale one.  A None sha (or a legacy sidecar
+    written before the field existed) falls back to presence-only."""
+    import json
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+    foaf_rdf   = os.path.join( env["KGSTEWARD_ROOT_DIR"], "doc/first_steps/foaf.rdf" )
+    ctx = "http://example.org/context/foaf_ontology"
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+    client.rewrite_repository( echo = True )
+    client.load_from_file( foaf_rdf, ctx, echo = True )
+    client.mark_rebuild( ctx, "sha-CURRENT" )   # checksum carried into the sidecar
+    client.server_start( echo = True )
+
+    # the supplied checksum lands in the sidecar alongside the graph IRI
+    sidecar = client.checkpoint_path( ctx ) + ".json"
+    with open( sidecar ) as f:
+        meta = json.load( f )
+    assert meta["graph"]  == ctx
+    assert meta["sha256"] == "sha-CURRENT"
+
+    # currency-aware matching
+    assert     client.has_checkpoint( ctx, "sha-CURRENT" ), "matching checksum -> current"
+    assert not client.has_checkpoint( ctx, "sha-STALE"   ), "different checksum -> stale"
+    assert     client.has_checkpoint( ctx ),                "no checksum supplied -> presence-only"
+
+    # legacy sidecar without a sha256 field -> accepted on presence
+    meta.pop( "sha256" )
+    with open( sidecar, "w" ) as f:
+        json.dump( meta, f )
+    assert client.has_checkpoint( ctx, "sha-anything" ), "legacy sidecar (no sha) -> accept on presence"
+
+
 def test_update_dataset_info_idempotent( qlever_workdir, monkeypatch ):
     """update_dataset_info must converge to EXACTLY ONE kgsteward:Dataset metadata
     set, no matter how many times it runs or what stale state it starts from.

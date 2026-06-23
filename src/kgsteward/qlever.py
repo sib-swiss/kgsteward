@@ -241,6 +241,21 @@ class QleverClient( GenericClient ):
             self.is_running = False
         report( "qlever server", "running" if self.is_running else "stopped" )
 
+        # A leftover server container from a previous crash/kill stays in an
+        # exited state and makes the next `qlever start` fail with a cryptic
+        # "container name already in use" docker conflict.  Fail fast with an
+        # actionable message instead.
+        if not self.is_running:
+            stale = self._stale_server_container()
+            if stale:
+                stop_error(
+                    "Leftover qlever server container '" + stale + "' exists but is not "
+                    "serving\n(most likely from a previous crash or `docker kill`). A new "
+                    "`qlever start`\nwould fail with a 'container name already in use' conflict.\n"
+                    "Remove the stale container, then re-run kgsteward:\n"
+                    "    " + self.system + " rm -f " + stale
+                )
+
     @property
     def has_index( self ):
         """True iff a qlever index exists in qleverdir (i.e. ``qlever index`` ran at least once)."""
@@ -250,10 +265,43 @@ class QleverClient( GenericClient ):
     # Low-level invocation helpers
     # ------------------------------------------------------------------ #
 
+    def _stale_server_container( self ):
+        """Return the name of a leftover, non-serving qlever server container, or None.
+
+        qlever-control names its container ``qlever.server.<NAME>``.  After a crash
+        or ``docker kill`` the container lingers in an *exited* state and the next
+        ``qlever start`` fails with a cryptic ``container name ... already in use``
+        (``docker run --name`` refuses to reuse the name).  Only meaningful for
+        docker/podman; returns None for native.
+        """
+        if self.system not in ( "docker", "podman" ):
+            return None
+        name = "qlever.server." + self.repository
+        r = run_system_cmd(
+            [ self.system, "ps", "-a", "--filter", "name=" + name, "--format", "{{.Names}}" ],
+            echo = False, capture_output = True, text = True,
+        )
+        if r.returncode == 0 and name in r.stdout.split():
+            return name
+        return None
+
     def _qlever( self, *args, echo = True ):
-        """Run a qlever CLI sub-command in qleverdir; stop_error on non-zero exit."""
-        r = run_system_cmd( self.qlever_cmd + list( args ), echo = echo, cwd = self.qleverdir )
+        """Run a qlever CLI sub-command in qleverdir; stop_error on non-zero exit.
+
+        With echo (``-v``) the child's stdout/stderr stream live to the terminal
+        -- useful for watching index builds and debugging.  Without it the output
+        is captured and printed only if the command fails, keeping normal runs
+        quiet like the HTTP drivers (whose verbosity is gated the same way).
+        """
+        if echo:
+            r = run_system_cmd( self.qlever_cmd + list( args ), echo = True, cwd = self.qleverdir )
+        else:
+            r = run_system_cmd( self.qlever_cmd + list( args ), echo = False, cwd = self.qleverdir,
+                                capture_output = True, text = True )
         if r.returncode != 0:
+            if not echo:
+                if r.stdout: print( r.stdout, flush = True )
+                if r.stderr: print( r.stderr, flush = True )
             stop_error( f"qlever {args[0]} failed" )
         return r
 
@@ -388,9 +436,16 @@ class QleverClient( GenericClient ):
                     + " ".join( riot_cmd ) + f" > {dest_path}",
                     "cyan",
                 ), flush = True )
+            # stdout always goes to the .nt file; capture stderr when quiet so a
+            # successful conversion stays silent but a failure can still be shown.
             with open( dest_path, "wb" ) as nt_out:
-                riot = subprocess.run( riot_cmd, stdout = nt_out, env = riot_env )
+                riot = subprocess.run(
+                    riot_cmd, stdout = nt_out, env = riot_env,
+                    stderr = None if echo else subprocess.PIPE, text = True,
+                )
             if riot.returncode != 0:
+                if not echo and riot.stderr:
+                    print( riot.stderr, flush = True )
                 stop_error( f"riot conversion failed for: {src}" )
             fmt, cmd = "nt", f"cat input/{dest_name}"
             report( "staged (riot→nt)", dest_path )
@@ -553,11 +608,11 @@ class QleverClient( GenericClient ):
         """Replay every queued SPARQL update; dump a checkpoint at each sentinel.
 
         ``pending_updates`` is a list of SPARQL strings interleaved with
-        ``(context_iri,)`` sentinels from ``mark_rebuild()``.  Each sentinel
-        triggers ``dump_checkpoint(context_iri)``, whose CONSTRUCT query
-        against the running server transparently merges the on-disk index
-        with the in-memory delta produced by the preceding updates — so the
-        new ``.nt.gz`` captures the complete post-update state.
+        ``(context_iri, sha256)`` sentinels from ``mark_rebuild()``.  Each
+        sentinel triggers ``dump_checkpoint(context_iri, sha256)``, whose
+        CONSTRUCT query against the running server transparently merges the
+        on-disk index with the in-memory delta produced by the preceding
+        updates — so the new ``.nt.gz`` captures the complete post-update state.
         """
         if not self.pending_updates:
             return
@@ -566,8 +621,9 @@ class QleverClient( GenericClient ):
         for item in self.pending_updates:
             if isinstance( item, tuple ):
                 context_iri = item[0]
+                sha256      = item[1] if len( item ) > 1 else None
                 if context_iri:
-                    self.dump_checkpoint( context_iri, echo = echo )
+                    self.dump_checkpoint( context_iri, sha256 = sha256, echo = echo )
             else:
                 self._do_sparql_update( item, echo = echo )
         self.pending_updates = []
@@ -705,6 +761,9 @@ class QleverClient( GenericClient ):
                 "--retry", "3", "--retry-delay", "5",
                 "-o", tmp_path, url,
             ]
+            # Quiet the progress meter unless verbose; keep errors visible.
+            if not echo:
+                curl_cmd[ 1:1 ] = [ "--silent", "--show-error" ]
             if echo:
                 print( colored( " ".join( curl_cmd ), "cyan" ), flush = True )
             r = subprocess.run( curl_cmd )
@@ -715,18 +774,21 @@ class QleverClient( GenericClient ):
             if os.path.exists( tmp_path ):
                 os.unlink( tmp_path )
 
-    def mark_rebuild( self, context_iri ):
+    def mark_rebuild( self, context_iri, sha256 = None ):
         """Queue a checkpoint-dump sentinel for *context_iri* in pending_updates.
 
-        When ``_apply_pending_updates`` hits the ``(context_iri,)`` tuple it
-        calls ``dump_checkpoint`` — the CONSTRUCT query against the running
+        When ``_apply_pending_updates`` hits the ``(context_iri, sha256)`` tuple
+        it calls ``dump_checkpoint`` — the CONSTRUCT query against the running
         server returns the on-disk index merged with the in-memory delta from
         the preceding updates, so the checkpoint captures the complete
         post-update state.  No ``qlever rebuild-index`` is needed because the
         next ``_finalize_index`` rebuilds the on-disk index from scratch
         using every checkpoint + the new dataset's staged files.
+
+        *sha256* (the dataset's kgsteward checksum, if known) is recorded in the
+        checkpoint sidecar so ``has_checkpoint`` can judge currency offline.
         """
-        self.pending_updates.append( ( context_iri, ) )
+        self.pending_updates.append( ( context_iri, sha256 ) )
 
     # ------------------------------------------------------------------ #
     # Public SPARQL API
@@ -925,14 +987,33 @@ class QleverClient( GenericClient ):
         safe = re.sub( r"[^a-zA-Z0-9_-]", "_", context_iri.rstrip( "/" ).split( "/" )[-1] )[:40]
         return os.path.join( self.qleverdir, f"{safe}_{h8}.nt.gz" )
 
-    def has_checkpoint( self, context_iri ):
+    def has_checkpoint( self, context_iri, sha256 = None ):
         """True iff a completed checkpoint exists for *context_iri*.
 
-        Completeness is determined by the presence of the ``.nt.gz.json``
-        sidecar, which is written *after* the ``.nt.gz`` and acts as the
-        atomic completeness marker.
+        Completeness is the presence of the ``.nt.gz.json`` sidecar, which is
+        written *after* the ``.nt.gz`` and acts as the atomic completeness
+        marker.
+
+        When *sha256* (the dataset's current kgsteward checksum) is supplied the
+        check is also *currency-aware*: the checksum recorded in the sidecar
+        must match.  This lets the stopped-server ``-C`` resume tell an
+        out-of-date checkpoint from a current one without querying the index.
+        A sidecar written before checksums were recorded (no ``sha256`` field)
+        is accepted on presence alone, so pre-existing checkpoints stay valid.
         """
-        return os.path.isfile( self.checkpoint_path( context_iri ) + ".json" )
+        sidecar = self.checkpoint_path( context_iri ) + ".json"
+        if not os.path.isfile( sidecar ):
+            return False
+        if sha256 is None:
+            return True
+        try:
+            with open( sidecar ) as f:
+                stored = json.load( f ).get( "sha256" )
+        except Exception:
+            return False
+        if stored is None:
+            return True
+        return stored == sha256
 
     def invalidate_checkpoint( self, context_iri ):
         """Delete the checkpoint files for *context_iri* (both ``.nt.gz`` and sidecar).
@@ -950,7 +1031,7 @@ class QleverClient( GenericClient ):
                 os.remove( fn )
                 report( "invalidated checkpoint", os.path.basename( fn ) )
 
-    def dump_checkpoint( self, context_iri, echo = True ):
+    def dump_checkpoint( self, context_iri, sha256 = None, echo = True ):
         """Save the named graph as ``<safe>_<h8>.nt.gz`` + ``.nt.gz.json`` sidecar.
 
         Two-step atomic write:
@@ -959,6 +1040,9 @@ class QleverClient( GenericClient ):
              ``os.replace(tmp, path)`` — the .nt.gz is either the OLD or the
              NEW content, never partial.
           2. Write the sidecar last; its presence is the completeness marker.
+             It records the named-graph IRI and, when known, the dataset's
+             kgsteward checksum (*sha256*) so ``has_checkpoint`` can judge
+             currency offline.
 
         Makes checkpointing transactional: until the new dump completes, the
         old checkpoint stays on disk as a fallback.
@@ -981,7 +1065,7 @@ class QleverClient( GenericClient ):
             f.write( r.content )
         os.replace( tmp_path, path )    # atomic on POSIX
         with open( sidecar, "w" ) as f:
-            json.dump( { "graph": context_iri }, f )
+            json.dump( { "graph": context_iri, "sha256": sha256 }, f )
         report( "checkpoint saved", fname )
 
     # ------------------------------------------------------------------ #

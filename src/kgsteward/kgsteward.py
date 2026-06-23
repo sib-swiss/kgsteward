@@ -579,6 +579,16 @@ def main():
     # Establish the list of contexts to update
     # --------------------------------------------------------- #
 
+    # Per-run memo for dataset checksums.  get_sha256 reads file contents and
+    # issues HTTP HEADs, so it must not be recomputed once per call site;
+    # compute each dataset's checksum at most once per run and reuse it.  This
+    # does NOT change get_sha256 itself.
+    _sha256_cache = {}
+    def dataset_sha256( name ):
+        if name not in _sha256_cache:
+            _sha256_cache[ name ] = get_sha256( config, name, echo = args.v )
+        return _sha256_cache[ name ]
+
     rdf_graph_all       = set()
     rdf_graph_to_update = set()
 
@@ -601,7 +611,7 @@ def main():
             # source of truth instead: datasets without a checkpoint need (re)processing.
             print_task( "qlever server stopped — using checkpoints to determine update set" )
             for name in rdf_graph_all :
-                if not server.has_checkpoint( name2context[ name ] ) :
+                if not server.has_checkpoint( name2context[ name ], dataset_sha256( name ) ) :
                     rdf_graph_to_update.add( name )
         else :
             config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
@@ -829,7 +839,7 @@ INSERT DATA {{
         # staged files), applies the queued SPARQL updates, rebuilds the persistent
         # index, and dumps the checkpoint — all before moving to the next dataset.
         if config["server"]["brand"] == "qlever" :
-            server.mark_rebuild( context )
+            server.mark_rebuild( context, dataset_sha256( name ) )
             server.server_start( echo = args.v )
 
     # --------------------------------------------------------- #
@@ -897,7 +907,7 @@ INSERT DATA {{
             print_task( "Refresh dataset info: " + name )
             update_dataset_info( server, config, name, echo = args.v )
             if is_qlever:
-                server.mark_rebuild( name2context[ name ] )
+                server.mark_rebuild( name2context[ name ], dataset_sha256( name ) )
         if is_qlever and server.pending_updates:
             print_break()
             print_task( "Flush metadata updates and re-dump checkpoints" )
