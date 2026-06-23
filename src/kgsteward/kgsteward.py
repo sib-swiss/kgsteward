@@ -178,13 +178,16 @@ def get_user_input():
         help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
     )
     parser.add_argument(
-        '--qlever_upload_quad_and_dump_checkpoints',
+        '--qlever_upload_quads',
         action = 'store_true',
-        help = "(qlever only) One-shot bootstrap: (i) wipe the qleverdir and restore the "
-               "user's Qleverfile, (ii) build the index with `qlever index` from the "
-               "configured INPUT_FILES (typically a big .nq.gz dump), (iii) start the "
-               "server, (iv) verify that the named graphs in the loaded index match the "
-               "YAML datasets, (v) dump every named graph as an .nt.gz + sidecar checkpoint.  "
+        help = "(qlever only) One-shot bootstrap from an externally-produced quad dump. "
+               "WARNING: WIPES THE ENTIRE CONTENT OF qleverdir before proceeding. "
+               "Steps: (i) stop the server, wipe qleverdir, restore the user's Qleverfile; "
+               "(ii) build the qlever index from the INPUT_FILES configured in the Qleverfile "
+               "(typically a big .nq.gz dump); "
+               "(iii) start the server; "
+               "(iv) verify that the named graphs in the loaded index match the YAML datasets; "
+               "(v) dump every named graph as an .nt.gz + sidecar checkpoint. "
                "After this, kgsteward's per-dataset checkpoint architecture is fully "
                "bootstrapped from the bulk dump and normal -C/-d operations work as usual."
     )
@@ -562,12 +565,12 @@ def main():
     # inform has_checkpoint() in -C stopped-server fallback mode.
     # --------------------------------------------------------- #
 
-    if args.qlever_upload_quad_and_dump_checkpoints:
+    if args.qlever_upload_quads:
         if config["server"]["brand"] != "qlever":
-            stop_error( "--qlever_upload_quad_and_dump_checkpoints is only valid for the qlever backend" )
+            stop_error( "--qlever_upload_quads is only valid for the qlever backend" )
         print_break()
         print_task( "Bootstrap qlever from quad dump and capture checkpoints" )
-        dumped = server.upload_quad_and_dump_checkpoints( name2context, echo = args.v )
+        dumped = server.upload_quads( name2context, echo = args.v )
         report( "checkpoints created", len( dumped ) )
 
     if args.qlever_complete and config["server"]["brand"] != "qlever":

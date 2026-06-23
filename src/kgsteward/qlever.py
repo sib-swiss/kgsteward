@@ -1063,7 +1063,9 @@ class QleverClient( GenericClient ):
         report( "dumped sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries)" )
 
     def list_context( self, echo = True ):
-        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
+        # qlever does not enumerate graphs via GRAPH ?g {} (empty body); the
+        # full triple pattern is required.
+        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g { ?s ?p ?o }}", echo = echo )
         if r is None:
             return set()
         return { rec["g"]["value"] for rec in r.json()["results"]["bindings"] if "g" in rec }
@@ -1245,10 +1247,11 @@ class QleverClient( GenericClient ):
         self.pending_updates         = []
         self._has_current_text_index = False
 
-    def upload_quad_and_dump_checkpoints( self, name2context, echo = True ):
+    def upload_quads( self, name2context, echo = True ):
         """Bootstrap a qlever index from a quad dump, verify it, dump per-graph checkpoints.
 
-        End-to-end "adoption" operation triggered by ``--qlever_upload_quad_and_dump_checkpoints``.
+        End-to-end "adoption" operation triggered by ``--qlever_upload_quads``.
+        WARNING: wipes the entire content of qleverdir before proceeding.
         Use case: the user has a big ``.nq.gz`` (or any qlever-loadable) dump
         produced outside kgsteward and wants to bring its content under
         kgsteward management.  Bulk-loading with ``qlever index`` is much

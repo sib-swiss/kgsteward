@@ -407,6 +407,98 @@ def test_scoped_index_then_complete_index( qlever_workdir ):
     print( "\nscoped rebuild excluded C; complete_index restored A, B, C" )
 
 
+QLEVER_PORT_BOOTSTRAP = 7023   # separate port to avoid clash with the module-scoped fixture
+
+
+@pytest.fixture( scope = "module" )
+def qlever_workdir_bootstrap( tmp_path_factory ):
+    """Isolated workdir for test_upload_quads.
+
+    Two small TTL files (one triple each) are placed directly inside qleverdir so
+    they survive ``rewrite_repository``'s selective wipe and are accessible when
+    the qlever docker container mounts qleverdir.  The Qleverfile uses
+    MULTI_INPUT_JSON to assign each file to a distinct named graph, bypassing
+    the normal _stage_file / INPUT_FILES path.
+    """
+    confdir = str( tmp_path_factory.mktemp( "qlever_boot_conf" ) )
+    workdir = str( tmp_path_factory.mktemp( "qlever_boot_workdir" ) )
+
+    ctx_a = "http://example.org/context/boot_A"
+    ctx_b = "http://example.org/context/boot_B"
+
+    # A single N-Quads file dropped into qleverdir — it survives rewrite_repository
+    # (only *.nt.gz, *.nt.gz.json, <repo>.*, input/, previous.*, rebuild.* are wiped).
+    # Quad format (nq) carries the graph IRI inline; no "-g" workaround needed.
+    nq_file = os.path.join( workdir, "boot_data.nq" )
+    with open( nq_file, "w" ) as f:
+        f.write( f"<{ctx_a}/s> <{ctx_a}/p> <{ctx_a}/o> <{ctx_a}> .\n" )
+        f.write( f"<{ctx_b}/s> <{ctx_b}/p> <{ctx_b}/o> <{ctx_b}> .\n" )
+
+    qleverfile = os.path.join( confdir, "Qleverfile" )
+    with open( qleverfile, "w" ) as f:
+        f.write(
+            "[data]\n"
+            "NAME          = boot_test\n"
+            "DESCRIPTION   = kgsteward bootstrap test\n"
+            "FORMAT        = nq\n"
+            "\n"
+            "[index]\n"
+            "INPUT_FILES     = boot_data.nq\n"
+            "CAT_INPUT_FILES = cat ${INPUT_FILES}\n"
+            "\n"
+            "[server]\n"
+            f"PORT         = {QLEVER_PORT_BOOTSTRAP}\n"
+            "HOST_NAME    = localhost\n"
+            "ACCESS_TOKEN = kgsteward_test\n"
+            "\n"
+            "[runtime]\n"
+            "SYSTEM = docker\n"
+            "IMAGE  = docker.io/adfreiburg/qlever:latest\n"
+        )
+
+    yield { "qleverfile": qleverfile, "qleverdir": workdir, "ctx_a": ctx_a, "ctx_b": ctx_b }
+
+    subprocess.run( ["qlever", "stop"], cwd = workdir, capture_output = True )
+    shutil.rmtree( workdir, ignore_errors = True )
+    shutil.rmtree( confdir, ignore_errors = True )
+
+
+def test_upload_quads( qlever_workdir_bootstrap ):
+    """--qlever_upload_quads: bulk-load a quad dump, verify graph reconciliation,
+    assert one checkpoint + sidecar per matched graph.
+
+    Two named graphs (boot_A, boot_B) are loaded from tiny TTL files embedded in
+    qleverdir via MULTI_INPUT_JSON.  The YAML name2context includes a third dataset
+    (boot_C) that is absent from the dump, exercising the 'missing' warning path.
+    Sidecars for the two matched graphs must exist; no checkpoint for boot_C.
+    """
+    from src.kgsteward.qlever import QleverClient
+
+    fix       = qlever_workdir_bootstrap
+    ctx_a     = fix["ctx_a"]
+    ctx_b     = fix["ctx_b"]
+    ctx_c     = "http://example.org/context/boot_C"
+    n2c       = { "boot_A": ctx_a, "boot_B": ctx_b, "boot_C": ctx_c }
+
+    client = QleverClient( fix["qleverfile"], fix["qleverdir"], echo = True )
+
+    dumped = client.upload_quads( n2c, echo = True )
+
+    assert set( dumped ) == { ctx_a, ctx_b }, (
+        f"upload_quads must return IRIs of matched graphs; got {sorted( dumped )}"
+    )
+    assert client.is_running, "Server must be running after upload_quads"
+
+    # Each matched graph must have a checkpoint (and its sidecar as completeness marker)
+    assert client.has_checkpoint( ctx_a ), "checkpoint sidecar must exist for boot_A"
+    assert client.has_checkpoint( ctx_b ), "checkpoint sidecar must exist for boot_B"
+
+    # Missing dataset (in YAML but not in dump) must NOT produce a checkpoint
+    assert not client.has_checkpoint( ctx_c ), "no checkpoint for a dataset absent from the dump"
+
+    print( f"\nupload_quads: {len(dumped)} graph(s) bootstrapped; boot_C correctly absent" )
+
+
 def test_rewrite_repository_full_wipe( qlever_workdir ):
     """rewrite_repository must wipe EVERYTHING qlever or kgsteward owns.
 
