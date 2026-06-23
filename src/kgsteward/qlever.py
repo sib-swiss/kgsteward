@@ -158,16 +158,20 @@ def parse_qleverfile( qleverfile ):
     real_path = os.path.realpath( qleverfile )
     if not os.path.isfile( real_path ):
         stop_error( "Qleverfile not found: " + qleverfile )
-    parser = configparser.ConfigParser( interpolation = None )
+    # inline_comment_prefixes=('#',) strips trailing "# ..." comments from
+    # values (qlever-control's own parser does too); without it a line like
+    # `TEXT_INDEX = ... # keep your preference` would leak the comment into the
+    # value and corrupt the `--text-index` argument passed to add-text-index.
+    parser = configparser.ConfigParser( interpolation = None, inline_comment_prefixes = ( '#', ) )
     parser.read( real_path )
     if "data" not in parser or "NAME" not in parser["data"]:
         stop_error( "Missing [data] NAME in Qleverfile: " + real_path )
-    repository   = parser["data"]["NAME"]
-    host         = parser.get( "server",  "HOST_NAME",    fallback = "localhost" )
-    port         = parser.get( "server",  "PORT",         fallback = "7019" )
-    system       = parser.get( "runtime", "SYSTEM",       fallback = "docker" )
-    access_token = parser.get( "server",  "ACCESS_TOKEN", fallback = "" )
-    text_index   = parser.get( "index",   "TEXT_INDEX",   fallback = "none" )
+    repository   = parser["data"]["NAME"].strip()
+    host         = parser.get( "server",  "HOST_NAME",    fallback = "localhost" ).strip()
+    port         = parser.get( "server",  "PORT",         fallback = "7019" ).strip()
+    system       = parser.get( "runtime", "SYSTEM",       fallback = "docker" ).strip()
+    access_token = parser.get( "server",  "ACCESS_TOKEN", fallback = "" ).strip()
+    text_index   = parser.get( "index",   "TEXT_INDEX",   fallback = "none" ).strip()
     return f"http://{host}:{port}", repository, system, access_token, text_index
 
 

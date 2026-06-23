@@ -133,6 +133,31 @@ def test_checkpoint_sha256_currency( qlever_workdir ):
     assert client.has_checkpoint( ctx, "sha-anything" ), "legacy sidecar (no sha) -> accept on presence"
 
 
+def test_parse_qleverfile_strips_inline_comments( tmp_path ):
+    """parse_qleverfile must strip trailing '# ...' comments from values, so a
+    commented TEXT_INDEX line does not corrupt the --text-index argument passed
+    to add-text-index during --qlever_complete."""
+    from src.kgsteward.qlever import parse_qleverfile
+
+    qf = tmp_path / "Qleverfile"
+    qf.write_text(
+        "[data]\n"
+        "NAME = demo                # the dataset name\n"
+        "[server]\n"
+        "HOST_NAME = localhost\n"
+        "PORT = 7033                # chosen port\n"
+        "[runtime]\n"
+        "SYSTEM = docker            # container runtime\n"
+        "[index]\n"
+        "TEXT_INDEX = from_text_records_and_literals    # keep your preference\n"
+    )
+    location, repository, system, token, text_index = parse_qleverfile( str( qf ) )
+    assert repository == "demo"
+    assert location   == "http://localhost:7033"
+    assert system     == "docker"
+    assert text_index == "from_text_records_and_literals"
+
+
 def test_update_dataset_info_idempotent( qlever_workdir, monkeypatch ):
     """update_dataset_info must converge to EXACTLY ONE kgsteward:Dataset metadata
     set, no matter how many times it runs or what stale state it starts from.
