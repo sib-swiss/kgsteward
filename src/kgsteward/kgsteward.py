@@ -605,14 +605,11 @@ def main():
     elif args.d : # status not checked here
         rdf_graph_to_update.update( resolve_names( args.d, rdf_graph_all, "dataset" ))
     elif args.C :
-        if config["server"]["brand"] == "qlever" and not server.is_running :
-            # qlever server is stopped (e.g. after a crash). The SPARQL status query
-            # would return all-EMPTY, which is meaningless. Use .nt.gz checkpoints as the
-            # source of truth instead: datasets without a checkpoint need (re)processing.
-            print_task( "qlever server stopped — using checkpoints to determine update set" )
-            for name in rdf_graph_all :
-                if not server.has_checkpoint( name2context[ name ], dataset_sha256( name ) ) :
-                    rdf_graph_to_update.add( name )
+        # A backend may resolve the update set offline (qlever, from checkpoints,
+        # when its server is stopped); otherwise fall back to the online status query.
+        offline = server.update_set_offline( rdf_graph_all, config, name2context, dataset_sha256 )
+        if offline is not None :
+            rdf_graph_to_update |= offline
         else :
             config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
             for name in rdf_graph_all :
@@ -620,35 +617,10 @@ def main():
                 if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
                     rdf_graph_to_update.add( name )
 
-    # --------------------------------------------------------- #
-    # For qlever: restrict incremental index rebuilds to the dependency
-    # closure of the datasets being processed (the update set plus all
-    # their transitive parents).  Untouched, unrelated datasets keep their
-    # checkpoints on disk but are left out of the rebuilt index -- so the
-    # served index may be partial until a --qlever_complete run reassembles
-    # everything.  This avoids re-reading every checkpoint on each rebuild.
-    # --------------------------------------------------------- #
-    if config["server"]["brand"] == "qlever" and rdf_graph_to_update :
-        parents_of = { t["name"]: list( t.get( "parent", [] ) or [] ) for t in config["dataset"] }
-        scope = set()
-        stack = list( rdf_graph_to_update )
-        while stack :
-            n = stack.pop()
-            if n in scope :
-                continue
-            scope.add( n )
-            stack.extend( parents_of.get( n, [] ) )
-        # A required parent that is NOT being processed this run must already
-        # have a checkpoint, otherwise the scoped index would silently miss
-        # data that the updates query.
-        for n in scope :
-            if n not in rdf_graph_to_update and not server.has_checkpoint( name2context[ n ] ) :
-                stop_error(
-                    "Dataset '" + n + "' is a required parent in the dependency scope but has "
-                    "no checkpoint. Include it in the run (e.g. add it to -d) or build it first."
-                )
-        server.index_scope = { name2context[ n ] for n in scope }
-        report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
+    # Restrict an incremental index rebuild to the dependency closure of the
+    # datasets being processed (no-op for live backends; qlever scopes its
+    # rebuilt index and validates required parents).
+    server.plan_index_scope( rdf_graph_to_update, config, name2context )
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
@@ -663,13 +635,10 @@ def main():
         context = name2context[ name ]
 
         if not name in rdf_graph_to_update :
-            # Dataset is up-to-date — nothing to reprocess.
-            # For qlever: checkpoints are auto-collected by _finalize_index via .nt.gz.json
-            # sidecars, so no explicit staging is needed here.  Warn if a checkpoint is
-            # missing for a dataset that would otherwise be silently dropped from the index.
-            if config["server"]["brand"] == "qlever" :
-                if not server.has_checkpoint( context ) and server.has_index :
-                    print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
+            # Dataset is up-to-date — nothing to reprocess.  For static-index
+            # backends, warn if it lacks a checkpoint and would be dropped from
+            # the served index (no-op for live backends).
+            server.warn_if_unindexed( name, context )
             continue
 
         print_break()
@@ -705,25 +674,15 @@ def main():
                     print( colored( " ".join( cmd ), "cyan" ))
                     subprocess.run( cmd )
                     server.load_from_file_using_riot( filename, context, echo = args.v )
-                else: # direct sparql_load
-                    if config["server"]["brand"] == "qlever":
-                        # qlever cannot defer LOAD — download immediately and stage for indexing
-                        server.load_url_as_file( path, context, echo = args.v )
-                    else:
-                        server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-INSERT DATA {{
-    GRAPH <{context}> {{
-        <{context}> void:dataDump <{path}>
-    }}
-}}""", echo = args.v )
+                else: # direct: load the remote graph + record void:dataDump
+                    # (the server object encapsulates LOAD vs static-index staging)
+                    server.load_url( path, context, echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
-                if config["server"]["brand"] == "qlever":
-                    # qlever uses a static index and does not support SPARQL LOAD.
-                    # Stage files directly into the deferred index build instead.
-                    # void:dataDump is baked into the staged files by _stage_file — no
-                    # explicit INSERT needed here.
+                if not server.supports_sparql_load:
+                    # Static-index backend (qlever): stage files directly into the
+                    # deferred index build instead of SPARQL LOAD.  void:dataDump is
+                    # baked into the staged files by the driver -- no INSERT needed.
                     for path in target["file"] :
                         for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                             filename = dir + "/" + fn
@@ -832,31 +791,19 @@ INSERT DATA {{
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
-        # For qlever: immediately finalize the index and checkpoint this dataset,
-        # mimicking the GraphDB driver's per-dataset persistence model.
-        # mark_rebuild queues the rebuild+checkpoint sentinel; server_start triggers
-        # _finalize_index (which auto-includes all existing checkpoints + the newly
-        # staged files), applies the queued SPARQL updates, rebuilds the persistent
-        # index, and dumps the checkpoint — all before moving to the next dataset.
-        if config["server"]["brand"] == "qlever" :
-            server.mark_rebuild( context, dataset_sha256( name ) )
-            server.server_start( echo = args.v )
+        # Persist this dataset (no-op for live backends, whose SPARQL writes are
+        # already durable; static-index backends queue a checkpoint + rebuild)
+        # then flush so per-dataset state mirrors the GraphDB persistence model.
+        server.queue_persist( context, dataset_sha256( name ) )
+        server.flush_pending( echo = args.v )
 
-    # --------------------------------------------------------- #
-    # For qlever: safety net — flush any staged data not yet finalized
-    # (normally server_start is called per-dataset inside the loop above)
-    # --------------------------------------------------------- #
-    if config["server"]["brand"] == "qlever" and ( server.pending_files or server.pending_updates ) :
-        server.server_start( echo = args.v )
+    # Safety net: flush anything staged but not yet finalized (no-op for live
+    # backends; normally a static-index backend already flushed per-dataset above).
+    server.flush_pending( echo = args.v )
 
-    # --------------------------------------------------------- #
-    # For qlever: assemble the complete index from all checkpoints
-    # (plus the text index, if configured) when --qlever_complete is set.
-    # --------------------------------------------------------- #
-    if args.qlever_complete and config["server"]["brand"] == "qlever":
-        print_break()
-        print_task( "Assemble complete qlever index (all checkpoints + text index)" )
-        server.complete_index( echo = args.v )
+    # End-of-session finalisation: static-index backends assemble the complete
+    # index (+ text index) when --qlever_complete is set; no-op otherwise.
+    server.finalize( args.qlever_complete, echo = args.v )
 
     # --------------------------------------------------------- #
     # Force update namespace declarations
@@ -882,36 +829,29 @@ INSERT DATA {{
     # --------------------------------------------------------- #
     # Force update dataset info -- re-stamp the kgsteward:Dataset
     # metadata (triples count, modified, checksum) for every dataset
-    # WITHOUT reloading the source data.  Useful when checkpoints exist
-    # but their metadata is missing or stale (e.g. checkpoints produced
-    # by a kgsteward version that had the metadata-loss bug, or after a
-    # bulk adoption via --qlever_upload_quad_and_dump_checkpoints).
+    # WITHOUT reloading the source data.  Useful when persisted data
+    # exists but its metadata is missing or stale.
     #
-    # For qlever, each refresh also queues a mark_rebuild sentinel so
-    # the final server_start flushes all the INSERTs against the
-    # running index AND dumps a fresh .nt.gz for every refreshed
-    # context -- otherwise the in-memory metadata would be lost at the
-    # next index rebuild.
+    # Each refresh is queued via queue_persist + flush_pending; for a
+    # static-index backend that re-dumps a fresh checkpoint per refreshed
+    # context (otherwise the in-memory metadata would be lost at the next
+    # rebuild), and is a no-op for live backends.
     # --------------------------------------------------------- #
 
     if args.U :
-        is_qlever = config["server"]["brand"] == "qlever"
         for target in config["dataset"] :
             name = target["name"]
-            if is_qlever and not server.has_checkpoint( name2context[ name ] ):
-                # Nothing to re-stamp -- the data isn't in any checkpoint, so
-                # any metadata we insert would be wiped by the next rebuild.
-                print_warn( f"-U: skipping '{name}' (no checkpoint on disk)" )
+            if not server.can_restamp( name2context[ name ] ):
+                # Nothing to re-stamp -- no persisted data for this dataset, so any
+                # metadata we insert would be lost (e.g. wiped by the next rebuild).
+                print_warn( f"-U: skipping '{name}' (no persisted data to re-stamp)" )
                 continue
             print_break()
             print_task( "Refresh dataset info: " + name )
             update_dataset_info( server, config, name, echo = args.v )
-            if is_qlever:
-                server.mark_rebuild( name2context[ name ], dataset_sha256( name ) )
-        if is_qlever and server.pending_updates:
-            print_break()
-            print_task( "Flush metadata updates and re-dump checkpoints" )
-            server.server_start( echo = args.v )
+            server.queue_persist( name2context[ name ], dataset_sha256( name ) )
+        # Flush queued metadata + re-dump checkpoints (no-op for live backends).
+        server.flush_pending( echo = args.v )
 
     # --------------------------------------------------------- #
     # Run all validation tests
@@ -1209,12 +1149,9 @@ INSERT DATA {{
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
-    # Ensure the qlever server is running at the end of the session
-    # (only if an index exists — avoids starting a server with no index)
-    if config["server"]["brand"] == "qlever" and not server.is_running and server.has_index:
-        print_break()
-        print_task( "Start qlever server" )
-        server.server_start( echo = args.v )
+    # Ensure the server is serving queries at the end of the session (no-op for
+    # live backends; static-index backends start if an index exists).
+    server.ensure_running( echo = args.v )
 
     # Dump per-call sparql_update timings to a TSV, if requested.  Useful for
     # diagnosing slow updates in a single backend and for benchmark comparison

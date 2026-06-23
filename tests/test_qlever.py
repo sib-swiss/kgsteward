@@ -133,6 +133,49 @@ def test_checkpoint_sha256_currency( qlever_workdir ):
     assert client.has_checkpoint( ctx, "sha-anything" ), "legacy sidecar (no sha) -> accept on presence"
 
 
+def test_update_set_offline_excludes_frozen( qlever_workdir ):
+    """Stopped-server -C: update_set_offline picks datasets lacking a CURRENT
+    checkpoint, but NEVER a frozen one (the 'frozen' contract: -C has no effect).
+    Uses synthetic context IRIs (no checkpoints) and a local is_running override
+    so the shared module server is left untouched for later tests."""
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+    client.is_running = False   # exercise the offline branch without touching the server
+
+    cfg = { "dataset": [ { "name": "live", "frozen": False },
+                         { "name": "frz",  "frozen": True  } ] }
+    n2c = { "live": "http://example.org/context/never_live",
+            "frz":  "http://example.org/context/never_frz" }
+
+    update = client.update_set_offline( [ "live", "frz" ], cfg, n2c, lambda n: "sha-" + n )
+    assert update == { "live" }, "frozen dataset must be excluded even without a checkpoint"
+
+
+def test_plan_index_scope_frozen_parent_warns_not_errors( qlever_workdir ):
+    """A required parent without a checkpoint hard-errors -- UNLESS it is frozen,
+    in which case it is an intentional exclusion (warn, dependants built without it).
+    Synthetic context IRIs (no checkpoints); shared server untouched."""
+    import pytest
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+    n2c = { "child": "http://example.org/context/never_child",
+            "par":   "http://example.org/context/never_par"  }
+
+    # frozen, checkpoint-less parent -> warn + proceed; scope still set
+    cfg_frozen = { "dataset": [ { "name": "child", "parent": [ "par" ] },
+                                { "name": "par",   "frozen": True } ] }
+    client.plan_index_scope( { "child" }, cfg_frozen, n2c )
+    assert client.index_scope == { n2c["child"], n2c["par"] }
+
+    # non-frozen, checkpoint-less required parent -> hard error (SystemExit)
+    cfg_strict = { "dataset": [ { "name": "child", "parent": [ "par" ] },
+                                { "name": "par",   "frozen": False } ] }
+    with pytest.raises( SystemExit ):
+        client.plan_index_scope( { "child" }, cfg_strict, n2c )
+
+
 def test_parse_qleverfile_strips_inline_comments( tmp_path ):
     """parse_qleverfile must strip trailing '# ...' comments from values, so a
     commented TEXT_INDEX line does not corrupt the --text-index argument passed

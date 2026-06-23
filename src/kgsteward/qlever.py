@@ -727,6 +727,104 @@ class QleverClient( GenericClient ):
         self.is_running = True
 
     # ------------------------------------------------------------------ #
+    # Polymorphic workflow hooks (see GenericClient for the contracts)
+    #
+    # qlever is a static-index backend: data is ingested by staging files into
+    # an offline index build, SPARQL updates live in an in-memory delta lost on
+    # rebuild/restart, and per-dataset state is persisted as .nt.gz checkpoints.
+    # These overrides keep all of that off the generic kgsteward workflow.
+    # ------------------------------------------------------------------ #
+
+    @property
+    def supports_sparql_load( self ):
+        return False   # static index: stage files, never SPARQL LOAD
+
+    def load_url( self, path, context, echo = True ):
+        # qlever cannot defer LOAD -- download immediately and stage for indexing
+        # (void:dataDump is baked in by _stage_file).
+        self.load_url_as_file( path, context, echo = echo )
+
+    def update_set_offline( self, names, config, name2context, sha_of ):
+        """When the server is stopped, the SPARQL status query would return
+        all-EMPTY, so use the .nt.gz checkpoints as the source of truth:
+        a dataset needs (re)processing unless a *current* checkpoint exists.
+        Frozen datasets are never touched by -C.  Returns None when the server
+        is running (kgsteward then uses the online status query)."""
+        if self.is_running:
+            return None
+        report( "qlever server stopped", "using checkpoints to determine update set" )
+        frozen_of = { t["name"]: bool( t.get( "frozen", False ) ) for t in config["dataset"] }
+        update = set()
+        for name in names:
+            if frozen_of.get( name ):
+                continue   # -C has no effect on frozen datasets (yaml 'frozen' contract)
+            if not self.has_checkpoint( name2context[ name ], sha_of( name ) ):
+                update.add( name )
+        return update
+
+    def plan_index_scope( self, update_names, config, name2context, echo = True ):
+        """Restrict the rebuilt index to the dependency closure of the datasets
+        being processed (update set + transitive parents).  Unrelated datasets
+        keep their checkpoints on disk but stay out of the rebuilt index until a
+        --qlever_complete run reassembles everything."""
+        if not update_names:
+            return
+        parents_of = { t["name"]: list( t.get( "parent", [] ) or [] ) for t in config["dataset"] }
+        frozen_of  = { t["name"]: bool( t.get( "frozen", False ) )     for t in config["dataset"] }
+        scope = set()
+        stack = list( update_names )
+        while stack:
+            n = stack.pop()
+            if n in scope:
+                continue
+            scope.add( n )
+            stack.extend( parents_of.get( n, [] ) )
+        # A required parent that is NOT being processed this run must already
+        # have a checkpoint, otherwise the scoped index would silently miss data
+        # that the updates query.  A *frozen* parent without one is an
+        # intentional exclusion (its dependants are rebuilt without its data).
+        for n in scope:
+            if n not in update_names and not self.has_checkpoint( name2context[ n ] ):
+                if frozen_of.get( n ):
+                    print_warn(
+                        "Frozen parent '" + n + "' has no checkpoint; excluded from the index, so "
+                        "its dependants are rebuilt WITHOUT its data. Load it explicitly with -d " + n + "."
+                    )
+                    continue
+                stop_error(
+                    "Dataset '" + n + "' is a required parent in the dependency scope but has "
+                    "no checkpoint. Include it in the run (e.g. add it to -d) or build it first."
+                )
+        self.index_scope = { name2context[ n ] for n in scope }
+        report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
+
+    def warn_if_unindexed( self, name, context ):
+        if not self.has_checkpoint( context ) and self.has_index:
+            print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
+
+    def queue_persist( self, context, sha256 = None ):
+        self.mark_rebuild( context, sha256 )
+
+    def flush_pending( self, echo = True ):
+        if self.pending_files or self.pending_updates:
+            self.server_start( echo = echo )
+
+    def finalize( self, complete, echo = True ):
+        if complete:
+            print_break()
+            print_task( "Assemble complete qlever index (all checkpoints + text index)" )
+            self.complete_index( echo = echo )
+
+    def ensure_running( self, echo = True ):
+        if not self.is_running and self.has_index:
+            print_break()
+            print_task( "Start qlever server" )
+            self.server_start( echo = echo )
+
+    def can_restamp( self, context ):
+        return self.has_checkpoint( context )
+
+    # ------------------------------------------------------------------ #
     # Public data-loading API
     # ------------------------------------------------------------------ #
 

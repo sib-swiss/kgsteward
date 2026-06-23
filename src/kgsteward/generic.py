@@ -139,3 +139,97 @@ WHERE{{
         if size > 0 :
             report( "triples so far", str( count ))
             self._flush_buf( context, "".join( buf ), headers )
+
+    # ------------------------------------------------------------------ #
+    # Polymorphic workflow hooks
+    #
+    # kgsteward.py drives every backend through the same workflow and calls
+    # these hooks unconditionally.  The defaults here suit a live, mutable
+    # HTTP triplestore (graphdb/fuseki/rdf4j); static-index backends such as
+    # qlever override them.  Keeping the brand-specific behaviour on the
+    # server object avoids `config["server"]["brand"] == ...` branches in the
+    # main workflow.
+    # ------------------------------------------------------------------ #
+
+    @property
+    def supports_sparql_load( self ):
+        """True iff the backend can ingest data via SPARQL ``LOAD`` / graph store.
+
+        False for static-index backends (qlever), which stage files into an
+        offline index build instead.
+        """
+        return True
+
+    def load_url( self, path, context, echo = True ):
+        """Load a remote graph and record its ``void:dataDump`` provenance."""
+        self.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = echo )
+        self.sparql_update(
+            "PREFIX void: <http://rdfs.org/ns/void#>\n"
+            f"INSERT DATA {{ GRAPH <{context}> {{ <{context}> void:dataDump <{path}> }} }}",
+            echo = echo,
+        )
+
+    def update_set_offline( self, names, config, name2context, sha_of ):
+        """Determine the -C update set without querying the server, or None.
+
+        Returns None for live backends: kgsteward then falls back to the
+        online status query (``update_config``).  qlever overrides this to use
+        on-disk checkpoints when its server is stopped.
+        """
+        return None
+
+    def plan_index_scope( self, update_names, config, name2context, echo = True ):
+        """Restrict an incremental index rebuild to a dependency closure.
+
+        No-op for live backends (they apply each update directly); qlever uses
+        it to scope the rebuilt index and validate required parents.
+        """
+        pass
+
+    def warn_if_unindexed( self, name, context ):
+        """Warn that a skipped dataset will be absent from the served data.
+
+        No-op for live backends, where skipped datasets simply stay in place.
+        """
+        pass
+
+    def queue_persist( self, context, sha256 = None ):
+        """Queue a dataset to be persisted at the next ``flush_pending``.
+
+        No-op for live backends: their SPARQL writes are already durable.
+        qlever queues a checkpoint-dump + index rebuild.
+        """
+        pass
+
+    def flush_pending( self, echo = True ):
+        """Apply anything queued by ``queue_persist`` / staged loads.
+
+        No-op for live backends; qlever rebuilds the index and dumps
+        checkpoints for the staged datasets.
+        """
+        pass
+
+    def finalize( self, complete, echo = True ):
+        """End-of-session finalisation hook.
+
+        No-op for live backends; qlever assembles the complete index (and the
+        text index) when *complete* is set (``--qlever_complete``).
+        """
+        pass
+
+    def ensure_running( self, echo = True ):
+        """Ensure the server is serving queries at the end of the session.
+
+        No-op for live backends (always up); qlever starts its server if an
+        index exists but the server is stopped.
+        """
+        pass
+
+    def can_restamp( self, context ):
+        """True iff -U can re-stamp metadata for *context* without reloading.
+
+        Always True for live backends (the data is in the repository); qlever
+        requires a checkpoint, otherwise the metadata would be lost at the next
+        rebuild.
+        """
+        return True
