@@ -170,8 +170,8 @@ class RDF4JConf( BaseModel ):
 class QleverConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand        : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe( "server_brand" ))
-    qleverfile   : str = Field( title = "Qleverfile path", description = "Path to the Qleverfile. location, repository and other settings are read from that file." )
-    qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory from which qlever CLI commands are run." )
+    qleverfile   : str = Field( title = "Qleverfile path", description = "Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped." )
+    qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there." )
     access_token : Optional[ str ] = Field( None, title = "Qlever access token", description = "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile." )
 
 class SpecialEnum( str, Enum ):
