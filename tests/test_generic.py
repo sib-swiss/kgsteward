@@ -33,3 +33,8 @@ def test_default_hooks_are_safe_noops():
     assert c.finalize( True,  echo = False )                  is None
     assert c.finalize( False, echo = False )                  is None
     assert c.ensure_running( echo = False )                   is None
+
+    # refine_status must not touch a live backend's computed statuses
+    cfg2 = { "dataset": [ { "name": "a", "context": "http://x/a", "status": "ok" } ] }
+    assert c.refine_status( cfg2 ) is None
+    assert cfg2["dataset"][0]["status"] == "ok", "live backend status must be left unchanged"

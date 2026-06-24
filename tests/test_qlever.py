@@ -176,6 +176,73 @@ def test_plan_index_scope_frozen_parent_warns_not_errors( qlever_workdir ):
         client.plan_index_scope( { "child" }, cfg_strict, n2c )
 
 
+def test_refine_status_ready_vs_ok( qlever_workdir, monkeypatch ):
+    """refine_status maps the qlever lifecycle onto the status report:
+
+        current checkpoint + complete index NOT in sync   -> READY
+        current checkpoint + complete index in sync        -> ok
+        no/stale checkpoint                                -> base status kept
+        frozen                                             -> untouched
+
+    Pure state test: has_checkpoint and _complete_index_in_sync are stubbed, so
+    no server or on-disk index is needed (the shared module server is untouched).
+    """
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+
+    ctx_cur   = "http://example.org/context/rs_current"
+    ctx_stale = "http://example.org/context/rs_stale"
+    ctx_frz   = "http://example.org/context/rs_frozen"
+
+    def make_config():
+        return { "dataset": [
+            { "name": "cur",   "context": ctx_cur,   "target_sha256": "a", "frozen": False, "status": "UPDATE" },
+            { "name": "stale", "context": ctx_stale, "target_sha256": "b", "frozen": False, "status": "UPDATE" },
+            { "name": "frz",   "context": ctx_frz,   "target_sha256": "c", "frozen": True,  "status": "FROZEN" },
+        ] }
+
+    # only the "current" context has an up-to-date checkpoint
+    monkeypatch.setattr( client, "has_checkpoint", lambda ctx, sha = None: ctx == ctx_cur )
+
+    # complete index NOT assembled -> current checkpoint is READY
+    monkeypatch.setattr( client, "_complete_index_in_sync", lambda: False )
+    cfg = make_config()
+    client.refine_status( cfg )
+    st = { d["name"]: d["status"] for d in cfg["dataset"] }
+    assert st["cur"]   == "READY",  "current checkpoint, not assembled -> READY"
+    assert st["stale"] == "UPDATE", "no current checkpoint -> base status kept"
+    assert st["frz"]   == "FROZEN", "frozen dataset must be left untouched"
+
+    # complete index assembled (--qlever_complete ran) -> current checkpoint is ok
+    monkeypatch.setattr( client, "_complete_index_in_sync", lambda: True )
+    cfg = make_config()
+    client.refine_status( cfg )
+    st = { d["name"]: d["status"] for d in cfg["dataset"] }
+    assert st["cur"]   == "ok",     "current checkpoint + complete index -> ok"
+    assert st["stale"] == "UPDATE", "no current checkpoint -> base status kept"
+    assert st["frz"]   == "FROZEN", "frozen dataset must be left untouched"
+
+
+def test_complete_marker_drives_in_sync( qlever_workdir ):
+    """_complete_index_in_sync requires BOTH an index and the complete-marker;
+    _mark_index_complete / _clear_index_complete toggle the marker file."""
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+
+    client._clear_index_complete()
+    assert not os.path.isfile( client._complete_marker_path() )
+
+    client._mark_index_complete()
+    assert os.path.isfile( client._complete_marker_path() ), "marker file must be created"
+
+    client._clear_index_complete()
+    assert not os.path.isfile( client._complete_marker_path() ), "marker file must be removed"
+    # idempotent: clearing a missing marker must not raise
+    client._clear_index_complete()
+
+
 def test_parse_qleverfile_strips_inline_comments( tmp_path ):
     """parse_qleverfile must strip trailing '# ...' comments from values, so a
     commented TEXT_INDEX line does not corrupt the --text-index argument passed

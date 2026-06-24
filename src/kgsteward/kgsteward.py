@@ -361,14 +361,18 @@ WHERE{
                 item["sha256"] = str( rec["sha256"]["value"] )
         except Exception as e: # test before and remove this try/except block
             stop_error( "Failed parsing server response: " + str( e ))
-    for item in config["dataset"]: # ordering respect dependency 
+    for item in config["dataset"]: # ordering respect dependency
         sha256 = get_sha256( config, item["name"], echo = echo )
-        # default status is "EMPTY" if the context is not found in the repository, 
-        # otherwise "ok" if the checksum is the same, 
+        item["target_sha256"] = sha256   # current input checksum, used by server.refine_status()
+        # default status is "EMPTY" if the context is not found in the repository,
+        # otherwise "ok" if the checksum is the same,
         # or "UPDATE" if the checksum is different,
-        # or "FROZEN" if the record is frozen, 
+        # or "FROZEN" if the record is frozen,
         # or "PROPAGATE" if it is not frozen but has a parent record to update.
-        # or "UNKNOWN" if is is not managed by kgsteward 
+        # or "UNKNOWN" if is is not managed by kgsteward
+        # A backend may later refine these via server.refine_status() -- notably
+        # qlever introduces "READY": a current checkpoint exists on disk but the
+        # complete (text-indexed) production index has not been assembled yet.
         if item["name"] in name_to_update:
             item["status"] = "UPDATE"
         elif item["sha256"] == sha256:
@@ -1127,6 +1131,10 @@ INSERT DATA {{
     # --------------------------------------------------------- #
 
     config = update_config( server, config, echo = args.v )
+    # Backend-specific status refinement (no-op for live backends; qlever marks
+    # current-but-unassembled checkpoints as READY).  Report-only: the -C update
+    # decision above is deliberately left untouched.
+    server.refine_status( config )
 
     if args.dependency_graph:
         print_break()

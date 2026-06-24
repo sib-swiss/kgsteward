@@ -585,6 +585,8 @@ class QleverClient( GenericClient ):
         for f in stale_text_files:
             os.remove( f )
             report( "wiped stale text index", os.path.basename( f ) )
+        # A partial/scoped rebuild is no longer the complete production index.
+        self._clear_index_complete()
         if self.user_text_index and self.user_text_index.lower() != "none":
             extra = " ; wiped " + str( len( stale_text_files ) ) + " stale text-index file(s)" if stale_text_files else ""
             print_warn(
@@ -725,6 +727,9 @@ class QleverClient( GenericClient ):
             print_warn( "Qleverfile has TEXT_INDEX = none — building complete index without a text index" )
         self._qlever( *self._start_args(), echo = echo )
         self.is_running = True
+        # The complete production index is now in sync: mark it so refine_status
+        # reports its datasets as 'ok' rather than 'READY'.
+        self._mark_index_complete()
 
     # ------------------------------------------------------------------ #
     # Polymorphic workflow hooks (see GenericClient for the contracts)
@@ -823,6 +828,32 @@ class QleverClient( GenericClient ):
 
     def can_restamp( self, context ):
         return self.has_checkpoint( context )
+
+    def refine_status( self, config, echo = False ):
+        """Mark current-but-unassembled checkpoints as READY.
+
+        qlever lifecycle (per dataset):
+
+            EMPTY / UPDATE  --(-C / -d / --qlever_upload_quads)-->  READY
+            READY           --(--qlever_complete)----------------->  ok
+
+        A dataset is READY when a *current* checkpoint exists on disk (currency
+        is verified against the input checksum stashed in ``target_sha256``) but
+        the complete production index -- the one ``--qlever_complete`` assembles
+        from every checkpoint, including the text index -- is not in sync.  Only
+        once that complete index has been built does the dataset become ``ok``.
+
+        Frozen datasets are intentionally left untouched (their status handling
+        is a separate, future concern).
+        """
+        complete = self._complete_index_in_sync()
+        for item in config["dataset"]:
+            if item.get( "frozen" ):
+                continue
+            context = item["context"]
+            if not self.has_checkpoint( context, item.get( "target_sha256" ) ):
+                continue   # no current checkpoint -> leave the base EMPTY/UPDATE status
+            item["status"] = "ok" if complete else "READY"
 
     # ------------------------------------------------------------------ #
     # Public data-loading API
@@ -1091,6 +1122,33 @@ class QleverClient( GenericClient ):
         safe = re.sub( r"[^a-zA-Z0-9_-]", "_", context_iri.rstrip( "/" ).split( "/" )[-1] )[:40]
         return os.path.join( self.qleverdir, f"{safe}_{h8}.nt.gz" )
 
+    def _complete_marker_path( self ):
+        """Path of the sentinel that records 'the complete index is in sync'.
+
+        Written by ``complete_index`` after a successful full (all-checkpoints +
+        text-index) build; cleared by any partial/bootstrap rebuild that
+        invalidates that completeness (``_finalize_index``, and -- via the
+        ``<repository>.*`` wipe -- ``rewrite_repository`` / ``upload_quads``).
+        Named ``<repository>.*`` so rewrite_repository removes it automatically.
+        """
+        return os.path.join( self.qleverdir, f"{self.repository}.kgsteward-complete" )
+
+    def _mark_index_complete( self ):
+        with open( self._complete_marker_path(), "w" ) as f:
+            f.write( "complete\n" )
+
+    def _clear_index_complete( self ):
+        marker = self._complete_marker_path()
+        if os.path.isfile( marker ):
+            os.remove( marker )
+
+    def _complete_index_in_sync( self ):
+        """True iff the on-disk index is the complete one assembled from every
+        checkpoint (so all current checkpoints are served and, if configured,
+        the text index is built).  Any per-dataset/scoped rebuild or bootstrap
+        clears the marker, so this stays False until the next --qlever_complete."""
+        return self.has_index and os.path.isfile( self._complete_marker_path() )
+
     def has_checkpoint( self, context_iri, sha256 = None ):
         """True iff a completed checkpoint exists for *context_iri*.
 
@@ -1298,4 +1356,16 @@ class QleverClient( GenericClient ):
         for g in sorted( graphs_in_server ):
             self.dump_checkpoint( g, echo = echo )
 
+        # The bulk index built here is NOT the complete production index: it has
+        # no text index and was assembled from the dump, not from the checkpoints.
+        # rewrite_repository above already cleared the complete-marker, so these
+        # datasets report READY.  Point the user at the assembling step.
+        wants_text = bool( self.user_text_index ) and self.user_text_index.lower() != "none"
+        print_warn(
+            "Datasets are READY (checkpoints captured) but not yet in production"
+            + ( " and the text index is NOT built" if wants_text else "" )
+            + ". Run with --qlever_complete to assemble the complete index"
+            + ( " + text index" if wants_text else "" )
+            + " from all checkpoints (READY -> ok)."
+        )
         return sorted( graphs_in_server )

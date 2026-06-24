@@ -233,3 +233,19 @@ WHERE{{
         rebuild.
         """
         return True
+
+    def refine_status( self, config, echo = False ):
+        """Report-only refinement of each dataset's ``status`` field.
+
+        No-op for live backends: what the server serves IS the managed content,
+        so the status derived from the server query (see ``update_config``) is
+        already authoritative.
+
+        Backends that stage content separately from what they serve override
+        this.  qlever is the first such backend (its on-disk ``.nt.gz``
+        checkpoints are the source of truth, and a checkpoint can be current yet
+        absent from the complete production index until ``--qlever_complete``
+        assembles it).  The same hook would let another brand surface a READY
+        state should it grow checkpoint-dumping later.
+        """
+        pass
