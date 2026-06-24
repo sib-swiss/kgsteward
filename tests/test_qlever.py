@@ -243,6 +243,37 @@ def test_complete_marker_drives_in_sync( qlever_workdir ):
     client._clear_index_complete()
 
 
+def test_complete_index_crash_leaves_no_stale_marker( qlever_workdir, monkeypatch ):
+    """complete_index must clear the complete-marker BEFORE mutating the index, so
+    a crash mid-rebuild cannot leave a stale marker that reports a broken index as
+    'ok'.  The index-build step is stubbed to raise; the pre-existing marker (from
+    a prior successful complete run) must be gone afterwards."""
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+
+    # Pretend a previous --qlever_complete succeeded.
+    client._mark_index_complete()
+    assert os.path.isfile( client._complete_marker_path() )
+
+    # Stub out everything up to (and including) the failing index build.
+    monkeypatch.setattr( client, "_collect_checkpoint_entries",
+                         lambda *a, **k: [ { "cmd": "cat x", "format": "nt", "graph": "http://x/g" } ] )
+    monkeypatch.setattr( client, "_patch_qleverfile", lambda *a, **k: None )
+    client.is_running = False
+
+    def boom( *a, **k ):
+        raise RuntimeError( "simulated qlever index crash" )
+    monkeypatch.setattr( client, "_qlever", boom )
+
+    with pytest.raises( RuntimeError ):
+        client.complete_index( echo = True )
+
+    assert not os.path.isfile( client._complete_marker_path() ), (
+        "a crashed complete_index must NOT leave a stale complete-marker"
+    )
+
+
 def test_parse_qleverfile_strips_inline_comments( tmp_path ):
     """parse_qleverfile must strip trailing '# ...' comments from values, so a
     commented TEXT_INDEX line does not corrupt the --text-index argument passed

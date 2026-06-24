@@ -713,6 +713,10 @@ class QleverClient( GenericClient ):
         self._patch_qleverfile( entries )
         if self.is_running:
             self.server_stop( echo = echo )
+        # Clear the complete-marker BEFORE mutating the index: it must exist only
+        # when a complete build has fully succeeded, otherwise a crash mid-rebuild
+        # would leave a stale marker and report a broken index as 'ok'.
+        self._clear_index_complete()
         # Wipe stale text-index files so they cannot mismatch the rebuilt main index.
         for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
             os.remove( f )
