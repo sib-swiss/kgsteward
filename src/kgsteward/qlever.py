@@ -347,7 +347,7 @@ class QleverClient( GenericClient ):
                 parser.write( f )
             report( "forced", "[server] HOST_NAME = localhost" )
 
-    def _patch_qleverfile( self, entries ):
+    def _patch_qleverfile( self, entries, echo = True ):
         """Re-sync qleverdir/Qleverfile from the user's source, then patch INPUT_FILES + MULTI_INPUT_JSON.
 
         Always re-copies from the user's source so edits to SETTINGS_JSON /
@@ -364,7 +364,7 @@ class QleverClient( GenericClient ):
         """
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         shutil.copy2( os.path.realpath( self.qleverfile ), dest )
-        report( "synced Qleverfile from user source", dest )
+        if echo: report( "synced Qleverfile from user source", dest )
 
         parser = configparser.RawConfigParser( inline_comment_prefixes = ('#',) )
         parser.optionxform = str    # preserve uppercase keys
@@ -387,8 +387,9 @@ class QleverClient( GenericClient ):
 
         with open( dest, "w" ) as f:
             parser.write( f )
-        report( "INPUT_FILES",      file_paths )
-        report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
+        if echo:
+            report( "INPUT_FILES",      file_paths )
+            report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
 
     # ------------------------------------------------------------------ #
     # Input staging
@@ -421,9 +422,11 @@ class QleverClient( GenericClient ):
             if os.path.lexists( dest_path ):
                 os.remove( dest_path )
             try:
-                os.link( src, dest_path );   report( "hard-link", dest_path )
+                os.link( src, dest_path )
+                if echo: report( "hard-link", dest_path )
             except OSError:
-                shutil.copy2( src, dest_path ); report( "copy", dest_path )
+                shutil.copy2( src, dest_path )
+                if echo: report( "copy", dest_path )
             cmd = f"zcat input/{dest_name}" if is_gz else f"cat input/{dest_name}"
         else:
             # Non-native (RDF/XML, OWL, …) — convert via riot to .nt.
@@ -452,7 +455,7 @@ class QleverClient( GenericClient ):
                     print( riot.stderr, flush = True )
                 stop_error( f"riot conversion failed for: {src}" )
             fmt, cmd = "nt", f"cat input/{dest_name}"
-            report( "staged (riot→nt)", dest_path )
+            if echo: report( "staged (riot→nt)", dest_path )
 
         # Bake the void:dataDump triple into the index as a sibling .nt file —
         # avoids a separate INSERT + rebuild.
@@ -473,11 +476,11 @@ class QleverClient( GenericClient ):
         # as .nt; the void file we emit ourselves is single-line .nt -- all safe.
         if fmt == "ttl" and _ttl_has_multiline_literal( src ):
             data_parallel = "false"
-            report( "multiline literal", f"disabling parallel parsing for {os.path.basename(src)}" )
+            if echo: report( "multiline literal", f"disabling parallel parsing for {os.path.basename(src)}" )
         else:
             data_parallel = "true"
 
-        report( "staged", f"input/{dest_name}  (+ void triple)" )
+        if echo: report( "staged", f"input/{dest_name}  (+ void triple)" )
         return [
             { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": data_parallel },
             { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": "true"        },
@@ -487,7 +490,7 @@ class QleverClient( GenericClient ):
     # Index lifecycle
     # ------------------------------------------------------------------ #
 
-    def _collect_checkpoint_entries( self, exclude_iris = None, include_iris = None ):
+    def _collect_checkpoint_entries( self, exclude_iris = None, include_iris = None, echo = True ):
         """MULTI_INPUT_JSON entries for every completed checkpoint in qleverdir.
 
         Reads ``*.nt.gz.json`` sidecar files (the atomic completeness marker),
@@ -516,13 +519,13 @@ class QleverClient( GenericClient ):
                 continue
             fname = os.path.basename( sidecar[ :-5 ] )   # strip ".json"
             if context_iri in exclude:
-                report( "checkpoint superseded by pending data", fname )
+                if echo: report( "checkpoint superseded by pending data", fname )
                 continue
             if include is not None and context_iri not in include:
-                report( "checkpoint outside index scope (skipped)", fname )
+                if echo: report( "checkpoint outside index scope (skipped)", fname )
                 continue
             entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": "true" } )
-            report( "checkpoint → index", fname )
+            if echo: report( "checkpoint → index", fname )
         return entries
 
     def _abort_if_index_log_has_error( self ):
@@ -564,15 +567,15 @@ class QleverClient( GenericClient ):
         pending_iris       = { e["graph"] for e in self.pending_files }
         # Restrict to the dependency-closure scope of this run (if set); the
         # pending files (the dataset(s) being processed) are always included.
-        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris, include_iris = self.index_scope )
+        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris, include_iris = self.index_scope, echo = echo )
         all_entries        = checkpoint_entries + self.pending_files
 
         if not all_entries:
             print_warn( "_finalize_index called with no files (no pending files, no checkpoints) — nothing to do." )
             return
 
-        print_task( "Write MULTI_INPUT_JSON to Qleverfile" )
-        self._patch_qleverfile( all_entries )
+        if echo: print_task( "Write MULTI_INPUT_JSON to Qleverfile" )
+        self._patch_qleverfile( all_entries, echo = echo )
 
         if self.is_running:
             self.server_stop( echo = echo )
@@ -584,10 +587,10 @@ class QleverClient( GenericClient ):
         stale_text_files = glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) )
         for f in stale_text_files:
             os.remove( f )
-            report( "wiped stale text index", os.path.basename( f ) )
+            if echo: report( "wiped stale text index", os.path.basename( f ) )
         # A partial/scoped rebuild is no longer the complete production index.
         self._clear_index_complete()
-        if self.user_text_index and self.user_text_index.lower() != "none":
+        if echo and self.user_text_index and self.user_text_index.lower() != "none":
             extra = " ; wiped " + str( len( stale_text_files ) ) + " stale text-index file(s)" if stale_text_files else ""
             print_warn(
                 "Qleverfile has TEXT_INDEX = " + self.user_text_index
@@ -605,7 +608,7 @@ class QleverClient( GenericClient ):
         input_dir = os.path.join( self.qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
-            report( "cleanup", input_dir )
+            if echo: report( "cleanup", input_dir )
 
         self.pending_files = []
         self._apply_pending_updates( echo = echo )
@@ -623,7 +626,7 @@ class QleverClient( GenericClient ):
         if not self.pending_updates:
             return
         n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
-        print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset checkpoint" )
+        if echo: print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset checkpoint" )
         for item in self.pending_updates:
             if isinstance( item, tuple ):
                 context_iri = item[0]
@@ -706,11 +709,11 @@ class QleverClient( GenericClient ):
         too.  This is the only path that guarantees a complete, queryable,
         text-indexed server.
         """
-        entries = self._collect_checkpoint_entries()   # all checkpoints, full scope
+        entries = self._collect_checkpoint_entries( echo = echo )   # all checkpoints, full scope
         if not entries:
             stop_error( "--qlever_complete: no checkpoints found to assemble into an index." )
         print_task( "Assemble complete qlever index from all checkpoints" )
-        self._patch_qleverfile( entries )
+        self._patch_qleverfile( entries, echo = echo )
         if self.is_running:
             self.server_stop( echo = echo )
         # Clear the complete-marker BEFORE mutating the index: it must exist only
@@ -720,7 +723,7 @@ class QleverClient( GenericClient ):
         # Wipe stale text-index files so they cannot mismatch the rebuilt main index.
         for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
             os.remove( f )
-            report( "wiped stale text index", os.path.basename( f ) )
+            if echo: report( "wiped stale text index", os.path.basename( f ) )
         self._has_current_text_index = False
         self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
         self._abort_if_index_log_has_error()
@@ -1114,7 +1117,7 @@ class QleverClient( GenericClient ):
         OOM-kill qlever-server with ``RemoteDisconnected`` — kgsteward
         used to send one here and we removed it.
         """
-        report( "drop_context", f"no-op for qlever (will be excluded from next index rebuild): {context}" )
+        if echo: report( "drop_context", f"no-op for qlever (will be excluded from next index rebuild): {context}" )
 
     # ------------------------------------------------------------------ #
     # Checkpoint management
@@ -1232,7 +1235,7 @@ class QleverClient( GenericClient ):
         os.replace( tmp_path, path )    # atomic on POSIX
         with open( sidecar, "w" ) as f:
             json.dump( { "graph": context_iri, "sha256": sha256 }, f )
-        report( "checkpoint saved", fname )
+        if echo: report( "checkpoint saved", fname )
 
     # ------------------------------------------------------------------ #
     # Repository / bulk-adoption operations
@@ -1273,20 +1276,20 @@ class QleverClient( GenericClient ):
         input_dir = os.path.join( self.qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
-            report( "wiped", input_dir )
+            if echo: report( "wiped", input_dir )
 
         # kgsteward-managed checkpoints + their atomic-completion sidecars
         for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ) ):
             os.remove( path )
-            report( "wiped checkpoint", os.path.basename( path ) )
+            if echo: report( "wiped checkpoint", os.path.basename( path ) )
         for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
             os.remove( path )
-            report( "wiped checkpoint sidecar", os.path.basename( path ) )
+            if echo: report( "wiped checkpoint sidecar", os.path.basename( path ) )
 
         # On-disk qlever index for this repository (everything named <NAME>.*)
         for path in sorted( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.*" ) ) ):
             os.remove( path )
-            report( "wiped index file", os.path.basename( path ) )
+            if echo: report( "wiped index file", os.path.basename( path ) )
 
         # Leftover snapshot directories from a prior `qlever rebuild-index`
         for path in sorted(
@@ -1295,7 +1298,7 @@ class QleverClient( GenericClient ):
         ):
             if os.path.isdir( path ):
                 shutil.rmtree( path )
-                report( "wiped rebuild dir", os.path.basename( path ) )
+                if echo: report( "wiped rebuild dir", os.path.basename( path ) )
 
         # Restore the user's Qleverfile (verbatim -- _patch_qleverfile will
         # re-sync + patch when the next _finalize_index runs).
@@ -1303,7 +1306,7 @@ class QleverClient( GenericClient ):
         dest      = os.path.join( self.qleverdir, "Qleverfile" )
         if user_real != ( os.path.realpath( dest ) if os.path.lexists( dest ) else None ):
             shutil.copy2( user_real, dest )
-            report( "copied Qleverfile", dest )
+            if echo: report( "copied Qleverfile", dest )
 
         self.pending_files           = []
         self.pending_updates         = []

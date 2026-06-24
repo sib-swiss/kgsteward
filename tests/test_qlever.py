@@ -224,6 +224,46 @@ def test_refine_status_ready_vs_ok( qlever_workdir, monkeypatch ):
     assert st["frz"]   == "FROZEN", "frozen dataset must be left untouched"
 
 
+def test_collect_checkpoint_entries_echo_gating( tmp_path, capsys ):
+    """The per-checkpoint 'checkpoint -> index' chatter must be silent unless -v.
+
+    _collect_checkpoint_entries runs on every per-dataset rebuild and reports one
+    line per checkpoint, so an N-dataset -C used to emit O(N^2) lines.  Gating it
+    behind echo keeps non-verbose runs quiet while -v still shows every entry.
+    The returned entries must be identical regardless of echo.
+    """
+    import json
+    from src.kgsteward.qlever import QleverClient
+
+    confdir = tmp_path / "conf"; confdir.mkdir()
+    workdir = tmp_path / "qlv";   workdir.mkdir()
+    ( confdir / "Qleverfile" ).write_text(
+        "[data]\nNAME = echo_test\n"
+        "[server]\nHOST_NAME = localhost\nPORT = 7039\n"
+        "[runtime]\nSYSTEM = docker\n"
+    )
+    client = QleverClient( str( confdir / "Qleverfile" ), str( workdir ), echo = False )
+
+    # Three completed checkpoints (only the sidecars are needed by the collector).
+    for i in range( 3 ):
+        ctx = f"http://example.org/context/echo_{i}"
+        sidecar = client.checkpoint_path( ctx ) + ".json"
+        with open( sidecar, "w" ) as f:
+            json.dump( { "graph": ctx, "sha256": f"sha{i}" }, f )
+
+    # Non-verbose: no per-checkpoint chatter, but all entries still collected.
+    entries_quiet = client._collect_checkpoint_entries( echo = False )
+    out_quiet = capsys.readouterr().out
+    assert len( entries_quiet ) == 3
+    assert "checkpoint" not in out_quiet, f"non-verbose must be silent, got:\n{out_quiet}"
+
+    # Verbose: one 'checkpoint -> index' line per checkpoint.
+    entries_loud = client._collect_checkpoint_entries( echo = True )
+    out_loud = capsys.readouterr().out
+    assert len( entries_loud ) == 3
+    assert out_loud.count( "checkpoint" ) >= 3, f"verbose must report each checkpoint, got:\n{out_loud}"
+
+
 def test_complete_marker_drives_in_sync( qlever_workdir ):
     """_complete_index_in_sync requires BOTH an index and the complete-marker;
     _mark_index_complete / _clear_index_complete toggle the marker file."""
