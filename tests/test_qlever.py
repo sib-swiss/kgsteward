@@ -289,6 +289,31 @@ def test_warn_if_unindexed_echo_gating( tmp_path, capsys ):
     assert "No checkpoint" in capsys.readouterr().out, "verbose must show the warning"
 
 
+def test_list_context_returns_managed_set_without_querying( qlever_workdir, monkeypatch ):
+    """list_context must return the managed contexts (the YAML dataset graphs)
+    WITHOUT issuing the SELECT DISTINCT ?g query, which OOMs on a large qlever
+    index (no graph-sorted permutation).  If sparql_query is ever called the
+    test fails."""
+    from src.kgsteward.qlever import QleverClient
+
+    managed = { "http://example.org/context/a", "http://example.org/context/b" }
+    client = QleverClient(
+        qlever_workdir["qleverfile"], qlever_workdir["qleverdir"],
+        echo = False, managed_contexts = managed,
+    )
+
+    def _boom( *a, **k ):
+        raise AssertionError( "list_context must NOT query the store when the managed set is known" )
+    monkeypatch.setattr( client, "sparql_query", _boom )
+
+    assert client.list_context() == managed
+
+    # Without a managed set (ad-hoc client) it falls back to the live query.
+    client.managed_contexts = None
+    monkeypatch.setattr( client, "_store_graphs_via_sparql", lambda echo = True: { "queried" } )
+    assert client.list_context() == { "queried" }
+
+
 def test_complete_marker_drives_in_sync( qlever_workdir ):
     """_complete_index_in_sync requires BOTH an index and the complete-marker;
     _mark_index_complete / _clear_index_complete toggle the marker file."""

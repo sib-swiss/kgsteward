@@ -181,7 +181,7 @@ class QleverClient( GenericClient ):
     # Construction
     # ------------------------------------------------------------------ #
 
-    def __init__( self, qleverfile, qleverdir, access_token = None, echo = True ):
+    def __init__( self, qleverfile, qleverdir, access_token = None, echo = True, managed_contexts = None ):
         for tool in ( "qlever", "riot" ):
             if shutil.which( tool ) is None:
                 stop_error( f"{tool} not found on PATH" )
@@ -211,6 +211,12 @@ class QleverClient( GenericClient ):
         self.access_token    = access_token if access_token is not None else access_token_from_file
         self.qlever_cmd      = ["qlever"]
         self.user_text_index = text_index   # original [index] TEXT_INDEX from user's source
+        # Context IRIs of all datasets kgsteward manages (from the YAML).  Used by
+        # list_context(): qlever cannot enumerate graphs cheaply (no G-sorted
+        # permutation -> SELECT DISTINCT ?g scans+sorts the whole index and OOMs),
+        # but kgsteward owns everything in the store, so the managed set IS the
+        # authoritative list of named graphs.
+        self.managed_contexts = set( managed_contexts ) if managed_contexts is not None else None
         # MULTI_INPUT_JSON entries staged for the next _finalize_index rebuild.
         self.pending_files   = []
         # SPARQL updates queued for the next _apply_pending_updates flush;
@@ -1101,8 +1107,27 @@ class QleverClient( GenericClient ):
         report( "dumped sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries)" )
 
     def list_context( self, echo = True ):
-        # qlever does not enumerate graphs via GRAPH ?g {} (empty body); the
-        # full triple pattern is required.
+        """Named graphs held by the store.
+
+        qlever has no graph-sorted permutation, so ``SELECT DISTINCT ?g WHERE {
+        GRAPH ?g { ?s ?p ?o } }`` degrades to a full index scan + sort over every
+        triple and blows the per-query memory budget on a large index (returning
+        an ERROR / empty result).  But a kgsteward-managed qlever store contains
+        exactly the datasets kgsteward put there, so the managed contexts (from
+        the YAML) are the authoritative graph list -- return them and skip the
+        query entirely.  Falls back to the live query only if the managed set was
+        not supplied at construction (e.g. an ad-hoc client)."""
+        if self.managed_contexts is not None:
+            return set( self.managed_contexts )
+        return self._store_graphs_via_sparql( echo = echo )
+
+    def _store_graphs_via_sparql( self, echo = True ):
+        """Enumerate named graphs by actually querying the running server.
+
+        Only used where the on-disk/managed set is not authoritative -- notably
+        the ``--qlever_upload_quads`` bootstrap, which must discover the graphs
+        present in a freshly bulk-loaded dump.  Expensive on large indexes (see
+        list_context); acceptable for the bootstrap one-shot."""
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g { ?s ?p ?o }}", echo = echo )
         if r is None:
             return set()
@@ -1340,7 +1365,9 @@ class QleverClient( GenericClient ):
         self.is_running = True
 
         print_task( "Verify graphs in the loaded index against the YAML datasets" )
-        graphs_in_server = self.list_context( echo = False )
+        # Must reflect what was ACTUALLY bulk-loaded from the dump (no checkpoints
+        # exist yet), so query the store directly rather than the managed set.
+        graphs_in_server = self._store_graphs_via_sparql( echo = False )
         if not graphs_in_server:
             stop_error( "No named graphs found in the loaded index — refusing to proceed.\n"
                         "Check INPUT_FILES / CAT_INPUT_FILES in the Qleverfile and that the dump "

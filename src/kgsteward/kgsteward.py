@@ -516,7 +516,10 @@ def main():
                 replace_env_var( config["server"]["qleverfile"] ),
                 replace_env_var( config["server"]["qleverdir"] ),
                 access_token = replace_env_var( config["server"]["access_token"] ) if config["server"].get( "access_token" ) else None,
-                echo = args.v
+                echo = args.v,
+                # qlever cannot enumerate graphs cheaply; kgsteward owns the store,
+                # so the managed dataset contexts are the authoritative graph list.
+                managed_contexts = { item["context"] for item in config["dataset"] },
             )
         except Exception as e:
             stop_error( "Failed to connect to Qlever server: " + str( e ))
