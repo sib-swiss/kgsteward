@@ -27,7 +27,7 @@ The drivers fall into two families that behave very differently:
   (one checkpoint file per dataset) and assembles the served index from it.
 
 Most of the per-backend remarks below were gathered while scaling real research
-projects up; see also [scaling up](../scaling_up/README.md).
+projects up; see also the [user guide](../user_guide/README.md).
 
 ## Live HTTP backends
 
