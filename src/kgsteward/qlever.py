@@ -1116,7 +1116,11 @@ class QleverClient( GenericClient ):
         exactly the datasets kgsteward put there, so the managed contexts (from
         the YAML) are the authoritative graph list -- return them and skip the
         query entirely.  Falls back to the live query only if the managed set was
-        not supplied at construction (e.g. an ad-hoc client)."""
+        not supplied at construction (e.g. an ad-hoc client).
+
+        Upstream limitation (revisit if qlever gains a graph-sorted permutation):
+        https://github.com/ad-freiburg/qlever/wiki/Current-deviations-from-the-SPARQL-1.1-standard
+        """
         if self.managed_contexts is not None:
             return set( self.managed_contexts )
         return self._store_graphs_via_sparql( echo = echo )
