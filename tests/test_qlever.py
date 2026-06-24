@@ -495,39 +495,63 @@ def test_sparql_update_connection_drop_is_reported( qlever_workdir, monkeypatch 
     print( "\nconnection drop mid-update -> clean stop_error + CONNECTION_LOST stats row" )
 
 
-def test_sparql_update_stats_streamed_live( qlever_workdir, tmp_path ):
-    """enable_sparql_update_stats writes a header immediately and _record_stat
-    appends+flushes one row per update -- so a Ctrl-C mid-run keeps every row
-    already gathered, instead of an empty file dumped only at session end."""
+def test_sparql_logs_paired_files_and_collision_safe_stem( qlever_workdir, tmp_path ):
+    """--sparql_logs writes a collision-safe pair of files into a shared dir:
+    <brand>_<UTCstart>_<pid>.{queries,timing}.tsv, both with headers on disk
+    immediately (tail-able), and concurrent runs/brands never share a stem."""
+    from src.kgsteward.common import SPARQL_LOG_COLS
     from src.kgsteward.qlever import QleverClient
 
-    client  = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = False )
-    tsv     = str( tmp_path / "stats.tsv" )
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = False )
+    logdir = str( tmp_path / "logs" )
 
-    client.enable_sparql_update_stats( tsv )
-    # Header is on disk before any update runs -> tail -f has something to show.
-    assert os.path.isfile( tsv )
-    header = open( tsv ).read().splitlines()
-    assert header == [ "n\tts\telapsed_ms\tqlever_total_ms\thttp_status\tsize_chars\tsha1_8\tfirst_line\terror" ]
+    client.enable_sparql_logs( logdir, "qlever" )
+    timing, queries = client.sparql_log_paths()
+    assert os.path.dirname( timing ) == os.path.dirname( queries ) == logdir
+    # paired stem, brand-prefixed, carries the pid -> distinct per concurrent run
+    stem = os.path.basename( timing )[: -len( ".timing.tsv" )]
+    assert os.path.basename( queries ) == stem + ".queries.tsv"
+    assert stem.startswith( "qlever_" ) and stem.endswith( "_" + str( os.getpid() ) )
+    # headers present before any update -> tail -f shows something
+    assert open( timing  ).read().splitlines() == [ "\t".join( SPARQL_LOG_COLS ) ]
+    assert open( queries ).read().splitlines() == [ "sha1_8\tsparql" ]
+    print( "\nsparql_logs: collision-safe paired files with headers up front" )
 
-    # Each recorded row lands on disk immediately (simulating a crash before the
-    # end-of-session dump would ever run).
-    client._record_stat( { "n": 1, "ts": "T", "elapsed_ms": 10, "qlever_total_ms": 5,
-                           "http_status": 200, "size_chars": 3, "sha1_8": "abcd1234",
-                           "first_line": "INSERT DATA ...", "error": "" } )
-    client._record_stat( { "n": 2, "ts": "T", "elapsed_ms": 9999, "qlever_total_ms": 9000,
-                           "http_status": 200, "size_chars": 7, "sha1_8": "ef567890",
-                           "first_line": "DELETE WHERE ...", "error": "" } )
 
-    rows = open( tsv ).read().splitlines()
-    assert len( rows ) == 3, "header + 2 rows must already be on disk without a final dump"
-    assert rows[1].startswith( "1\t" ) and rows[2].startswith( "2\t" )
-    assert "9999" in rows[2]
+def test_sparql_logs_query_before_timing_and_dedup( qlever_workdir, tmp_path ):
+    """The query text is logged BEFORE the POST (so an in-flight/hung update is
+    the sha1_8 in queries.tsv with no timing row), the timing row AFTER, and the
+    queries file is deduped by sha1_8.  Both stream live (Ctrl-C-safe)."""
+    from src.kgsteward.common import sparql_sha1_8
+    from src.kgsteward.qlever import QleverClient
 
-    # The end-of-session dump must NOT clobber the streamed file; it just confirms.
-    client.dump_sparql_update_stats( tsv )
-    assert open( tsv ).read().splitlines() == rows, "dump must not rewrite the streamed TSV"
-    print( "\nsparql_update_stats streamed live (Ctrl-C-safe), dump is a no-op rewrite" )
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = False )
+    logdir = str( tmp_path / "logs" )
+    client.enable_sparql_logs( logdir, "qlever" )
+    timing, queries = client.sparql_log_paths()
+
+    sparql = "INSERT DATA {\n\tGRAPH <http://x/g> { <http://x/s> <http://x/p> <http://x/o> }\n}"
+    sha    = sparql_sha1_8( sparql )
+
+    # BEFORE the POST: the query is already on disk; no timing row yet.
+    tok = client._sparql_update_started( sparql )
+    qrows = open( queries ).read().splitlines()
+    assert qrows[1].startswith( sha + "\t" )
+    assert "\\n" in qrows[1] and "\\t" in qrows[1], "newlines/tabs escaped to one row"
+    assert len( open( timing ).read().splitlines() ) == 1, "no timing row before completion"
+
+    # AFTER: the timing row lands, flushed.
+    client._sparql_update_finished( tok, 200, qlever_total_ms = 12 )
+    trows = open( timing ).read().splitlines()
+    assert len( trows ) == 2 and trows[1].split( "\t" )[6] == sha
+
+    # Re-running the identical statement re-times it but does NOT duplicate the
+    # query-text entry (deduped by sha1_8).
+    tok2 = client._sparql_update_started( sparql )
+    client._sparql_update_finished( tok2, 200 )
+    assert len( open( queries ).read().splitlines() ) == 2, "queries.tsv deduped by sha1_8"
+    assert len( open( timing  ).read().splitlines() ) == 3, "timing.tsv keeps every run"
+    print( "\nsparql_logs: query logged pre-execution, timing post, queries deduped" )
 
 
 def test_drop_context_is_noop_and_invalidate_clears_checkpoint( qlever_workdir ):

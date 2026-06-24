@@ -203,15 +203,19 @@ def get_user_input():
                "everything except `?x ql:contains-word ...` queries)."
     )
     parser.add_argument(
-        '--sparql_update_stats',
-        metavar = 'FILE',
-        help   = "Stream per-update timings to a TSV (one row per sparql_update "
-                 "call, with wall-clock and server-side timings, size, sha1, error "
-                 "if any).  Rows are written and flushed live, so the file is "
-                 "tail-able during the run and a Ctrl-C keeps everything gathered "
-                 "so far.  Useful for diagnosing slow updates and for benchmark "
-                 "comparison between backends (run with each backend, then join on "
-                 "sha1_8 to compare per-update timings)."
+        '--sparql_logs',
+        metavar = 'DIR',
+        help   = "Log every SPARQL update to a directory (created if needed), as a "
+                 "pair of files per run sharing a collision-safe stem "
+                 "<brand>_<UTCstart>_<pid> (so concurrent runs of any brand/session "
+                 "into one dir never overwrite each other): '*.queries.tsv' maps "
+                 "sha1_8 -> full SPARQL, written BEFORE each statement runs (deduped); "
+                 "'*.timing.tsv' has one row per update written AFTER it returns "
+                 "(wall-clock + server-side timings, size, sha1, error).  Both are "
+                 "flushed live, so the files are tail-able and a Ctrl-C keeps "
+                 "everything; an in-flight/hung update is the sha1_8 present in "
+                 "queries.tsv but absent from timing.tsv.  Run with each backend and "
+                 "join the timing TSVs on sha1_8 to compare per-update timings."
     )
     parser.add_argument(
         '--sib_swiss_editor',
@@ -533,11 +537,10 @@ def main():
     os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
     os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
 
-    # Stream per-update timings to the TSV live (header now, one flushed row per
-    # update) so it is tail-able during the run and a Ctrl-C keeps what ran so
-    # far.  The end-of-session dump then just confirms the file (see below).
-    if args.sparql_update_stats and hasattr( server, "enable_sparql_update_stats" ):
-        server.enable_sparql_update_stats( args.sparql_update_stats )
+    # Start the per-update SPARQL logs (query text before each statement, timing
+    # after) into the requested directory, under a collision-safe per-run stem.
+    if args.sparql_logs:
+        server.enable_sparql_logs( args.sparql_logs, config["server"]["brand"] )
 
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
@@ -1175,13 +1178,16 @@ INSERT DATA {{
     # live backends; static-index backends start if an index exists).
     server.ensure_running( echo = args.v )
 
-    # Dump per-call sparql_update timings to a TSV, if requested.  Useful for
-    # diagnosing slow updates in a single backend and for benchmark comparison
-    # across backends (run with each, then join on sha1_8 to compare timings).
-    if args.sparql_update_stats and hasattr( server, "dump_sparql_update_stats" ):
-        print_break()
-        print_task( "Dump per-call sparql_update timing stats" )
-        server.dump_sparql_update_stats( args.sparql_update_stats )
+    # Confirm the SPARQL logs at session end (they were streamed live; nothing to
+    # write here).  Diagnose slow updates by sorting timing.tsv on elapsed_ms, or
+    # compare backends by joining their timing.tsv files on sha1_8.
+    if args.sparql_logs:
+        paths = server.sparql_log_paths()
+        if paths:
+            print_break()
+            print_task( "SPARQL logs" )
+            report( "timing log",  f"{paths[0]}  ({len( server.sparql_update_stats )} updates)" )
+            report( "queries log", paths[1] )
 
     #  save_json_schema(  "doc/kgsteward.schema.json" )
 

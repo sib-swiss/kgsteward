@@ -180,10 +180,11 @@ class FusekiClient( GenericClient ):
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
+        tok = self._sparql_update_started( sparql )   # log query BEFORE the POST
         # ``data=`` (form body) — previously ``params=`` was used, which puts
         # the update in the query string and made some Fuseki versions reject
         # the request with HTTP 400 for "no update statement".
-        http_call(
+        r = http_call(
             { 'method':  'POST',
               'url':     self.endpoint_update,
               'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -192,6 +193,8 @@ class FusekiClient( GenericClient ):
             status_code_ok,
             echo,
         )
+        self._sparql_update_finished( tok, getattr( r, "status_code", None ) )
+        return r
 
     def list_context( self, echo = True ):
         r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )

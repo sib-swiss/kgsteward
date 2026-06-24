@@ -18,6 +18,7 @@ class GenericClient():
         self.endpoint_store  = endpoint_store
         self.cookies         = None
         self.headers         = None
+        self._ensure_sparql_log_state()
 
     def list_repository( self ):
         """ Return a list of existing repository """
@@ -139,6 +140,107 @@ WHERE{{
         if size > 0 :
             report( "triples so far", str( count ))
             self._flush_buf( context, "".join( buf ), headers )
+
+    # ------------------------------------------------------------------ #
+    # SPARQL update logging  (--sparql_logs <dir>)
+    #
+    # Every driver's sparql_update records, per call: the full query text and a
+    # timing row.  Two paired files per run share a collision-safe stem
+    # <brand>_<UTCstart>_<pid> so concurrent runs (any brand/session) into one
+    # shared dir never overwrite each other:
+    #   *.queries.tsv  sha1_8 -> SPARQL, written BEFORE the POST (deduped)
+    #   *.timing.tsv   one row per update, written AFTER the POST
+    # An in-flight / hung / Ctrl-C'd update is therefore the sha1_8 present in
+    # queries.tsv but absent from timing.tsv.  Both files are flushed + fsync'd
+    # per write so an interrupt keeps everything gathered so far.
+    # ------------------------------------------------------------------ #
+
+    def _ensure_sparql_log_state( self ):
+        if not hasattr( self, "sparql_update_stats" ):   self.sparql_update_stats   = []
+        if not hasattr( self, "_sparql_update_counter" ): self._sparql_update_counter = 0
+        if not hasattr( self, "_sparql_timing_path" ):    self._sparql_timing_path    = None
+        if not hasattr( self, "_sparql_queries_path" ):   self._sparql_queries_path   = None
+        if not hasattr( self, "_sparql_logged_hashes" ):  self._sparql_logged_hashes  = set()
+
+    def _sparql_logging_on( self ):
+        self._ensure_sparql_log_state()
+        return self._sparql_timing_path is not None
+
+    @staticmethod
+    def _append_flush( path, line ):
+        with open( path, "a" ) as f:
+            f.write( line )
+            f.flush()
+            os.fsync( f.fileno() )
+
+    def enable_sparql_logs( self, directory, brand ):
+        """Start streaming per-update query + timing logs into *directory*.
+
+        Writes the two paired files' headers immediately (so they are tail-able
+        from the first update) under a stem ``<brand>_<UTCstart>_<pid>``.
+        """
+        self._ensure_sparql_log_state()
+        os.makedirs( directory, exist_ok = True )
+        stem = f"{brand}_{time.strftime( '%Y%m%dT%H%M%S' )}_{os.getpid()}"
+        self._sparql_timing_path  = os.path.join( directory, stem + ".timing.tsv" )
+        self._sparql_queries_path = os.path.join( directory, stem + ".queries.tsv" )
+        self._sparql_logged_hashes = set()
+        self._append_flush( self._sparql_timing_path,  "\t".join( SPARQL_LOG_COLS ) + "\n" )
+        self._append_flush( self._sparql_queries_path, "sha1_8\tsparql\n" )
+        report( "sparql logs", self._sparql_timing_path )
+        report( "sparql logs", self._sparql_queries_path )
+
+    def sparql_log_paths( self ):
+        """(timing_path, queries_path) if --sparql_logs is active, else None."""
+        self._ensure_sparql_log_state()
+        if self._sparql_timing_path is None:
+            return None
+        return ( self._sparql_timing_path, self._sparql_queries_path )
+
+    def _sparql_update_started( self, sparql ):
+        """Call right BEFORE issuing an update: bump the counter, log the full
+        query text (pre-execution, deduped) and return a token for
+        ``_sparql_update_finished``."""
+        self._ensure_sparql_log_state()
+        self._sparql_update_counter += 1
+        sha = sparql_sha1_8( sparql )
+        if self._sparql_logging_on() and sha not in self._sparql_logged_hashes:
+            self._sparql_logged_hashes.add( sha )
+            esc = ( sparql.replace( "\\", "\\\\" ).replace( "\t", "\\t" )
+                          .replace( "\r", "\\r" ).replace( "\n", "\\n" ) )
+            self._append_flush( self._sparql_queries_path, f"{sha}\t{esc}\n" )
+        return { "n": self._sparql_update_counter, "sha1_8": sha,
+                 "size_chars": len( sparql ), "first_line": sparql_first_line( sparql ),
+                 "t0": time.time() }
+
+    def _sparql_update_finished( self, tok, http_status, qlever_total_ms = None, error = "" ):
+        """Call AFTER the update returns (or fails): record the timing row."""
+        self._record_stat( {
+            "n":               tok["n"],
+            "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
+            "elapsed_ms":      int( ( time.time() - tok["t0"] ) * 1000 ),
+            "qlever_total_ms": qlever_total_ms,
+            "http_status":     http_status,
+            "size_chars":      tok["size_chars"],
+            "sha1_8":          tok["sha1_8"],
+            "first_line":      tok["first_line"],
+            "error":           error,
+        } )
+
+    @staticmethod
+    def _stats_row( stat ):
+        return "\t".join(
+            str( stat[c] ) if stat.get( c ) is not None else ""
+            for c in SPARQL_LOG_COLS
+        )
+
+    def _record_stat( self, stat ):
+        """Keep *stat* in memory and, if logging is on, append the timing row
+        (flushed + fsync'd)."""
+        self._ensure_sparql_log_state()
+        self.sparql_update_stats.append( stat )
+        if self._sparql_logging_on():
+            self._append_flush( self._sparql_timing_path, self._stats_row( stat ) + "\n" )
 
     # ------------------------------------------------------------------ #
     # Polymorphic workflow hooks

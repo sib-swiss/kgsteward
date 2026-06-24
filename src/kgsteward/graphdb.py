@@ -158,16 +158,19 @@ class GraphDBClient( GenericClient ):
     def sparql_update( self, sparql, status_code_ok = [ 204 ], echo = True ):
         if echo :
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
-        http_call(
+        tok = self._sparql_update_started( sparql )   # log query BEFORE the POST
+        r = http_call(
             {
                 'method'  : 'POST',
                 'url'     : self.endpoint_update,
                 'headers' : self.headers,
                 'params'  : { 'update': sparql },
-            }, 
+            },
             status_code_ok,
             echo
         )
+        self._sparql_update_finished( tok, getattr( r, "status_code", None ) )
+        return r
 
     def load_from_file( 
         self,

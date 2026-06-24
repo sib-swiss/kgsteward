@@ -1,5 +1,6 @@
 import os
 import glob
+import hashlib
 import requests
 import shutil
 import subprocess
@@ -17,6 +18,32 @@ RE_CATCH_ENV_VAR     = re.compile( r"\$\{([^\}]+)\}" )
 RE_CATCH_BEGIN_SPACE = re.compile( r"^(\s*)" )
 RE_CATCH_END_SPACE   = re.compile( r"(\s*)$" )
 RE_CATCH_TAB         = re.compile( r"(\t)" )
+
+# Column order of the per-update timing TSV written under --sparql_logs.
+# Shared by every driver via GenericClient (see _record_stat / _stats_row).
+SPARQL_LOG_COLS = [
+    "n", "ts", "elapsed_ms", "qlever_total_ms", "http_status",
+    "size_chars", "sha1_8", "first_line", "error",
+]
+
+def sparql_first_line( sparql ):
+    """Return the first non-empty, non-comment, non-PREFIX/BASE line of *sparql*.
+
+    Used as a human-readable identifier in the timing TSV.
+    """
+    for line in sparql.splitlines():
+        s = line.strip()
+        if not s:                             continue
+        if s.startswith( "#" ):               continue
+        if s.upper().startswith( "PREFIX " ): continue
+        if s.upper().startswith( "BASE " ):   continue
+        return s[:120]
+    return ""
+
+def sparql_sha1_8( sparql ):
+    """Short stable hash of a SPARQL string — same text → same hash, so timing
+    TSVs from different backends can be joined on it."""
+    return hashlib.sha1( sparql.encode() ).hexdigest()[:8]
 
 def replace_env_var( txt ) :
     """ A helper sub with no magic """

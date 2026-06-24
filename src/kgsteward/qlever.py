@@ -98,28 +98,6 @@ _JDK_XML_UNLIMITED = " ".join((
     "-Djdk.xml.maxElementDepth=0",
 ))
 
-# Column order of the --sparql_update_stats TSV.  Shared by the live streaming
-# writer (_append_stat_row) and the batch writer (dump_sparql_update_stats).
-_SPARQL_UPDATE_STATS_COLS = [
-    "n", "ts", "elapsed_ms", "qlever_total_ms", "http_status",
-    "size_chars", "sha1_8", "first_line", "error",
-]
-
-
-def _first_meaningful_sparql_line( sparql ):
-    """Return the first non-empty, non-comment, non-PREFIX/BASE line of *sparql*.
-
-    Used in the sparql_update stats TSV so each row has a human-readable identifier.
-    """
-    for line in sparql.splitlines():
-        s = line.strip()
-        if not s:                             continue
-        if s.startswith( "#" ):               continue
-        if s.upper().startswith( "PREFIX " ): continue
-        if s.upper().startswith( "BASE " ):   continue
-        return s[:120]
-    return ""
-
 
 def _qlever_fmt( filename ):
     """Return qlever format token ('ttl'/'nt') or None if riot conversion is needed."""
@@ -238,12 +216,8 @@ class QleverClient( GenericClient ):
         # on disk and the next server start should load it.  _finalize_index
         # always resets this to False.
         self._has_current_text_index = False
-        # Per-call timing recorded by _do_sparql_update; dumped to a TSV file.
-        # When sparql_update_stats_path is set (enable_sparql_update_stats),
-        # each row is also appended+flushed live so a Ctrl-C keeps what ran.
-        self.sparql_update_stats      = []
-        self._sparql_update_counter   = 0
-        self.sparql_update_stats_path = None
+        # Per-update timing/query logging state lives on GenericClient (shared by
+        # every driver, enabled via --sparql_logs); super().__init__ set it up.
 
         # Remove any leftover input/ from a previous crashed staging phase.
         # pending_files starts empty, so any files on disk are orphans.
@@ -1004,12 +978,15 @@ class QleverClient( GenericClient ):
         Adds ``timeout=999999s`` plus the access token to the form data so the
         per-query timeout in the Qleverfile (appropriate for interactive
         queries) doesn't abort long-running bulk updates.
+
+        Shares the per-update logging with every backend via GenericClient:
+        the query text is logged BEFORE the POST (``_sparql_update_started``)
+        and the timing row AFTER (``_sparql_update_finished``), plus qlever's
+        own server-side ``qlever_total_ms``.
         """
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
-        self._sparql_update_counter += 1
-        sha = hashlib.sha1( sparql.encode() ).hexdigest()[:8]
-        t_start = time.time()
+        tok = self._sparql_update_started( sparql )   # logs query pre-execution
         try:
             r = http_call(
                 { 'method': 'POST', 'url': self.endpoint_query,
@@ -1035,22 +1012,15 @@ class QleverClient( GenericClient ):
             # against the restarted server would build inconsistent data.  Fail
             # loudly instead; transactional checkpoints keep prior datasets safe.
             self.is_running = False
-            self._record_stat( {
-                "n":               self._sparql_update_counter,
-                "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
-                "elapsed_ms":      int( ( time.time() - t_start ) * 1000 ),
-                "qlever_total_ms": None,
-                "http_status":     "CONNECTION_LOST",
-                "size_chars":      len( sparql ),
-                "sha1_8":          sha,
-                "first_line":      _first_meaningful_sparql_line( sparql ),
-                "error":           "server closed connection mid-update (likely OOM crash)",
-            } )
+            self._sparql_update_finished(
+                tok, "CONNECTION_LOST",
+                error = "server closed connection mid-update (likely OOM crash)",
+            )
             stop_error(
                 "qlever server closed the connection without responding while applying "
-                f"SPARQL update #{self._sparql_update_counter} "
-                f"(sha1 {sha}, {len( sparql )} chars):\n"
-                f"    {_first_meaningful_sparql_line( sparql )}\n"
+                f"SPARQL update #{tok['n']} "
+                f"(sha1 {tok['sha1_8']}, {tok['size_chars']} chars):\n"
+                f"    {tok['first_line']}\n"
                 "The server process crashed mid-update -- this is a hard crash, not a SPARQL "
                 "error, and is almost always an out-of-memory kill: the INSERT/DELETE result "
                 "materialization exceeded available RAM.  Note MEMORY_FOR_QUERIES limits queries, "
@@ -1061,7 +1031,6 @@ class QleverClient( GenericClient ):
                 "dataset has no checkpoint and will be reprocessed on the next run.\n"
                 f"  -> underlying error: {exc}"
             )
-        elapsed_ms = int( ( time.time() - t_start ) * 1000 )
 
         # Best-effort extraction of qlever's server-side timing + error.
         qlever_total_ms = None
@@ -1081,73 +1050,15 @@ class QleverClient( GenericClient ):
         except Exception:
             pass
 
-        self._record_stat( {
-            "n":               self._sparql_update_counter,
-            "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
-            "elapsed_ms":      elapsed_ms,
-            "qlever_total_ms": qlever_total_ms,
-            "http_status":     r.status_code,
-            "size_chars":      len( sparql ),
-            "sha1_8":          sha,
-            "first_line":      _first_meaningful_sparql_line( sparql ),
-            "error":           ( qlever_error[:200] if qlever_error else "" ),
-        } )
+        self._sparql_update_finished(
+            tok, r.status_code,
+            qlever_total_ms = qlever_total_ms,
+            error = ( qlever_error[:200] if qlever_error else "" ),
+        )
 
         if r.status_code != 200 and r.text:
             print_warn( r.text )
         return r
-
-    @staticmethod
-    def _stats_row( stat ):
-        return "\t".join(
-            str( stat[c] ) if stat.get( c ) is not None else ""
-            for c in _SPARQL_UPDATE_STATS_COLS
-        )
-
-    def _record_stat( self, stat ):
-        """Keep *stat* in memory and, if live streaming is on, append it to the
-        TSV immediately (flushed + fsync'd) so a Ctrl-C keeps the timings so far."""
-        self.sparql_update_stats.append( stat )
-        if not self.sparql_update_stats_path:
-            return
-        with open( self.sparql_update_stats_path, "a" ) as f:
-            f.write( self._stats_row( stat ) + "\n" )
-            f.flush()
-            os.fsync( f.fileno() )
-
-    def enable_sparql_update_stats( self, filepath ):
-        """Stream per-update timings to *filepath* incrementally instead of only
-        at session end: write the header now (truncating any old file) and let
-        ``_record_stat`` append+flush one row per update.  This is what makes the
-        TSV ``tail -f``-able live and Ctrl-C-safe (a kill keeps every row already
-        written, not an empty file)."""
-        self.sparql_update_stats_path = filepath
-        with open( filepath, "w" ) as f:
-            f.write( "\t".join( _SPARQL_UPDATE_STATS_COLS ) + "\n" )
-            f.flush()
-            os.fsync( f.fileno() )
-
-    def dump_sparql_update_stats( self, filepath ):
-        """Write per-call sparql_update timings to *filepath* as TSV.
-
-        Useful for diagnosing slow updates in a single backend and for benchmark
-        comparison between backends (run with each backend, then join the TSVs
-        on ``sha1_8`` — same SPARQL → same hash → same row).
-
-        No-op rewrite when the rows were already streamed live to the same path
-        by ``enable_sparql_update_stats`` (the file is already complete).
-        """
-        if self.sparql_update_stats_path == filepath:
-            report( "sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries, streamed live)" )
-            return
-        if not self.sparql_update_stats:
-            report( "sparql update stats", "(empty — nothing to dump)" )
-            return
-        with open( filepath, "w" ) as f:
-            f.write( "\t".join( _SPARQL_UPDATE_STATS_COLS ) + "\n" )
-            for s in self.sparql_update_stats:
-                f.write( self._stats_row( s ) + "\n" )
-        report( "dumped sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries)" )
 
     def list_context( self, echo = True ):
         """Named graphs held by the store.
