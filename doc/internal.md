@@ -9,4 +9,4 @@
 | `rewrite_repository` | DELETE + recreate repository via REST API | wipe `input/`, copy Qleverfile |
 | named graphs | standard SPARQL `INTO GRAPH` at load time | `multi_input_json` `graph` key at index time |
 | server lifecycle | external, unmanaged | controlled via `qlever start/stop/rebuild-index` |
-| `drop_context` | `DROP GRAPH` via SPARQL | `DELETE WHERE { GRAPH <ctx> { ?s ?p ?o } }` (`DROP GRAPH` not yet implemented in QLever) |
+| `drop_context` | `DROP GRAPH` via SPARQL | no-op — the context is excluded from the next index rebuild (`invalidate_checkpoint` removes its checkpoint) |
