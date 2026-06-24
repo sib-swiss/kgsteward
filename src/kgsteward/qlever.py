@@ -235,7 +235,7 @@ class QleverClient( GenericClient ):
         input_dir = os.path.join( qleverdir, "input" )
         if os.path.isdir( input_dir ):
             shutil.rmtree( input_dir )
-            print_warn( f"Removed stale input/ from previous run: {input_dir}" )
+            if echo: print_warn( f"Removed stale input/ from previous run: {input_dir}" )
 
         # Best-effort probe — does NOT distinguish "stopped" from "unreachable".
         try:
@@ -810,8 +810,8 @@ class QleverClient( GenericClient ):
         self.index_scope = { name2context[ n ] for n in scope }
         report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
 
-    def warn_if_unindexed( self, name, context ):
-        if not self.has_checkpoint( context ) and self.has_index:
+    def warn_if_unindexed( self, name, context, echo = True ):
+        if echo and not self.has_checkpoint( context ) and self.has_index:
             print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
 
     def queue_persist( self, context, sha256 = None ):

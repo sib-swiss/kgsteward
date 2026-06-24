@@ -186,7 +186,7 @@ WHERE{{
         """
         pass
 
-    def warn_if_unindexed( self, name, context ):
+    def warn_if_unindexed( self, name, context, echo = True ):
         """Warn that a skipped dataset will be absent from the served data.
 
         No-op for live backends, where skipped datasets simply stay in place.

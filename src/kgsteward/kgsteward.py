@@ -645,7 +645,7 @@ def main():
             # Dataset is up-to-date — nothing to reprocess.  For static-index
             # backends, warn if it lacks a checkpoint and would be dropped from
             # the served index (no-op for live backends).
-            server.warn_if_unindexed( name, context )
+            server.warn_if_unindexed( name, context, echo = args.v )
             continue
 
         print_break()

@@ -264,6 +264,31 @@ def test_collect_checkpoint_entries_echo_gating( tmp_path, capsys ):
     assert out_loud.count( "checkpoint" ) >= 3, f"verbose must report each checkpoint, got:\n{out_loud}"
 
 
+def test_warn_if_unindexed_echo_gating( tmp_path, capsys ):
+    """The per-skipped-dataset 'No checkpoint ... absent from the index' warning
+    fires once per up-to-date dataset in a -C run; it must be silent unless -v."""
+    from src.kgsteward.qlever import QleverClient
+
+    confdir = tmp_path / "conf"; confdir.mkdir()
+    workdir = tmp_path / "qlv";   workdir.mkdir()
+    ( confdir / "Qleverfile" ).write_text(
+        "[data]\nNAME = warn_test\n"
+        "[server]\nHOST_NAME = localhost\nPORT = 7040\n"
+        "[runtime]\nSYSTEM = docker\n"
+    )
+    # A fake index file makes has_index True; no sidecar => has_checkpoint False,
+    # so the warning condition (no checkpoint + has index) is satisfied.
+    ( workdir / "warn_test.index.meta" ).write_text( "x" )
+    client = QleverClient( str( confdir / "Qleverfile" ), str( workdir ), echo = False )
+    ctx = "http://example.org/context/warn_me"
+
+    client.warn_if_unindexed( "warn_me", ctx, echo = False )
+    assert "No checkpoint" not in capsys.readouterr().out, "non-verbose must be silent"
+
+    client.warn_if_unindexed( "warn_me", ctx, echo = True )
+    assert "No checkpoint" in capsys.readouterr().out, "verbose must show the warning"
+
+
 def test_complete_marker_drives_in_sync( qlever_workdir ):
     """_complete_index_in_sync requires BOTH an index and the complete-marker;
     _mark_index_complete / _clear_index_complete toggle the marker file."""
