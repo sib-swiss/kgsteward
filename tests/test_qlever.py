@@ -495,6 +495,41 @@ def test_sparql_update_connection_drop_is_reported( qlever_workdir, monkeypatch 
     print( "\nconnection drop mid-update -> clean stop_error + CONNECTION_LOST stats row" )
 
 
+def test_sparql_update_stats_streamed_live( qlever_workdir, tmp_path ):
+    """enable_sparql_update_stats writes a header immediately and _record_stat
+    appends+flushes one row per update -- so a Ctrl-C mid-run keeps every row
+    already gathered, instead of an empty file dumped only at session end."""
+    from src.kgsteward.qlever import QleverClient
+
+    client  = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = False )
+    tsv     = str( tmp_path / "stats.tsv" )
+
+    client.enable_sparql_update_stats( tsv )
+    # Header is on disk before any update runs -> tail -f has something to show.
+    assert os.path.isfile( tsv )
+    header = open( tsv ).read().splitlines()
+    assert header == [ "n\tts\telapsed_ms\tqlever_total_ms\thttp_status\tsize_chars\tsha1_8\tfirst_line\terror" ]
+
+    # Each recorded row lands on disk immediately (simulating a crash before the
+    # end-of-session dump would ever run).
+    client._record_stat( { "n": 1, "ts": "T", "elapsed_ms": 10, "qlever_total_ms": 5,
+                           "http_status": 200, "size_chars": 3, "sha1_8": "abcd1234",
+                           "first_line": "INSERT DATA ...", "error": "" } )
+    client._record_stat( { "n": 2, "ts": "T", "elapsed_ms": 9999, "qlever_total_ms": 9000,
+                           "http_status": 200, "size_chars": 7, "sha1_8": "ef567890",
+                           "first_line": "DELETE WHERE ...", "error": "" } )
+
+    rows = open( tsv ).read().splitlines()
+    assert len( rows ) == 3, "header + 2 rows must already be on disk without a final dump"
+    assert rows[1].startswith( "1\t" ) and rows[2].startswith( "2\t" )
+    assert "9999" in rows[2]
+
+    # The end-of-session dump must NOT clobber the streamed file; it just confirms.
+    client.dump_sparql_update_stats( tsv )
+    assert open( tsv ).read().splitlines() == rows, "dump must not rewrite the streamed TSV"
+    print( "\nsparql_update_stats streamed live (Ctrl-C-safe), dump is a no-op rewrite" )
+
+
 def test_drop_context_is_noop_and_invalidate_clears_checkpoint( qlever_workdir ):
     """drop_context is intentionally a no-op for qlever — verify its documented
     semantics, and that invalidate_checkpoint is the real removal path.

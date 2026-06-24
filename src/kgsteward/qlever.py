@@ -98,6 +98,13 @@ _JDK_XML_UNLIMITED = " ".join((
     "-Djdk.xml.maxElementDepth=0",
 ))
 
+# Column order of the --sparql_update_stats TSV.  Shared by the live streaming
+# writer (_append_stat_row) and the batch writer (dump_sparql_update_stats).
+_SPARQL_UPDATE_STATS_COLS = [
+    "n", "ts", "elapsed_ms", "qlever_total_ms", "http_status",
+    "size_chars", "sha1_8", "first_line", "error",
+]
+
 
 def _first_meaningful_sparql_line( sparql ):
     """Return the first non-empty, non-comment, non-PREFIX/BASE line of *sparql*.
@@ -231,10 +238,12 @@ class QleverClient( GenericClient ):
         # on disk and the next server start should load it.  _finalize_index
         # always resets this to False.
         self._has_current_text_index = False
-        # Per-call timing recorded by _do_sparql_update; flushed at session
-        # end by dump_sparql_update_stats() to a TSV file.
-        self.sparql_update_stats    = []
-        self._sparql_update_counter = 0
+        # Per-call timing recorded by _do_sparql_update; dumped to a TSV file.
+        # When sparql_update_stats_path is set (enable_sparql_update_stats),
+        # each row is also appended+flushed live so a Ctrl-C keeps what ran.
+        self.sparql_update_stats      = []
+        self._sparql_update_counter   = 0
+        self.sparql_update_stats_path = None
 
         # Remove any leftover input/ from a previous crashed staging phase.
         # pending_files starts empty, so any files on disk are orphans.
@@ -1026,7 +1035,7 @@ class QleverClient( GenericClient ):
             # against the restarted server would build inconsistent data.  Fail
             # loudly instead; transactional checkpoints keep prior datasets safe.
             self.is_running = False
-            self.sparql_update_stats.append( {
+            self._record_stat( {
                 "n":               self._sparql_update_counter,
                 "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
                 "elapsed_ms":      int( ( time.time() - t_start ) * 1000 ),
@@ -1072,7 +1081,7 @@ class QleverClient( GenericClient ):
         except Exception:
             pass
 
-        self.sparql_update_stats.append( {
+        self._record_stat( {
             "n":               self._sparql_update_counter,
             "ts":              time.strftime( "%Y-%m-%dT%H:%M:%S" ),
             "elapsed_ms":      elapsed_ms,
@@ -1088,25 +1097,56 @@ class QleverClient( GenericClient ):
             print_warn( r.text )
         return r
 
+    @staticmethod
+    def _stats_row( stat ):
+        return "\t".join(
+            str( stat[c] ) if stat.get( c ) is not None else ""
+            for c in _SPARQL_UPDATE_STATS_COLS
+        )
+
+    def _record_stat( self, stat ):
+        """Keep *stat* in memory and, if live streaming is on, append it to the
+        TSV immediately (flushed + fsync'd) so a Ctrl-C keeps the timings so far."""
+        self.sparql_update_stats.append( stat )
+        if not self.sparql_update_stats_path:
+            return
+        with open( self.sparql_update_stats_path, "a" ) as f:
+            f.write( self._stats_row( stat ) + "\n" )
+            f.flush()
+            os.fsync( f.fileno() )
+
+    def enable_sparql_update_stats( self, filepath ):
+        """Stream per-update timings to *filepath* incrementally instead of only
+        at session end: write the header now (truncating any old file) and let
+        ``_record_stat`` append+flush one row per update.  This is what makes the
+        TSV ``tail -f``-able live and Ctrl-C-safe (a kill keeps every row already
+        written, not an empty file)."""
+        self.sparql_update_stats_path = filepath
+        with open( filepath, "w" ) as f:
+            f.write( "\t".join( _SPARQL_UPDATE_STATS_COLS ) + "\n" )
+            f.flush()
+            os.fsync( f.fileno() )
+
     def dump_sparql_update_stats( self, filepath ):
         """Write per-call sparql_update timings to *filepath* as TSV.
 
         Useful for diagnosing slow updates in a single backend and for benchmark
         comparison between backends (run with each backend, then join the TSVs
         on ``sha1_8`` — same SPARQL → same hash → same row).
+
+        No-op rewrite when the rows were already streamed live to the same path
+        by ``enable_sparql_update_stats`` (the file is already complete).
         """
+        if self.sparql_update_stats_path == filepath:
+            report( "sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries, streamed live)" )
+            return
         if not self.sparql_update_stats:
             report( "sparql update stats", "(empty — nothing to dump)" )
             return
-        cols = [ "n", "ts", "elapsed_ms", "qlever_total_ms", "http_status",
-                 "size_chars", "sha1_8", "first_line", "error" ]
         with open( filepath, "w" ) as f:
-            f.write( "\t".join( cols ) + "\n" )
+            f.write( "\t".join( _SPARQL_UPDATE_STATS_COLS ) + "\n" )
             for s in self.sparql_update_stats:
-                f.write( "\t".join(
-                    str( s[c] ) if s.get( c ) is not None else ""
-                    for c in cols
-                ) + "\n" )
+                f.write( self._stats_row( s ) + "\n" )
         report( "dumped sparql update stats", f"{filepath}  ({len(self.sparql_update_stats)} entries)" )
 
     def list_context( self, echo = True ):

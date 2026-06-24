@@ -205,11 +205,13 @@ def get_user_input():
     parser.add_argument(
         '--sparql_update_stats',
         metavar = 'FILE',
-        help   = "Dump per-update timings to a TSV at session end (one row per "
-                 "sparql_update call, with wall-clock and server-side timings, "
-                 "size, sha1, error if any).  Useful for diagnosing slow updates "
-                 "and for benchmark comparison between backends (run with each "
-                 "backend, then join on sha1_8 to compare per-update timings)."
+        help   = "Stream per-update timings to a TSV (one row per sparql_update "
+                 "call, with wall-clock and server-side timings, size, sha1, error "
+                 "if any).  Rows are written and flushed live, so the file is "
+                 "tail-able during the run and a Ctrl-C keeps everything gathered "
+                 "so far.  Useful for diagnosing slow updates and for benchmark "
+                 "comparison between backends (run with each backend, then join on "
+                 "sha1_8 to compare per-update timings)."
     )
     parser.add_argument(
         '--sib_swiss_editor',
@@ -530,6 +532,12 @@ def main():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
     os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
     os.environ[ "kgsteward_server_endpoint_update"] = server.get_endpoint_update()
+
+    # Stream per-update timings to the TSV live (header now, one flushed row per
+    # update) so it is tail-able during the run and a Ctrl-C keeps what ran so
+    # far.  The end-of-session dump then just confirms the file (see below).
+    if args.sparql_update_stats and hasattr( server, "enable_sparql_update_stats" ):
+        server.enable_sparql_update_stats( args.sparql_update_stats )
 
     # --------------------------------------------------------- #
     # Create a new empty repository or rewrite an existing one
