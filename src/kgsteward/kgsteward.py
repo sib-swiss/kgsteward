@@ -617,7 +617,7 @@ def main():
     elif args.C :
         # A backend may resolve the update set offline (qlever, from checkpoints,
         # when its server is stopped); otherwise fall back to the online status query.
-        offline = server.update_set_offline( rdf_graph_all, config, name2context, dataset_sha256 )
+        offline = server.update_set_offline( rdf_graph_all, config, name2context, dataset_sha256, echo = args.v )
         if offline is not None :
             rdf_graph_to_update |= offline
         else :
@@ -630,7 +630,7 @@ def main():
     # Restrict an incremental index rebuild to the dependency closure of the
     # datasets being processed (no-op for live backends; qlever scopes its
     # rebuilt index and validates required parents).
-    server.plan_index_scope( rdf_graph_to_update, config, name2context )
+    server.plan_index_scope( rdf_graph_to_update, config, name2context, echo = args.v )
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective

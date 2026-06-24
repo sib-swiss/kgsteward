@@ -762,7 +762,7 @@ class QleverClient( GenericClient ):
         # (void:dataDump is baked in by _stage_file).
         self.load_url_as_file( path, context, echo = echo )
 
-    def update_set_offline( self, names, config, name2context, sha_of ):
+    def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
         """When the server is stopped, the SPARQL status query would return
         all-EMPTY, so use the .nt.gz checkpoints as the source of truth:
         a dataset needs (re)processing unless a *current* checkpoint exists.
@@ -770,7 +770,8 @@ class QleverClient( GenericClient ):
         is running (kgsteward then uses the online status query)."""
         if self.is_running:
             return None
-        report( "qlever server stopped", "using checkpoints to determine update set" )
+        if echo:
+            report( "qlever server stopped", "using checkpoints to determine update set" )
         frozen_of = { t["name"]: bool( t.get( "frozen", False ) ) for t in config["dataset"] }
         update = set()
         for name in names:
@@ -804,17 +805,19 @@ class QleverClient( GenericClient ):
         for n in scope:
             if n not in update_names and not self.has_checkpoint( name2context[ n ] ):
                 if frozen_of.get( n ):
-                    print_warn(
-                        "Frozen parent '" + n + "' has no checkpoint; excluded from the index, so "
-                        "its dependants are rebuilt WITHOUT its data. Load it explicitly with -d " + n + "."
-                    )
+                    if echo:
+                        print_warn(
+                            "Frozen parent '" + n + "' has no checkpoint; excluded from the index, so "
+                            "its dependants are rebuilt WITHOUT its data. Load it explicitly with -d " + n + "."
+                        )
                     continue
                 stop_error(
                     "Dataset '" + n + "' is a required parent in the dependency scope but has "
                     "no checkpoint. Include it in the run (e.g. add it to -d) or build it first."
                 )
         self.index_scope = { name2context[ n ] for n in scope }
-        report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
+        if echo:
+            report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
 
     def warn_if_unindexed( self, name, context, echo = True ):
         if echo and not self.has_checkpoint( context ) and self.has_index:

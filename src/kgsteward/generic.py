@@ -169,7 +169,7 @@ WHERE{{
             echo = echo,
         )
 
-    def update_set_offline( self, names, config, name2context, sha_of ):
+    def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
         """Determine the -C update set without querying the server, or None.
 
         Returns None for live backends: kgsteward then falls back to the
