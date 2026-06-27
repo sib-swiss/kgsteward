@@ -853,6 +853,23 @@ class QleverClient( GenericClient ):
             if not self.has_checkpoint( context, item.get( "target_sha256" ) ):
                 continue   # no current checkpoint -> leave the base EMPTY/UPDATE status
             item["status"] = "ok" if complete else "READY"
+            # The live status query (update_config) only sees a running server;
+            # qlever's is usually stopped, so #triple / last modified arrive
+            # blank.  Backfill them from the checkpoint sidecar -- the offline
+            # source of truth -- so the status table matches a live backend's.
+            # Live query values (when the server IS up) take precedence: we only
+            # fill what is still blank.  Older sidecars lacking these fields just
+            # stay blank (graceful).
+            if not item.get( "count" ) or not item.get( "date" ):
+                try:
+                    with open( self.checkpoint_path( context ) + ".json" ) as f:
+                        meta = json.load( f )
+                    if not item.get( "count" ) and "triples" in meta:
+                        item["count"] = str( meta["triples"] )
+                    if not item.get( "date" ) and "modified" in meta:
+                        item["date"] = meta["modified"]
+                except ( OSError, ValueError ):
+                    pass
 
     # ------------------------------------------------------------------ #
     # Public data-loading API
@@ -1216,8 +1233,18 @@ class QleverClient( GenericClient ):
         with gzip.open( tmp_path, "wb" ) as f:
             f.write( r.content )
         os.replace( tmp_path, path )    # atomic on POSIX
+        # Record triple count + modification time alongside the IRI/checksum so
+        # the status table can fill #triple / last modified OFFLINE.  qlever's
+        # server is usually stopped at status time, so the live query in
+        # update_config returns nothing and those two columns would otherwise be
+        # blank (a live backend like GraphDB always answers).  The count is the
+        # number of N-Triples lines just dumped; modified is this checkpoint's
+        # write time.
+        triples  = r.content.count( b"\n" )
+        modified = time.strftime( "%Y-%m-%dT%H:%M:%S" )
         with open( sidecar, "w" ) as f:
-            json.dump( { "graph": context_iri, "sha256": sha256 }, f )
+            json.dump( { "graph": context_iri, "sha256": sha256,
+                         "triples": triples, "modified": modified }, f )
         if echo: report( "checkpoint saved", fname )
 
     # ------------------------------------------------------------------ #

@@ -1,4 +1,5 @@
 import pytest
+import json
 import shutil
 import subprocess
 import os
@@ -222,6 +223,44 @@ def test_refine_status_ready_vs_ok( qlever_workdir, monkeypatch ):
     assert st["cur"]   == "ok",     "current checkpoint + complete index -> ok"
     assert st["stale"] == "UPDATE", "no current checkpoint -> base status kept"
     assert st["frz"]   == "FROZEN", "frozen dataset must be left untouched"
+
+
+def test_refine_status_backfills_count_and_date_from_sidecar( qlever_workdir, monkeypatch ):
+    """When the qlever server is down the live status query yields nothing, so
+    #triple / last modified would be blank.  refine_status backfills them from
+    the checkpoint sidecar (triples/modified) and never overrides values the
+    live query already provided.
+    """
+    from src.kgsteward.qlever import QleverClient
+
+    client = QleverClient( qlever_workdir["qleverfile"], qlever_workdir["qleverdir"], echo = True )
+
+    ctx = "http://example.org/context/bf_current"
+    sidecar = client.checkpoint_path( ctx ) + ".json"
+    with open( sidecar, "w" ) as f:
+        json.dump( { "graph": ctx, "sha256": "a",
+                     "triples": 12345, "modified": "2026-06-25T09:09:17" }, f )
+
+    monkeypatch.setattr( client, "has_checkpoint",         lambda c, sha = None: c == ctx )
+    monkeypatch.setattr( client, "_complete_index_in_sync", lambda: True )
+
+    # blank count/date (server was down) -> backfilled from the sidecar
+    cfg = { "dataset": [ { "name": "cur", "context": ctx, "target_sha256": "a",
+                           "frozen": False, "status": "UPDATE", "count": "", "date": "" } ] }
+    client.refine_status( cfg )
+    item = cfg["dataset"][0]
+    assert item["status"] == "ok"
+    assert item["count"]  == "12345",               "blank #triple backfilled from sidecar"
+    assert item["date"]   == "2026-06-25T09:09:17", "blank last-modified backfilled from sidecar"
+
+    # live query already filled them -> refine_status must NOT override
+    cfg = { "dataset": [ { "name": "cur", "context": ctx, "target_sha256": "a",
+                           "frozen": False, "status": "UPDATE",
+                           "count": "999", "date": "2020-01-01T00:00:00" } ] }
+    client.refine_status( cfg )
+    item = cfg["dataset"][0]
+    assert item["count"] == "999",                 "live #triple preserved"
+    assert item["date"]  == "2020-01-01T00:00:00", "live last-modified preserved"
 
 
 def test_collect_checkpoint_entries_echo_gating( tmp_path, capsys ):
