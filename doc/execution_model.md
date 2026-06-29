@@ -21,7 +21,7 @@ flowchart TD
     C1 --> K1[["checksum #1 (under -C, before the loop):<br/>target vs stored → status"]]
     K1 --> L{For each dataset,<br/>in declaration order:<br/>in the update set?}
     L -- no --> S[skip — leave as-is]
-    L -- yes --> P[system → url → file → update]
+    L -- yes --> P[system → url → file → update → special]
     P --> K2[["checksum #2 (end of dataset, after system):<br/>persisted as kgsteward:checksum + triple count + date"]]
     K2 --> L
     L --> Z[Show status table]
@@ -29,11 +29,13 @@ flowchart TD
 
 Within a selected dataset the clauses always run in this single fixed order:
 
-> **`system` → `url` → `file` → `update`**, then the dataset's metadata is persisted.
+> **`system` → `url` → `file` → `update` → `special`**, then the dataset's metadata is persisted.
 
 `system` typically *produces* the data the later clauses load; `update` SPARQL
-statements are applied in file order then document order, after `replace:`
-substitution. Any clause may be absent. This order is **not configurable**: to
+statements run in file order then document order; `special` emits
+kgsteward-generated triples (void / prefix / query descriptions). `replace` is
+**not** a stage — it is the string-substitution map applied to the `update` text
+before it runs. Any clause may be absent. This order is **not configurable**: to
 run steps in any other order (e.g. an `update` before a `file` load), split the
 work across **two datasets** and declare the second with the first as its
 `parent:` — the dependency forces the first to be processed in full before the
@@ -47,7 +49,7 @@ from its last load (`kgsteward:checksum`). The checksum covers the dataset's
 
 | Hashed | Not hashed |
 |--------|------------|
-| `context` IRI; `system` command strings; `file` **byte content**; `url` string **+ HTTP HEAD** (Last-Modified/ETag); `stamp` (HEAD or content); `replace` pairs; `update` file **text** | parent **content** (only parent *names* are hashed — see below); `frozen` status |
+| `context` IRI; `system` command strings; `file` **byte content**; `url` string **+ HTTP HEAD** (Last-Modified/ETag); `stamp` (HEAD or content); `replace` pairs; `update` file **text**; `special` keys | parent **content** (only parent *names* are hashed — see below); `frozen` status |
 
 So a rebuild is triggered by an edited input file, a changed remote resource, an
 edited `update`/`system`/`replace`/`url`/`stamp` entry, or a forcing flag.
