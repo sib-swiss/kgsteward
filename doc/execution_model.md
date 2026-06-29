@@ -15,16 +15,18 @@ propagation work in one forward pass.
 
 ```mermaid
 flowchart TD
-    A[Parse YAML — datasets in declaration order, parents first] --> B[Connect backend; -I wipes the repository]
-    B --> C[Select the UPDATE SET]
-    C --> C1["-D/-F: all  /  -d: named  /  -C: status-driven  /  none: report only"]
-    C1 --> K1[["checksum #1 (under -C, before the loop):<br/>target vs stored → status"]]
-    K1 --> L{For each dataset,<br/>in declaration order:<br/>in the update set?}
-    L -- no --> S[skip — leave as-is]
-    L -- yes --> P[system → url → file → update → special]
-    P --> K2[["checksum #2 (end of dataset, after system):<br/>persisted as kgsteward:checksum + triple count + date"]]
-    K2 --> L
-    L --> Z[Show status table]
+    A[Read CLI args<br/>-F expands to -I + -D] --> B[Parse YAML config<br/>declaration order;<br/>parents before children]
+    B --> C[Connect to backend<br/>graphdb / rdf4j / fuseki / qlever]
+    C --> D{-I given?}
+    D -- yes --> E[Rewrite repository<br/>ERASE all RDF data]
+    D -- no --> F
+    E --> F[Select the UPDATE SET<br/>-D/-F: all · -d: named · -C: status-driven · none: report-only]
+    F --> G[plan_index_scope<br/>qlever: restrict rebuild<br/>to dependency closure]
+    G --> H[Per-dataset loop, in declaration order<br/>system → url → file → update → special]
+    H --> I[Post-processing:<br/>prefixes, -U restamp,<br/>-V validate, -Q queries, dumps]
+    I --> J[Recompute status + refine_status]
+    J --> K[Show current status table]
+    K --> L[ensure server running<br/>+ SPARQL-log summary]
 ```
 
 Within a selected dataset the clauses always run in this single fixed order:
@@ -54,19 +56,10 @@ from its last load (`kgsteward:checksum`). The checksum covers the dataset's
 So a rebuild is triggered by an edited input file, a changed remote resource, an
 edited `update`/`system`/`replace`/`url`/`stamp` entry, or a forcing flag.
 
-```mermaid
-flowchart TD
-    F{forced? -d / -D / -F} -- yes --> U[UPDATE]
-    F -- no --> C{stored == target checksum?}
-    C -- yes --> OK[ok]
-    C -- no --> FR{frozen?}
-    FR -- yes --> FZ[FROZEN — skipped by -C]
-    FR -- no --> U
-    OK --> P{a parent is UPDATE/PROPAGATE/EMPTY?}
-    U --> P
-    P -- yes, not frozen --> PR[PROPAGATE]
-    P -- no --> KEEP[keep]
-```
+Each dataset resolves to one status: **forced** (`-d`/`-D`/`-F`) → `UPDATE`;
+else **checksum matches** → `ok`; else **frozen** → `FROZEN` (skipped); else
+→ `UPDATE`. Finally, a not-frozen dataset with a parent that is `EMPTY`/`UPDATE`/
+`PROPAGATE` becomes `PROPAGATE`.
 
 Under `-C`, every dataset ending **EMPTY / UPDATE / PROPAGATE** is reprocessed.
 Because datasets are evaluated in declaration order, a parent marked `UPDATE`
