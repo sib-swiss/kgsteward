@@ -91,11 +91,14 @@ Updating the parent datset will provoke the update of its children, unless it is
 """,
     "stamp": """List of file paths or URLs to which last modification dates will used.
 The file contents are ignored.
-Wildcards `*` can be used.
+Wildcards `*` can be used in file/URL entries; they are expanded by kgsteward
+(glob) before hashing.
 An entry of the form `$(command)` is evaluated by running the shell command;
 its stdout is hashed into the fingerprint (use for a computed change-signal
 such as a monthly token, e.g. `$(date -u +%Y-%m)`). The command runs on every
 kgsteward invocation during planning, so keep it cheap and side-effect-free.
+kgsteward does no wildcard expansion on a `$(command)` entry: any `*` inside it
+is left to the shell (the command runs with shell=True).
 """,
     "replace": """Dictionary to perform string substitution in SPARQL queries from `update` list.
 Of uttermost interest is the `${TARGET_GRAPH_CONTEXT}` which permit to restrict updates to the current context.
