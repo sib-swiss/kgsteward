@@ -78,21 +78,37 @@ with `-d` or `--force_unfreeze`).
 > A parent's data changing rebuilds the child through `PROPAGATE` (when the
 > parent is in the update set), not through the checksum.
 
-## When the checksum is computed
+## The three passes over a dataset
 
-`get_sha256` reads `stamp`/`file`/`url`/`update` *when it runs*, and (see the
-lifecycle diagram) it runs **twice**, with `system:` between:
+A dataset definition is traversed **three times** per run, each time over a
+different subset of clauses. The store is modified only in the middle pass;
+`stamp` (and `context`, `parent`, `replace`) feed the checksum passes only.
 
-- **checksum #1**, at selection, *before* the loop — the rebuild **decision**
-  (`-C` only; `-d`/`-D` force the set and skip it). Sees inputs **before** this
-  run's `system:`.
-- **checksum #2**, at persist, *after* the dataset's `system`/`url`/`file`/`update`
-  — the value **stored** for next time. Sees inputs **after** `system:`.
+```mermaid
+flowchart TB
+    subgraph S1["1 — compute checksum (selection, before system) → rebuild decision"]
+      direction LR
+      a1[context] --> a2[parent] --> a3[system] --> a4[file] --> a5[url] --> a6[stamp] --> a7[replace] --> a8[update] --> a9[special]
+    end
+    subgraph S2["2 — modify the store (execution)"]
+      direction LR
+      b3[system] --> b5[url] --> b4[file] --> b8[update] --> b9[special]
+    end
+    subgraph S3["3 — recompute checksum (persist, after system) → stored value"]
+      direction LR
+      c1[context] --> c2[parent] --> c3[system] --> c4[file] --> c5[url] --> c6[stamp] --> c7[replace] --> c8[update] --> c9[special]
+    end
+    S1 --> S2 --> S3
+```
 
-Consequence: a dataset's `system:` runs after the deciding checksum, so it
-**cannot trigger its own rebuild in the same run** — its effect is only seen by
-the *next* run. Point `stamp`/`url`/`file` at the **upstream source** whose change
-should trigger a rebuild, never at a file your own `system:` produces.
+Pass 1 runs only under `-C` (`-d`/`-D` force the set and skip it). In passes 1
+and 3 each clause is *hashed* (e.g. `system` = its command text); in pass 2 the
+clauses are *executed* (e.g. `system` = the command runs). Because the store is
+modified (pass 2) **after** the deciding checksum (pass 1), a dataset's `system:`
+cannot trigger its own rebuild in the same run — its effect is captured by
+pass 3 and seen only by the next run. So point `stamp`/`url`/`file` at the
+**upstream source** whose change should trigger a rebuild, never at a file your
+own `system:` produces.
 
 ## Reference
 
