@@ -152,6 +152,44 @@ always precede children, a parent marked `UPDATE` flips each not-frozen child to
 children. A `frozen` dataset stops the cascade (it is never auto-marked) and must
 be refreshed explicitly with `-d <name>` or `--force_unfreeze`.
 
+### 4.3 *When* the checksum is computed — relative to `system:`
+
+`get_sha256()` reads `stamp` / `file` / `url` / `update` **at the moment it is
+called**, and it is called at **two different points** in a run, with the
+`system:` clause running **between** them:
+
+```mermaid
+flowchart LR
+    A["SELECTION (once, before the loop)<br/>get_sha256 reads stamp / file / url / update<br/>→ the rebuild DECISION (-C)"]
+    A --> B["system:"]
+    subgraph LOOP["per-dataset loop (only if selected)"]
+      direction LR
+      B --> C["url:"] --> D["file:"] --> E["update:"] --> F["PERSIST<br/>get_sha256 again<br/>→ the STORED checksum"]
+    end
+```
+
+1. **At selection** (phase F, *before* the per-dataset loop) — under `-C`, to
+   decide which datasets are out of date. This read sees inputs **as they are
+   before any `system:` command of the current run**. (`-d` / `-D` skip this and
+   force the set, so no selection-time checksum is taken.)
+2. **At persist** (`update_dataset_info`, at the end of each processed dataset,
+   *after* that dataset's `system` → `url` → `file` → `update`) — to compute the
+   `kgsteward:checksum` **stored** in the store for next time. This read sees
+   inputs **after** `system:` ran.
+
+**Consequences:**
+
+- A dataset's `system:` step runs **after** the checksum that decided whether to
+  rebuild it — so `system:` **cannot trigger its own dataset's rebuild within
+  the same run**. Its effect on the inputs is captured only by the *persisted*
+  checksum, i.e. it is detected by the **next** run's selection.
+- Therefore point **`stamp` (and `url` / `file`) at the *upstream source*** whose
+  change should trigger a rebuild — **not** at a file your own `system:`
+  produces. A `stamp` on a `system:` output won't have been regenerated yet at
+  selection time, so it can't drive the decision; a `stamp` on the upstream
+  input (e.g. a remote URL whose `Last-Modified` changes) is what makes a
+  `system:`-generated dataset rebuild when its source changes.
+
 ---
 
 ## 5. Order of statements *within* a dataset
