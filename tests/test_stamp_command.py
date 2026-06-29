@@ -48,6 +48,19 @@ def test_stamp_command_failure_aborts():
         _sha( [ "$(false)" ] )
 
 
+def test_botched_command_stamp_warns_and_is_treated_as_path( capsys ):
+    """A `$(...)` with surrounding text (e.g. a path prefix) is NOT a command:
+    it falls back to the file branch, emits a targeted hint, and runs nothing."""
+    botched = "/tmp/does-not-exist//$(echo hi)"
+    s1 = _sha( [ botched ] )
+    s2 = _sha( [ botched ] )
+    cap = capsys.readouterr()
+    out = cap.out + cap.err
+    assert s1 == s2, "stable — no command executed, missing file silently skipped"
+    assert "looks like a $(command)" in out, "targeted hint emitted"
+    assert s1 != _sha( [ "$(echo hi)" ] ), "not equal to actually running the command"
+
+
 def test_file_stamp_unaffected( tmp_path ):
     """Backward compatibility: a plain local-file stamp still hashes file content
     and is stable; it is NOT mistaken for a command."""

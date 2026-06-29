@@ -299,6 +299,10 @@ def get_sha256( config, name, echo = True ) :
                 info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
+                if "$(" in path:  # a botched command-capture: $(...) must be the WHOLE entry
+                    print_warn( "stamp '" + path + "' looks like a $(command) but has surrounding "
+                                "text; the whole entry must be a bare $(...), so it is treated as a "
+                                "file path instead." )
                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
                     filename = dir + "/" + fn
                     with open( replace_env_var( filename ), "rb") as f :

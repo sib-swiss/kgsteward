@@ -78,19 +78,17 @@ def expand_path( path, default_dir, fatal = True ):
         if paths:
             for p in sorted( paths ):
                 res.append( os.path.split( p ))
-        else:
-            if fatal:
-                stop_error( "Not a single file found: " + dir + "/" + filename )
-            else:
-                print_warn( "Not a single file found: " + dir + "/" + filename )
+        elif fatal:
+            stop_error( "Not a single file found: " + dir + "/" + filename )
+        # fatal=False is used only by get_sha256() during fingerprint planning,
+        # where a missing input is routine (e.g. a file produced later by the
+        # dataset's own `system:` step); real missing files are caught loudly at
+        # ingest time (fatal=True), so stay silent here.
     else:
         if os.path.isfile( dir + "/" + filename ):
             res.append([ dir, filename ])
-        else:
-            if fatal:
-                stop_error( "File does not exists: " + dir + "/" + filename )
-            else:
-                print_warn( "File does not exists: " + dir + "/" + filename )
+        elif fatal:
+            stop_error( "File does not exists: " + dir + "/" + filename )
     return res
 
 def http_call( request_args, status_code = [ 200 ], echo = True ):
