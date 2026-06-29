@@ -87,7 +87,7 @@ flowchart TB
     end
     subgraph S2["2 — modify the store (execution, ordered)"]
       direction LR
-      b3[system] --> b5[url] --> b4[file] --> b8[update] --> b9[special]
+      b3[system] --> b5[url] --> b4[file] --> b8["replace+update"] --> b9[special]
     end
     subgraph S3["3 — recompute checksum (persist, after system) → stored value"]
       c1[context] & c2[parent] & c3[system] & c4[file] & c5[url] & c6[stamp] & c7[replace] & c8[update] & c9[special] --> CH(["SHA-256"])
