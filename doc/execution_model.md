@@ -77,31 +77,32 @@ A dataset definition is traversed **three times** per run, each time over a
 different subset of clauses. The store is modified only in the middle pass;
 `stamp` (and `context`, `parent`, `replace`) feed the checksum passes only.
 
+Passes 1 and 3 are **unordered sets** of hashed inputs (the order they are fed
+to the hash is irrelevant); only pass 2 is a true ordered sequence.
+
 ```mermaid
 flowchart TB
     subgraph S1["1 — compute checksum (selection, before system) → rebuild decision"]
-      direction LR
-      a1[context] --> a2[parent] --> a3[system] --> a4[file] --> a5[url] --> a6[stamp] --> a7[replace] --> a8[update] --> a9[special]
+      a1[context] & a2[parent] & a3[system] & a4[file] & a5[url] & a6[stamp] & a7[replace] & a8[update] & a9[special] --> AH(["SHA-256"])
     end
-    subgraph S2["2 — modify the store (execution)"]
+    subgraph S2["2 — modify the store (execution, ordered)"]
       direction LR
       b3[system] --> b5[url] --> b4[file] --> b8[update] --> b9[special]
     end
     subgraph S3["3 — recompute checksum (persist, after system) → stored value"]
-      direction LR
-      c1[context] --> c2[parent] --> c3[system] --> c4[file] --> c5[url] --> c6[stamp] --> c7[replace] --> c8[update] --> c9[special]
+      c1[context] & c2[parent] & c3[system] & c4[file] & c5[url] & c6[stamp] & c7[replace] & c8[update] & c9[special] --> CH(["SHA-256"])
     end
     S1 --> S2 --> S3
 ```
 
 Pass 1 runs only under `-C` (`-d`/`-D` force the set and skip it). In passes 1
 and 3 each clause is *hashed* (e.g. `system` = its command text); in pass 2 the
-clauses are *executed* (e.g. `system` = the command runs). Because the store is
-modified (pass 2) **after** the deciding checksum (pass 1), a dataset's `system:`
-cannot trigger its own rebuild in the same run — its effect is captured by
-pass 3 and seen only by the next run. So point `stamp`/`url`/`file` at the
-**upstream source** whose change should trigger a rebuild, never at a file your
-own `system:` produces.
+clauses are *executed* (e.g. `system` = the command runs) — and only there does
+`url` actually precede `file`. Because the store is modified (pass 2) **after**
+the deciding checksum (pass 1), a dataset's `system:` cannot trigger its own
+rebuild in the same run — its effect is captured by pass 3 and seen only by the
+next run. So point `stamp`/`url`/`file` at the **upstream source** whose change
+should trigger a rebuild, never at a file your own `system:` produces.
 
 ## Reference
 
