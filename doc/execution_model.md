@@ -27,10 +27,17 @@ flowchart TD
     L --> Z[Show status table]
 ```
 
-Within a selected dataset the clauses always run in the order
-**`system` → `url` → `file` → `update`**: `system` typically *produces* the data
-the later clauses load; `update` SPARQL statements are applied in file order then
-document order, after `replace:` substitution. Any clause may be absent.
+Within a selected dataset the clauses always run in this single fixed order:
+
+> **`system` → `url` → `file` → `update`**, then the dataset's metadata is persisted.
+
+`system` typically *produces* the data the later clauses load; `update` SPARQL
+statements are applied in file order then document order, after `replace:`
+substitution. Any clause may be absent. This order is **not configurable**: to
+run steps in any other order (e.g. an `update` before a `file` load), split the
+work across **two datasets** and declare the second with the first as its
+`parent:` — the dependency forces the first to be processed in full before the
+second.
 
 ## What triggers a rebuild
 
@@ -69,7 +76,7 @@ with `-d` or `--force_unfreeze`).
 > A parent's data changing rebuilds the child through `PROPAGATE` (when the
 > parent is in the update set), not through the checksum.
 
-## When the checksum is computed — relative to `system:`
+## When the checksum is computed
 
 `get_sha256` reads `stamp`/`file`/`url`/`update` *when it runs*, and (see the
 lifecycle diagram) it runs **twice**, with `system:` between:
