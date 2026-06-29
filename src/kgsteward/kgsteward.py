@@ -286,8 +286,17 @@ def get_sha256( config, name, echo = True ) :
         for link in target["stamp"] :
             path = replace_env_var( link )
             sha256.update( path.encode('utf-8') )
-            if( path.startswith( "http" )):
-                info = get_head_info( path, echo = echo  ) # as a side effect: verify is the server is responding
+            m = re.match( r"^\s*\$\((?P<cmd>.+)\)\s*$", path, re.DOTALL )
+            if m :  # capture a command's stdout (e.g. a monthly token / pinned commit)
+                cmd = m.group( "cmd" )
+                if echo :
+                    print( colored( "stamp $(" + cmd + ")", "cyan" ))
+                r = subprocess.run( cmd, shell = True, capture_output = True, text = True )
+                if r.returncode != 0 :
+                    stop_error( "stamp command failed: " + cmd + "\n" + r.stderr )
+                sha256.update( r.stdout.strip().encode('utf-8') )
+            elif path.startswith( "http" ):
+                info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"], fatal = False ):
