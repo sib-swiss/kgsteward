@@ -29,6 +29,31 @@ world it is a little more complicated. The examples in [first
 steps](../first_steps/README.md) yield exactly the same results, but on very
 small datasets.
 
+## Comparing store contents (debugging)
+
+To check whether two backends really hold the same data, dump each store to
+sorted TSV and `diff` them:
+
+```sh
+kgsteward config.yaml --dump_all_dataset --dump_dir dumpA   # run against backend A
+kgsteward config.yaml --dump_all_dataset --dump_dir dumpB   # run against backend B
+diff -r dumpA dumpB
+```
+
+`--dump_all_dataset` writes one sorted `<dataset>.tsv` per named graph;
+`--dump_all_select` does the same for every configured SELECT query (`--dump_dataset`
+/ `--dump_select` restrict to named ones). Sorting is enforced so triple/row order
+never shows up as a spurious diff, and every cell is escaped so embedded tabs or
+newlines inside a literal cannot misalign the grid.
+
+This is strictly a **debugging / comparison aid** — the TSV is meant to be read and
+diffed, **not** to retrieve RDF for further processing. It intentionally drops
+datatype and language tags so that trivial serialization differences between stores
+do not register as diffs, which also means it is *not* a faithful RDF serialization.
+To move actual RDF between stores use the normal load path, or — for qlever — the
+checkpoint / quad-dump mechanisms described in [triplestore
+drivers](../drivers/README.md).
+
 ## Develop on GraphDB, deploy where you need
 
 A practical workflow that has worked well: **author and debug a project against

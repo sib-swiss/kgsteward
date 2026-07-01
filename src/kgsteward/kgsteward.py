@@ -118,8 +118,8 @@ def get_user_input():
         '--dump_all_select',
         action = 'store_true',
         help   = "Run ALL configured SPARQL SELECT queries and dump each result as a sorted TSV "
-                 "into --dump_dir. Same sorting/comparison semantics as --dump_all_dataset. "
-                 "Mutually exclusive with --dump_select."
+                 "into --dump_dir. Same debug-only, diff-comparison semantics as --dump_all_dataset: "
+                 "for cross-server diffing, not for retrieving data. Mutually exclusive with --dump_select."
     )
     parser.add_argument(
         '--dump_select',
