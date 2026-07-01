@@ -8,6 +8,7 @@ catch_key_value_rq  = re.compile( r"PREFIX\s+(\S*):\s+<([^>]+)>",  re.IGNORECASE
 def make_void_description( context ):
     return """PREFIX void:     <http://rdfs.org/ns/void#>
 PREFIX void-ext: <http://ldf.fi/void-ext#>
+PREFIX rdf:      <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
 INSERT{
     GRAPH <""" + context + """> {
@@ -41,7 +42,8 @@ WHERE{
             ?s ?prop ?o .
             ?s a ?c_s .
             ?o a ?c_o .
-     	} 
+            FILTER( ?prop != rdf:type )
+     	}
      	GROUP BY ?prop ?c_s ?c_o
     }
     BIND( IRI( CONCAT( '""" + context + """/void/class_partition_',    MD5( STR( ?c_s ))))  AS ?cps )
@@ -65,6 +67,7 @@ WHERE{
             ?s ?prop ?o .
             ?s a ?c_s .
             FILTER( isLITERAL( ?o ))
+            FILTER( ?prop != rdf:type )
             BIND( DATATYPE( ?o ) AS ?dt )
      	} 
      	GROUP BY ?prop ?c_s ?dt
