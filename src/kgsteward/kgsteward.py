@@ -635,7 +635,16 @@ def main():
             target["frozen"] = False
 
     if args.D :
-        rdf_graph_to_update = rdf_graph_all
+        # -D (and -F, which sets args.D) rebuilds ALL datasets EXCEPT frozen ones:
+        # dragging a frozen dataset into a full rebuild can be catastrophic (e.g. a
+        # huge frozen graph OOM-crashing the qlever index build).  -C already skips
+        # frozen (update_set_offline) and -d is explicit-by-name, so only -D needs
+        # this guard.  --force_unfreeze runs just above and clears frozen, so
+        # `-F --force_unfreeze` still rebuilds everything (the escape hatch holds).
+        rdf_graph_to_update = {
+            name for name in rdf_graph_all
+            if not get_target( config, name )["frozen"]
+        }
     elif args.d : # status not checked here
         rdf_graph_to_update.update( resolve_names( args.d, rdf_graph_all, "dataset" ))
     elif args.C :
