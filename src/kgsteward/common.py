@@ -225,19 +225,35 @@ def run_system_cmd( cmd, echo = True, **kwargs ):
         print( colored( cmd_str, "cyan" ), flush = True )
     return subprocess.run( cmd, **kwargs )
 
+def tsv_escape( value ):
+    """Escape a cell so embedded TAB / CR / NEWLINE cannot break the TSV grid.
+
+    SPARQL literals routinely carry these characters (rdfs:comment, labels,
+    descriptions). Written raw they would split a value across columns or rows,
+    silently corrupting the diff-based cross-backend comparison. Backslash is
+    escaped first so the escapes introduced below stay unambiguous.
+    """
+    return ( str( value ).replace( "\\", "\\\\" )
+                         .replace( "\t", "\\t" )
+                         .replace( "\r", "\\r" )
+                         .replace( "\n", "\\n" ))
+
 def write_sorted_tsv( out_dir, name, header, rows ):
     """Write (header, rows) as a sorted TSV to <out_dir>/<name>.tsv.
 
     Sorting is enforced irrespective of the source order so that dumps from
     different servers can be compared with diff. The header line is always
-    written, making the output self-describing.
+    written, making the output self-describing. Every cell is TSV-escaped
+    (see tsv_escape) so whitespace inside a value cannot misalign the grid.
+    Rows are sorted on their raw values before escaping, so escaping never
+    perturbs the ordering.
     """
     out_path = os.path.join( out_dir, name + ".tsv" )
     report( "write file", out_path )
     with open( out_path, "w", encoding="utf-8" ) as f:
-        f.write( "\t".join( header ) + "\n" )
+        f.write( "\t".join( tsv_escape( h ) for h in header ) + "\n" )
         for row in sorted( rows ):
-            f.write( "\t".join( map( str, row )) + "\n" )
+            f.write( "\t".join( tsv_escape( c ) for c in row ) + "\n" )
 
 def resolve_names( arg, catalog, kind ):
     """Split a comma-separated CLI selection and validate it against a catalog.
