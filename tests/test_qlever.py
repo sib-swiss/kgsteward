@@ -814,3 +814,49 @@ def test_rewrite_repository_full_wipe( qlever_workdir ):
     )
     assert not client.is_running, "Server should be stopped after rewrite_repository"
     print( f"\nrewrite_repository: {len(files_before)} files → {len(files_after)} (only Qleverfile remains)" )
+
+
+def test_checkpoint_captures_all_triples( qlever_workdir ):
+    """Regression for the silently-truncated checkpoint bug.
+
+    A fully-unbound ``CONSTRUCT { ?s ?p ?o }`` over a named graph is truncated by
+    QLever (it once returned 32 of 443 triples for ReconX_schema) while the
+    identical SELECT is complete — so every checkpoint was under-populated and the
+    loss compounded across rebuilds.  dump_checkpoint now enumerates the distinct
+    predicates and runs one BOUND CONSTRUCT each.  This test pins the invariant:
+    the dumped .nt.gz (and the sidecar count) must equal the live COUNT(*).
+    """
+    import gzip
+    from src.kgsteward.qlever import QleverClient
+
+    qleverfile = qlever_workdir["qleverfile"]
+    qleverdir  = qlever_workdir["qleverdir"]
+    foaf_rdf   = os.path.join( env["KGSTEWARD_ROOT_DIR"], "doc/first_steps/foaf.rdf" )
+    ctx = "http://example.org/context/foaf_checkpoint_complete"
+
+    client = QleverClient( qleverfile, qleverdir, echo = True )
+    client.rewrite_repository( echo = True )
+    client.load_from_file( foaf_rdf, ctx, echo = True )
+    client.mark_rebuild( ctx, "sha-complete" )
+    client.server_start( echo = True )
+    assert client.has_checkpoint( ctx, "sha-complete" )
+
+    # Live truth: COUNT(*) and the number of distinct predicates.
+    r = client.sparql_query(
+        f"SELECT ( COUNT(*) AS ?n ) WHERE {{ GRAPH <{ctx}> {{ ?s ?p ?o }} }}", echo = True )
+    live = int( r.json()["results"]["bindings"][0]["n"]["value"] )
+    r = client.sparql_query(
+        f"SELECT ( COUNT( DISTINCT ?p ) AS ?n ) WHERE {{ GRAPH <{ctx}> {{ ?s ?p ?o }} }}", echo = True )
+    n_preds = int( r.json()["results"]["bindings"][0]["n"]["value"] )
+    assert live > n_preds > 1, (
+        f"need a multi-predicate graph to exercise the per-predicate loop; "
+        f"got {live} triples over {n_preds} predicates" )
+
+    # The checkpoint on disk must hold EVERY triple, not a truncated subset.
+    with gzip.open( client.checkpoint_path( ctx ), "rt", encoding = "utf-8" ) as f:
+        dumped = sum( 1 for line in f if line.strip() )
+    assert dumped == live, f"checkpoint truncated: {dumped} lines on disk vs {live} live triples"
+
+    with open( client.checkpoint_path( ctx ) + ".json" ) as f:
+        assert json.load( f )["triples"] == live, "sidecar triple count must match live COUNT(*)"
+    print( f"\ncheckpoint complete: {live} triples over {n_preds} predicates, all captured" )

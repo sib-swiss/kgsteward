@@ -927,8 +927,8 @@ class QleverClient( GenericClient ):
         """Queue a checkpoint-dump sentinel for *context_iri* in pending_updates.
 
         When ``_apply_pending_updates`` hits the ``(context_iri, sha256)`` tuple
-        it calls ``dump_checkpoint`` — the CONSTRUCT query against the running
-        server returns the on-disk index merged with the in-memory delta from
+        it calls ``dump_checkpoint`` — the CONSTRUCT queries against the running
+        server return the on-disk index merged with the in-memory delta from
         the preceding updates, so the checkpoint captures the complete
         post-update state.  No ``qlever rebuild-index`` is needed because the
         next ``_finalize_index`` rebuilds the on-disk index from scratch
@@ -1205,9 +1205,9 @@ class QleverClient( GenericClient ):
 
         Two-step atomic write:
 
-          1. Dump CONSTRUCT response to ``<path>.tmp``, then
-             ``os.replace(tmp, path)`` — the .nt.gz is either the OLD or the
-             NEW content, never partial.
+          1. Dump the graph (one bound CONSTRUCT per distinct predicate — see
+             below) to ``<path>.tmp``, then ``os.replace(tmp, path)`` — the
+             .nt.gz is either the OLD or the NEW content, never partial.
           2. Write the sidecar last; its presence is the completeness marker.
              It records the named-graph IRI and, when known, the dataset's
              kgsteward checksum (*sha256*) so ``has_checkpoint`` can judge
@@ -1220,18 +1220,39 @@ class QleverClient( GenericClient ):
         fname    = os.path.basename( path )
         sidecar  = path + ".json"
         tmp_path = path + ".tmp"
-        sparql   = f"CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}"
         if echo:
             print( colored( f"dump checkpoint → {fname}", "cyan" ), flush = True )
-        r = http_call(
+        # A fully-unbound CONSTRUCT { ?s ?p ?o } over a named graph is SILENTLY
+        # TRUNCATED by QLever (e.g. 32 of 443 triples for ReconX_schema) while
+        # the identical SELECT returns everything — and the loss compounds across
+        # rebuilds.  Work around it by enumerating the distinct predicates and
+        # running one BOUND CONSTRUCT per predicate: QLever serializes those
+        # correctly and streams them, so we never materialize the whole graph in
+        # memory (matters for graphs like MetaNetX_MNXref, ~70M triples).
+        # Upstream bug (report pending): once QLever returns complete results for
+        # the unbound CONSTRUCT, this whole per-predicate dance can collapse back
+        # to a single CONSTRUCT { ?s ?p ?o }.
+        sel = http_call(
             { "method": "POST", "url": self.endpoint_query,
-              "headers": { "Accept": "application/n-triples",
+              "headers": { "Accept": "application/sparql-results+json",
                            "Content-Type": "application/x-www-form-urlencoded" },
-              "data": { "query": sparql } },
+              "data": { "query": f"SELECT DISTINCT ?p WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}" } },
             [ 200 ], echo = False,
         )
+        preds = [ b["p"]["value"] for b in sel.json()["results"]["bindings"] ]
+        triples = 0
         with gzip.open( tmp_path, "wb" ) as f:
-            f.write( r.content )
+            for p in preds:
+                p_iri = "<" + p.replace( "\\", "\\\\" ).replace( ">", "\\>" ) + ">"
+                r = http_call(
+                    { "method": "POST", "url": self.endpoint_query,
+                      "headers": { "Accept": "application/n-triples",
+                                   "Content-Type": "application/x-www-form-urlencoded" },
+                      "data": { "query": f"CONSTRUCT {{ ?s {p_iri} ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s {p_iri} ?o }} }}" } },
+                    [ 200 ], echo = False,
+                )
+                f.write( r.content )
+                triples += r.content.count( b"\n" )
         os.replace( tmp_path, path )    # atomic on POSIX
         # Record triple count + modification time alongside the IRI/checksum so
         # the status table can fill #triple / last modified OFFLINE.  qlever's
@@ -1240,7 +1261,6 @@ class QleverClient( GenericClient ):
         # blank (a live backend like GraphDB always answers).  The count is the
         # number of N-Triples lines just dumped; modified is this checkpoint's
         # write time.
-        triples  = r.content.count( b"\n" )
         modified = time.strftime( "%Y-%m-%dT%H:%M:%S" )
         with open( sidecar, "w" ) as f:
             json.dump( { "graph": context_iri, "sha256": sha256,
