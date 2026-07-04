@@ -1,4 +1,328 @@
 {
+  "$defs": {
+    "AutocompleteWidget": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "Widget identifier, minted as kgsteward:<id>.",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Human-readable label shown for the widget (kgsteward:prompt).",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the query returning the option rows. Defaults to the query the selector is declared on (kgsteward:selectQuery).",
+          "title": "Options query"
+        },
+        "valueIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 1,
+          "description": "1-based column of the option query's projection used as the value. A string is interpreted as a variable name (emitted as kgsteward:valueVar).",
+          "title": "Value index"
+        },
+        "nameIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 2,
+          "description": "1-based column of the option query's projection used as the label. A string is interpreted as a variable name (emitted as kgsteward:nameVar).",
+          "title": "Name index"
+        },
+        "type": {
+          "const": "autocomplete",
+          "default": "autocomplete",
+          "description": "Widget kind: select, checkbox, autocomplete (all query-backed), text (free text, optional regexp) or slider (numeric range).",
+          "title": "Widget type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prompt"
+      ],
+      "title": "AutocompleteWidget",
+      "type": "object"
+    },
+    "CheckboxWidget": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "Widget identifier, minted as kgsteward:<id>.",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Human-readable label shown for the widget (kgsteward:prompt).",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the query returning the option rows. Defaults to the query the selector is declared on (kgsteward:selectQuery).",
+          "title": "Options query"
+        },
+        "valueIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 1,
+          "description": "1-based column of the option query's projection used as the value. A string is interpreted as a variable name (emitted as kgsteward:valueVar).",
+          "title": "Value index"
+        },
+        "nameIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 2,
+          "description": "1-based column of the option query's projection used as the label. A string is interpreted as a variable name (emitted as kgsteward:nameVar).",
+          "title": "Name index"
+        },
+        "type": {
+          "const": "checkbox",
+          "default": "checkbox",
+          "description": "Widget kind: select, checkbox, autocomplete (all query-backed), text (free text, optional regexp) or slider (numeric range).",
+          "title": "Widget type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prompt"
+      ],
+      "title": "CheckboxWidget",
+      "type": "object"
+    },
+    "FormFieldConf": {
+      "additionalProperties": true,
+      "properties": {
+        "target": {
+          "description": "Verbatim string in the query body to be replaced (kgsteward:targetStr).",
+          "title": "Target string",
+          "type": "string"
+        },
+        "widget": {
+          "description": "Identifier of the selector widget providing the value (kgsteward:replaceWith).",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default",
+          "description": "Optional default value used when the field is left unset (kgsteward:default)."
+        }
+      },
+      "required": [
+        "target",
+        "widget"
+      ],
+      "title": "FormFieldConf",
+      "type": "object"
+    },
+    "SelectWidget": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "Widget identifier, minted as kgsteward:<id>.",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Human-readable label shown for the widget (kgsteward:prompt).",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the query returning the option rows. Defaults to the query the selector is declared on (kgsteward:selectQuery).",
+          "title": "Options query"
+        },
+        "valueIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 1,
+          "description": "1-based column of the option query's projection used as the value. A string is interpreted as a variable name (emitted as kgsteward:valueVar).",
+          "title": "Value index"
+        },
+        "nameIndex": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 2,
+          "description": "1-based column of the option query's projection used as the label. A string is interpreted as a variable name (emitted as kgsteward:nameVar).",
+          "title": "Name index"
+        },
+        "type": {
+          "const": "select",
+          "default": "select",
+          "description": "Widget kind: select, checkbox, autocomplete (all query-backed), text (free text, optional regexp) or slider (numeric range).",
+          "title": "Widget type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prompt"
+      ],
+      "title": "SelectWidget",
+      "type": "object"
+    },
+    "SliderWidget": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "Widget identifier, minted as kgsteward:<id>.",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Human-readable label shown for the widget (kgsteward:prompt).",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "type": {
+          "const": "slider",
+          "default": "slider",
+          "description": "Widget kind: select, checkbox, autocomplete (all query-backed), text (free text, optional regexp) or slider (numeric range).",
+          "title": "Widget type",
+          "type": "string"
+        },
+        "min": {
+          "description": "Lower bound of a slider (kgsteward:min).",
+          "title": "Min",
+          "type": "number"
+        },
+        "max": {
+          "description": "Upper bound of a slider (kgsteward:max).",
+          "title": "Max",
+          "type": "number"
+        },
+        "step": {
+          "default": 1,
+          "description": "Step of a slider (kgsteward:step).",
+          "title": "Step",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "prompt",
+        "min",
+        "max"
+      ],
+      "title": "SliderWidget",
+      "type": "object"
+    },
+    "TextWidget": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "description": "Widget identifier, minted as kgsteward:<id>.",
+          "title": "Widget id",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "Human-readable label shown for the widget (kgsteward:prompt).",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "type": {
+          "const": "text",
+          "default": "text",
+          "description": "Widget kind: select, checkbox, autocomplete (all query-backed), text (free text, optional regexp) or slider (numeric range).",
+          "title": "Widget type",
+          "type": "string"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regular expression validating a free-text field (text widget only; kgsteward:pattern).",
+          "title": "Pattern"
+        }
+      },
+      "required": [
+        "id",
+        "prompt"
+      ],
+      "title": "TextWidget",
+      "type": "object"
+    }
+  },
   "additionalProperties": true,
   "description": "grlc decorators recognised in the `#+` comment block of a SPARQL query file",
   "properties": {
@@ -51,7 +375,7 @@
         }
       ],
       "default": null,
-      "description": "Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, kept for compatibility but not reflected in the RDF documentation.",
+      "description": "Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, not reflected in the RDF documentation.",
       "title": "Endpoint in URL"
     },
     "endpoint-method": {
@@ -130,13 +454,15 @@
         }
       ],
       "default": null,
-      "description": "List of single-key mappings giving default values for query parameters (?_name). Applied by substitution into the returned query; parameters without a default are left untouched.",
+      "description": "List of single-key mappings giving default values for grlc parameters (?_name). Applied by substitution into the returned query; parameters without a default are left untouched.",
       "title": "Defaults"
     },
     "enumerate": {
       "anyOf": [
         {
-          "items": {},
+          "items": {
+            "type": "object"
+          },
           "type": "array"
         },
         {
@@ -159,6 +485,106 @@
       "default": null,
       "description": "SPARQLTransformer structure used to reshape results. grlc option, not reflected in the RDF documentation.",
       "title": "Transform"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Provenance of the query (e.g. an upstream sparql-examples file). Emitted as dct:source.",
+      "title": "Source"
+    },
+    "citation": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Bibliographic citation to credit when using the query. Emitted as schema:citation.",
+      "title": "Citation"
+    },
+    "param": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Standalone parameter mechanism (list of single-key mappings). Recognised and preserved; substitution semantics are left to the parameter mechanism.",
+      "title": "Param"
+    },
+    "selector": {
+      "anyOf": [
+        {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "autocomplete": "#/$defs/AutocompleteWidget",
+                "checkbox": "#/$defs/CheckboxWidget",
+                "select": "#/$defs/SelectWidget",
+                "slider": "#/$defs/SliderWidget",
+                "text": "#/$defs/TextWidget"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SelectWidget"
+              },
+              {
+                "$ref": "#/$defs/CheckboxWidget"
+              },
+              {
+                "$ref": "#/$defs/AutocompleteWidget"
+              },
+              {
+                "$ref": "#/$defs/TextWidget"
+              },
+              {
+                "$ref": "#/$defs/SliderWidget"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Reusable input widgets that populate form fields. Declared on the query that provides the option values.",
+      "title": "Selector widgets"
+    },
+    "form": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/FormFieldConf"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Declares this query as a dynamic input form: a list of string substitutions, each binding a target string to a selector widget.",
+      "title": "Input form"
     }
   },
   "title": "GrlcDecorators",
