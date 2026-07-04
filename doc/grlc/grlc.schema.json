@@ -1,0 +1,166 @@
+{
+  "additionalProperties": true,
+  "description": "grlc decorators recognised in the `#+` comment block of a SPARQL query file",
+  "properties": {
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Short one-line summary of the query, shown next to its name.",
+      "title": "Summary"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Longer human-readable description of what the query does.",
+      "title": "Description"
+    },
+    "endpoint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "SPARQL endpoint the query is meant to run against. Takes precedence over any endpoint supplied by kgsteward when documenting the query (schema:target).",
+      "title": "Endpoint"
+    },
+    "endpoint_in_url": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, kept for compatibility but not reflected in the RDF documentation.",
+      "title": "Endpoint in URL"
+    },
+    "endpoint-method": {
+      "anyOf": [
+        {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "HTTP method used to send the query to the endpoint (GET or POST). grlc HTTP-API option, not reflected in the RDF documentation.",
+      "title": "Endpoint method"
+    },
+    "method": {
+      "anyOf": [
+        {
+          "enum": [
+            "GET",
+            "POST"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "HTTP method exposed by the generated API operation (GET or POST). grlc HTTP-API option, not reflected in the RDF documentation.",
+      "title": "Method"
+    },
+    "pagination": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Page size for paginated results. grlc HTTP-API option, not reflected in the RDF documentation.",
+      "title": "Pagination"
+    },
+    "tags": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List of tags used to group related queries. Emitted as schema:keywords.",
+      "title": "Tags"
+    },
+    "defaults": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List of single-key mappings giving default values for query parameters (?_name). Applied by substitution into the returned query; parameters without a default are left untouched.",
+      "title": "Defaults"
+    },
+    "enumerate": {
+      "anyOf": [
+        {
+          "items": {},
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List of parameters offered as an enumerated choice. grlc HTTP-API option, not reflected in the RDF documentation.",
+      "title": "Enumerate"
+    },
+    "transform": {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "SPARQLTransformer structure used to reshape results. grlc option, not reflected in the RDF documentation.",
+      "title": "Transform"
+    }
+  },
+  "title": "GrlcDecorators",
+  "type": "object"
+}
