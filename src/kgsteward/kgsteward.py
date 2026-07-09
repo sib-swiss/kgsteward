@@ -975,8 +975,6 @@ INSERT DATA {{
                     filename = dir + "/" + fn
                     print_break()
                     with open( filename ) as f: sparql = f.read()
-                    name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                    sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
                     report( "validate", filename )
                     server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 
@@ -1003,7 +1001,6 @@ INSERT DATA {{
                         print_break()
                         with open( filename ) as f: sparql = f.read()
                         name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
-                        sparql = "## " + name + " ##\n" + sparql # to ease debugging from logs
 #                    report( "validate", filename )
 #                    server.validate_sparql_query( sparql, echo = args.v, timeout=args.timeout )
 #                    if not args.graphdb_upload_query:
