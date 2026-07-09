@@ -827,7 +827,7 @@ INSERT DATA {{
                                 #FIXME: filter on publish
                                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                                     filenames.append( dir + "/" + fn )
-                            sparql = make_query_description( context, filenames )
+                            sparql = make_query_description( context, filenames, server.get_endpoint_query() )
                             for s in sparql:
                                 server.sparql_update( s, echo = args.v )
                     else:

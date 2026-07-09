@@ -1,5 +1,6 @@
 import re
 from .common import *
+from . import grlc
 
 # Unsolved problem catch_key_value_rq is a particular case of catch_key_value_ttl
 catch_key_value_ttl = re.compile( r"\@prefix\s+(\S*):\s+<([^>]+)>\s*\.", re.IGNORECASE )
@@ -129,14 +130,11 @@ def escape_sparql_long_string( text ):
     """
     return text.replace( "\\", "\\\\" ).replace( '"', '\\"' )
 
-def make_query_description( context, filenames ):
+def make_query_description( context, filenames, endpoint = None ):
     sparql = []
     seen = {}
     for filename in filenames:
         report( "read query", filename )
-        comment  = []
-        query    = [] # i.e. the SPARQL query itself
-        more_ttl = []
         name     = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
         name     = re.sub( r"\W", "_", name )
         if name in seen:
@@ -144,14 +142,33 @@ def make_query_description( context, filenames ):
         else:
             seen[name] = True
         with open( filename ) as file:
-            for line in file:
-                if re.match( r"^#\+", line ):
-                    l = re.sub( r"^#\+", "", line.rstrip() )
-                    more_ttl.append( l )
-                elif re.match( r"^#", line ):
-                    comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
-                else:
-                    query.append( line.rstrip().replace( "\t", "    "))
+            text = file.read()
+        # grlc parser path: activated when the file starts with a '#+' decorator.
+        # The grlc parser turns the '#+' YAML block into valid RDF; the uploaded
+        # query (sh:select) keeps its '#'/'#+' comment lines (query as authored).
+        first = next(( ln for ln in text.splitlines() if ln.strip() != "" ), "" )
+        if first.startswith( "#+" ):
+            g = grlc.build_graph(
+                text, name, grlc.parse_decorators( text ),
+                endpoint = endpoint, form = grlc.detect_form( text )
+            )
+            sparql.append(
+                "INSERT DATA {\n    GRAPH <" + context + "> {\n"
+                + g.serialize( format = "nt" ) + "    }\n}"
+            )
+            continue
+        # ---- legacy behaviour (preserved): '#+' lines are Turtle, '#' the comment ----
+        comment  = []
+        query    = [] # i.e. the SPARQL query itself
+        more_ttl = []
+        for line in text.splitlines():
+            if re.match( r"^#\+", line ):
+                l = re.sub( r"^#\+", "", line.rstrip() )
+                more_ttl.append( l )
+            elif re.match( r"^#", line ):
+                comment.append( re.sub( r"^#\s*", "", line.rstrip() ))
+            else:
+                query.append( line.rstrip().replace( "\t", "    "))
         iri = "http://rdf.example.org/queryform/" + name
         sparql.append( """PREFIX sh: <http://www.w3.org/ns/shacl#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
