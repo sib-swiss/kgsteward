@@ -361,7 +361,13 @@ def build_graph( text, name, decorators, endpoint = None, form = None, graph = N
     if form in _FORM_TO_SH:
         cls, pred = _FORM_TO_SH[ form ]
         g.add(( subj, RDF.type, cls ))
-        g.add(( subj, pred, RdfLiteral( text )))
+        # Prepend a '#+ endpoint:' grlc directive so the published query is
+        # self-describing, unless it already declares its own endpoint.
+        own_endpoint = decorators.endpoint if decorators else None
+        query_text = text
+        if endpoint and not own_endpoint:
+            query_text = "#+ endpoint: " + endpoint + "\n" + text
+        g.add(( subj, pred, RdfLiteral( query_text )))
 
     if decorators:
         comment = decorators.description or decorators.summary
