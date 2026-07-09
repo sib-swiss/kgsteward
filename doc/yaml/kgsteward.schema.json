@@ -240,19 +240,6 @@
           "title": "Server URL",
           "type": "string"
         },
-        "public_sparql_endpoint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
-          "title": "Public SPARQL endpoint"
-        },
         "server_config": {
           "description": "Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.",
           "title": "Server config file",
@@ -313,19 +300,6 @@
           "description": "URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. GraphDB has location 'http://localhost:7200' by default",
           "title": "Server URL",
           "type": "string"
-        },
-        "public_sparql_endpoint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
-          "title": "Public SPARQL endpoint"
         },
         "server_config": {
           "description": "Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.",
@@ -426,19 +400,6 @@
           "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
           "title": "Qlever brand",
           "type": "string"
-        },
-        "public_sparql_endpoint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
-          "title": "Public SPARQL endpoint"
         },
         "qleverfile": {
           "description": "Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped.",
@@ -558,19 +519,6 @@
           "description": "URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. RDF4J has location 'http://localhost:8080' by default",
           "title": "Server URL",
           "type": "string"
-        },
-        "public_sparql_endpoint": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
-          "title": "Public SPARQL endpoint"
         },
         "repository": {
           "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
@@ -774,6 +722,19 @@
       "description": "Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try.",
       "title": "context base IRI",
       "type": "string"
+    },
+    "public_sparql_endpoint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional top-level, read-only public SPARQL endpoint URL. Independent of the server brand: it is used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
+      "title": "Public SPARQL endpoint"
     },
     "queries": {
       "anyOf": [

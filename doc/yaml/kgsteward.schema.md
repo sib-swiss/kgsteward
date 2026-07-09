@@ -49,6 +49,7 @@ Top level YAML keys
 | dataset | `array` | ✅ | [DatasetConf](#datasetconf) | Mandatory key to specify the content of the knowledge graph in the triplestore. |
 | context_base_IRI | `string` | ✅ | string | Base IRI to construct the graph context. In doubt, give `http://example.org/context/` a try. |
 | queries | `array` or `null` | ✅ | [QueryConf](#queryconf) | Structured list of SPARQL queries. |
+| public_sparql_endpoint | `string` or `null` |  | string | Optional top-level, read-only public SPARQL endpoint URL. Independent of the server brand: it is used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint. |
 
 
 ---
@@ -100,7 +101,6 @@ No description provided for this model.
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. Fuseki has location 'http://localhost:3030' by default |
 | server_config | `string` | ✅ | string | Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore. |
-| public_sparql_endpoint | `string` or `null` |  | string | Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint. |
 | username | `string` or `null` |  | string | The name of a user with write-access rights in the triplestore. |
 | password | `string` or `null` |  | string | The password of a user with write-access rights to the triplestore. It is recommended that the value of this variable is passed trough an environment variable. By this way the password is not stored explicitely in the config file. Alternatively `?` can be used and the password will be asked interactively at run time. |
 
@@ -116,7 +116,6 @@ No description provided for this model.
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. GraphDB has location 'http://localhost:7200' by default |
 | server_config | `string` | ✅ | string | Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`. |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore. |
-| public_sparql_endpoint | `string` or `null` |  | string | Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint. |
 | username | `string` or `null` |  | string | The name of a user with write-access rights in the triplestore. |
 | password | `string` or `null` |  | string | The password of a user with write-access rights to the triplestore. It is recommended that the value of this variable is passed trough an environment variable. By this way the password is not stored explicitely in the config file. Alternatively `?` can be used and the password will be asked interactively at run time. |
 | prefixes | `array` or `null` |  | string | A list of Turtle files from which prefix definitions can be obtained.         This list will used to update the namespace definitions in GraphDB and RDF4J.         Otherwise it is ignored |
@@ -143,7 +142,6 @@ No description provided for this model.
 | brand | `const` | ✅ | `qlever` | String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' |
 | qleverfile | `string` | ✅ | string | Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped. |
 | qleverdir | `string` | ✅ | string | Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there. |
-| public_sparql_endpoint | `string` or `null` |  | string | Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint. |
 | access_token | `string` or `null` |  | string | Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile. |
 
 ## QueryConf
@@ -171,7 +169,6 @@ No description provided for this model.
 | brand | `const` | ✅ | `rdf4j` | String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' |
 | location | `string` | ✅ | string | URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand. RDF4J has location 'http://localhost:8080' by default |
 | repository | `string` | ✅ | [`^\w{1,32}$`](https://regex101.com/?regex=%5E%5Cw%7B1%2C32%7D%24) | The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore. |
-| public_sparql_endpoint | `string` or `null` |  | string | Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint. |
 
 ## RiotChunkStoreFileLoader
 

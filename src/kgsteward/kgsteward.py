@@ -545,8 +545,8 @@ def main():
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
-    if config["server"].get( "public_sparql_endpoint" ):
-        server.public_sparql_endpoint = replace_env_var( config["server"]["public_sparql_endpoint"] )
+    if config.get( "public_sparql_endpoint" ):
+        server.public_sparql_endpoint = replace_env_var( config["public_sparql_endpoint"] )
 
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )

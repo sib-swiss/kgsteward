@@ -25,7 +25,7 @@ description = {
 """,
     "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' """,
     "location" :  """URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand.""" ,
-    "public_sparql_endpoint": """Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.""",
+    "public_sparql_endpoint": """Optional top-level, read-only public SPARQL endpoint URL. Independent of the server brand: it is used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.""",
     "repository": """The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.""",
     "username":      """The name of a user with write-access rights in the triplestore.""",
     "password":      """The password of a user with write-access rights to the triplestore.
@@ -151,7 +151,6 @@ class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_graphdb" ))
-    public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     # file_server_port  : Optional[ int ] = Field( None, title = "file_server_port", description = describe( "file_server_port" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
@@ -163,7 +162,6 @@ class FusekiConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "fuseki" ] = Field( title = "Fuseki brand", description = describe( "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_fuseki" ))
-    public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     server_config     : str = Field( title = "Server config file", description = describe( "server_config" ))
     username          : Optional[ str ] = Field( None, title = "Username", description = describe( "username" ))
     password          : Optional[ str ] = Field( None, title = "Password", description = describe( "password" ))
@@ -174,14 +172,12 @@ class RDF4JConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "rdf4j" ] = Field( title = "RDF4J brand", description = describe(  "server_brand" ))
     location          : str = Field( title = "Server URL", description = describe( "location_rdf4j" ))
-    public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     repository        : str= Field( pattern = r"^\w{1,32}$", title = "Repository ID", description = describe( "repository" ))
     # file_server_port  : Optional[ int ]  = Field( 0, title = "file_server_port", description = describe( "file_server_port" ))
 
 class QleverConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand        : Literal[ "qlever" ] = Field( title = "Qlever brand", description = describe( "server_brand" ))
-    public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     qleverfile   : str = Field( title = "Qleverfile path", description = "Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped." )
     qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there." )
     access_token : Optional[ str ] = Field( None, title = "Qlever access token", description = "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile." )
@@ -254,6 +250,7 @@ class KGStewardConf( BaseModel ):
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))
     context_base_IRI  : str = Field( title = "context base IRI", description = describe( "context_base_IRI" ) )
+    public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     queries           : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
     # validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
 
