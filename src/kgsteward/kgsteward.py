@@ -545,6 +545,9 @@ def main():
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
+    if config["server"].get( "public_sparql_endpoint" ):
+        server.public_sparql_endpoint = replace_env_var( config["server"]["public_sparql_endpoint"] )
+
     for key in config["server"].keys():
         os.environ[ "kgsteward_server_" + str( key )] = str( config["server"][key] )
     os.environ[ "kgsteward_server_endpoint_query"]  = server.get_endpoint_query()
@@ -827,7 +830,7 @@ INSERT DATA {{
                                 #FIXME: filter on publish
                                 for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                                     filenames.append( dir + "/" + fn )
-                            sparql = make_query_description( context, filenames, server.get_endpoint_query() )
+                            sparql = make_query_description( context, filenames, server.get_public_sparql_endpoint() )
                             for s in sparql:
                                 server.sparql_update( s, echo = args.v )
                     else:

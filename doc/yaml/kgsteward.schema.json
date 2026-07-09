@@ -152,7 +152,7 @@
             }
           ],
           "default": null,
-          "description": "List of file paths or URLs to which last modification dates will used. The file contents are ignored. Wildcards `*` can be used.",
+          "description": "List of file paths or URLs to which last modification dates will used. The file contents are ignored. Wildcards `*` can be used in file/URL entries; they are expanded by kgsteward (glob) before hashing. An entry of the form `$(command)` is evaluated by running the shell command; its stdout is hashed into the fingerprint (use for a computed change-signal such as a monthly token, e.g. `$(date -u +%Y-%m)`). The command runs on every kgsteward invocation during planning, so keep it cheap and side-effect-free. kgsteward does no wildcard expansion on a `$(command)` entry: any `*` inside it is left to the shell (the command runs with shell=True).",
           "title": "Stamp file(s)"
         },
         "replace": {
@@ -231,7 +231,7 @@
       "properties": {
         "brand": {
           "const": "fuseki",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
           "title": "Fuseki brand",
           "type": "string"
         },
@@ -240,29 +240,61 @@
           "title": "Server URL",
           "type": "string"
         },
-        "repository": {
-          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
-          "pattern": "^\\w{1,32}$",
-          "title": "Repository ID",
-          "type": "string"
-        },
-        "file_server_port": {
+        "public_sparql_endpoint": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": 0,
-          "description": "Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
-          "title": "file_server_port"
+          "default": null,
+          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
+          "title": "Public SPARQL endpoint"
+        },
+        "server_config": {
+          "description": "Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.",
+          "title": "Server config file",
+          "type": "string"
+        },
+        "username": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of a user with write-access rights in the triplestore.",
+          "title": "Username"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The password of a user with write-access rights to the triplestore. It is recommended that the value of this variable is passed trough an environment variable. By this way the password is not stored explicitely in the config file. Alternatively `?` can be used and the password will be asked interactively at run time.",
+          "title": "Password"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
         }
       },
       "required": [
         "brand",
         "location",
+        "server_config",
         "repository"
       ],
       "title": "FusekiConf",
@@ -273,7 +305,7 @@
       "properties": {
         "brand": {
           "const": "graphdb",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
           "title": "GraphDB brand",
           "type": "string"
         },
@@ -282,23 +314,23 @@
           "title": "Server URL",
           "type": "string"
         },
-        "server_config": {
-          "description": "Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.",
-          "title": "Server config file",
-          "type": "string"
-        },
-        "file_server_port": {
+        "public_sparql_endpoint": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "description": "Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
-          "title": "file_server_port"
+          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
+          "title": "Public SPARQL endpoint"
+        },
+        "server_config": {
+          "description": "Filename with the triplestore configuration, possibly a turtle file. This file can be saved from the UI interface of RDF4J/GraphDB after a first repository was created interactively, thus permitting to reproduce the repository configuration elsewhere. This file is used by the `-I` and `-F` options. Beware that the repository ID could be hard-coded in the config file and should be maintained in sync with `repository`.",
+          "title": "Server config file",
+          "type": "string"
         },
         "username": {
           "anyOf": [
@@ -386,6 +418,60 @@
       "title": "HttpServerFileLoader",
       "type": "object"
     },
+    "QleverConf": {
+      "additionalProperties": true,
+      "properties": {
+        "brand": {
+          "const": "qlever",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
+          "title": "Qlever brand",
+          "type": "string"
+        },
+        "public_sparql_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
+          "title": "Public SPARQL endpoint"
+        },
+        "qleverfile": {
+          "description": "Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped.",
+          "title": "Qleverfile path",
+          "type": "string"
+        },
+        "qleverdir": {
+          "description": "Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there.",
+          "title": "Qlever working directory",
+          "type": "string"
+        },
+        "access_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile.",
+          "title": "Qlever access token"
+        }
+      },
+      "required": [
+        "brand",
+        "qleverfile",
+        "qleverdir"
+      ],
+      "title": "QleverConf",
+      "type": "object"
+    },
     "QueryConf": {
       "properties": {
         "name": {
@@ -464,7 +550,7 @@
       "properties": {
         "brand": {
           "const": "rdf4j",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
           "title": "RDF4J brand",
           "type": "string"
         },
@@ -473,24 +559,24 @@
           "title": "Server URL",
           "type": "string"
         },
-        "repository": {
-          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
-          "pattern": "^\\w{1,32}$",
-          "title": "Repository ID",
-          "type": "string"
-        },
-        "file_server_port": {
+        "public_sparql_endpoint": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": 0,
-          "description": "Integer, `0` by default, i.e. the file server is turned off. When set to a positive integer, say `8000`, local files will be exposed through a temporary HTTP server and loaded from it. Support for different RDF file types and their compressed version depend on the tripelstore. The benefit is the that RDF data from `file` are processed with the same protocol as those supplied remotely through `url`. Essentially for GraphDB, file-size limits are suppressed and compressed formats are supported. Beware that the used python-based server is potentially insecure (see [here](https://docs.python.org/3/library/http.server.html) for details). This should however pose no real treat if used on a personal computer or on a server that is behind a firewall.",
-          "title": "file_server_port"
+          "default": null,
+          "description": "Optional public, read-only SPARQL endpoint URL used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.",
+          "title": "Public SPARQL endpoint"
+        },
+        "repository": {
+          "description": "The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.",
+          "pattern": "^\\w{1,32}$",
+          "title": "Repository ID",
+          "type": "string"
         }
       },
       "required": [
@@ -627,6 +713,7 @@
         "mapping": {
           "fuseki": "#/$defs/FusekiConf",
           "graphdb": "#/$defs/GraphDBConf",
+          "qlever": "#/$defs/QleverConf",
           "rdf4j": "#/$defs/RDF4JConf"
         },
         "propertyName": "brand"
@@ -640,6 +727,9 @@
         },
         {
           "$ref": "#/$defs/FusekiConf"
+        },
+        {
+          "$ref": "#/$defs/QleverConf"
         }
       ],
       "title": "Server"

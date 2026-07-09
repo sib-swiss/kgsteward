@@ -16,6 +16,10 @@ class GenericClient():
         self.endpoint_query  = endpoint_query
         self.endpoint_update = endpoint_update
         self.endpoint_store  = endpoint_store
+        # Public, read-only SPARQL endpoint used to mint IRIs in published
+        # artefacts (e.g. sparql-examples). Set from config after construction;
+        # None means "fall back to the local query endpoint".
+        self.public_sparql_endpoint = None
         self.cookies         = None
         self.headers         = None
         self._ensure_sparql_log_state()
@@ -30,6 +34,11 @@ class GenericClient():
     
     def get_endpoint_query( self ):
         return self.endpoint_query
+
+    def get_public_sparql_endpoint( self ):
+        """Public, read-only SPARQL endpoint for published artefacts.
+        Falls back to the local query endpoint when not configured."""
+        return self.public_sparql_endpoint or self.endpoint_query
 
     def get_endpoint_update( self ):
         return self.endpoint_update
