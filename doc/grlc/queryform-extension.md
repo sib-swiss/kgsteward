@@ -276,13 +276,33 @@ existing ones.
 
 ## 10. Roadmap / non-goals
 
-* **v1** (this document, implemented): flat `InputForm`s, raw string
-  substitution, five widgets, scalar `prompt`, optional `source`/`citation`.
-* **v2** (designed, not built): language-map `prompt`/`summary`/`description`
-  (§ i18n), and **cascading / inter-field dependency** — a selector's option
-  query parameterised by another field's value (`kgsteward:dependsOn` /
-  `filterVar`). The v1 field blank-nodes are shaped so these can be added
-  without breaking the flat case.
+grlc's decorator set is fixed (`summary`, `description`, `endpoint`,
+`endpoint_in_url`, `endpoint-method`, `method`, `pagination`, `tags`,
+`defaults`, `enumerate`, `transform`). Everything below — like `selector`,
+`form`, `source`, `citation` above — is a **kgsteward extension** layered on the
+same `#+` mechanism, **not** part of grlc.
+
+* **Implemented (this document):** flat `InputForm`s, raw string substitution,
+  five widgets, scalar `prompt`, optional `source`/`citation`.
+* **Designed, not built:**
+  * **Faceted keywords** — a kgsteward `facets:` decorator (e.g. `concept`,
+    `intent`, `source`) emitted as `schema:keywords` **`schema:DefinedTerm`**
+    objects: `schema:inDefinedTermSet` = the facet, `schema:termCode` /
+    `schema:name` = the value. grlc's flat `tags` is left untouched (still
+    `schema:keywords` **Text**), so files stay valid grlc and a plain consumer
+    still reads all keywords, while a facet-aware consumer filters on
+    `inDefinedTermSet`. Preferred over inventing `kgsteward:intent/concept/…`
+    predicates because `schema:keywords` already admits Text, URL **and**
+    DefinedTerm (https://schema.org/keywords) — it stays inside the schema.org
+    vocabulary kgsteward already emits. Facets may be seeded from the filename
+    nomenclature (`count_`, `list_`, `fetch_`, `report_`, `import_`, …) and
+    overridden/augmented by the decorator.
+  * **i18n** — language-map `prompt`/`summary`/`description` (scalar-or-map →
+    language-tagged literals).
+  * **cascading / inter-field dependency** — a selector's option query
+    parameterised by another field's value (`kgsteward:dependsOn` / `filterVar`).
+    The v1 field blank-nodes are shaped so this can be added without breaking
+    the flat case.
 
 ## 11. Consumption by an MCP server
 
