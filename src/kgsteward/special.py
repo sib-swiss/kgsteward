@@ -148,7 +148,7 @@ def make_query_description( context, filenames, endpoint = None ):
         # query (sh:select) keeps its '#'/'#+' comment lines (query as authored).
         first = next(( ln for ln in text.splitlines() if ln.strip() != "" ), "" )
         if first.startswith( "#+" ):
-            decorators = grlc.parse_decorators( text )
+            decorators = grlc.parse_decorators( text, source = filename )
             if decorators is None or not decorators.summary:
                 stop_error( "Query '" + name + "' uses grlc notation ('#+') but lacks the mandatory '#+ summary:' decorator." )
             g = grlc.build_graph(

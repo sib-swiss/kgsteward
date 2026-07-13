@@ -31,6 +31,8 @@ from rdflib import Graph, URIRef, BNode, Literal as RdfLiteral, Namespace
 from rdflib.namespace import RDF, RDFS, XSD
 from rdflib.collection import Collection
 
+from .common import print_warn
+
 # --------------------------------------------------------------------------- #
 # Decorator descriptions (local dict, mirroring yamlconfig but separate).
 # --------------------------------------------------------------------------- #
@@ -164,18 +166,28 @@ def extract_decorator_block( text ):
     lines = [ line[ 2: ] for line in text.splitlines() if line.startswith( "#+" ) ]
     return "\n".join( lines ) if lines else None
 
-def parse_decorators( text ):
+def parse_decorators( text, source = None ):
     """Parse the grlc `#+` decorator block into :class:`GrlcDecorators`.
-    Returns ``None`` when the file has no `#+` line. Malformed YAML is treated
-    leniently (empty decorator set); type errors on known keys raise."""
+    Returns ``None`` when the file has no `#+` line. Type errors on known keys
+    raise. A `#+` block that is malformed YAML or does not parse to a mapping is
+    still handled leniently (empty decorator set, never a crash), but now emits
+    a warning naming *source* rather than silently discarding the metadata -- a
+    malformed block would otherwise vanish unnoticed. An empty block (no content
+    after the `#+`) is legitimately empty and is not warned about."""
     block = extract_decorator_block( text )
     if block is None:
         return None
+    where = " in " + source if source else ""
     try:
         data = yaml.safe_load( block )
-    except yaml.YAMLError:
-        data = None
-    if not isinstance( data, dict ):
+    except yaml.YAMLError as err:
+        detail = str( err ).splitlines()[ 0 ] if str( err ).strip() else "invalid YAML"
+        print_warn( "malformed grlc '#+' block" + where + " ignored (" + detail + "); metadata discarded" )
+        data = {}
+    if data is None:
+        data = {}                                  # empty block: no metadata, not an error
+    elif not isinstance( data, dict ):
+        print_warn( "grlc '#+' block" + where + " is not a mapping (" + type( data ).__name__ + "); metadata discarded" )
         data = {}
     return GrlcDecorators( **data )
 
@@ -420,7 +432,7 @@ class GrlcCatalog:
     def parse( self, text, name, endpoint = None ):
         """Parse one query file, fold its documentation into the graph, and
         return the :class:`GrlcQuery`."""
-        decorators = parse_decorators( text )
+        decorators = parse_decorators( text, source = name )
         form       = detect_form( text )
         query      = apply_defaults( text, decorators )
         subject    = subject_iri( name, endpoint )

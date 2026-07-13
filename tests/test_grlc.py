@@ -35,12 +35,32 @@ def test_no_decorator_block_returns_none():
     assert parse_decorators( "SELECT * WHERE { ?s ?p ?o }" ) is None
 
 
-def test_malformed_yaml_is_lenient():
-    """A '#+' block that is not valid YAML yields an empty decorator set, not a
-    crash (grlc-lenient); a decorated file therefore never breaks parsing."""
-    d = parse_decorators( "#+ : : not: valid: yaml:\nSELECT * WHERE { ?s ?p ?o }" )
-    assert d is not None
-    assert d.summary is None
+def test_malformed_yaml_warns_naming_source( capsys ):
+    """A malformed '#+' block yields an empty decorator set, not a crash
+    (grlc-lenient, so a decorated file never breaks parsing), but must WARN
+    naming its source instead of silently discarding metadata."""
+    d = parse_decorators( "#+ : : not: valid: yaml:\nSELECT * WHERE { ?s ?p ?o }",
+                          source = "broken.rq" )
+    assert d is not None and d.summary is None      # still lenient
+    err = capsys.readouterr().out
+    assert "malformed" in err and "broken.rq" in err  # loud, and names the file
+
+
+def test_non_mapping_block_warns( capsys ):
+    """A '#+' block that parses to a non-mapping (e.g. a list) is discarded with
+    a warning, not silently."""
+    d = parse_decorators( "#+ - just\n#+ - a list\nSELECT * WHERE { ?s ?p ?o }",
+                          source = "listy.rq" )
+    assert d is not None and d.summary is None
+    err = capsys.readouterr().out
+    assert "not a mapping" in err and "listy.rq" in err
+
+
+def test_empty_block_is_not_warned( capsys ):
+    """An empty '#+' block is legitimately metadata-free and must NOT warn."""
+    d = parse_decorators( "#+\n#+\nSELECT * WHERE { ?s ?p ?o }", source = "empty.rq" )
+    assert d is not None and d.summary is None
+    assert capsys.readouterr().out == ""
 
 
 def test_unknown_keys_are_preserved():
