@@ -37,7 +37,7 @@ from rdflib.collection import Collection
 
 description = {
     # standard grlc
-    "summary"         : "Short one-line summary of the query, shown next to its name. Emitted as rdfs:label.",
+    "summary"         : "Short one-line summary of the query, shown next to its name. Mandatory when a query uses grlc notation. Emitted as rdfs:label.",
     "description"     : "Longer human-readable description of what the query does. Emitted as rdfs:comment (falls back to summary when absent).",
     "endpoint"        : "SPARQL endpoint the query is meant to run against. Takes precedence over any endpoint supplied by kgsteward when documenting the query (schema:target).",
     "endpoint_in_url" : "Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, not reflected in the RDF documentation.",

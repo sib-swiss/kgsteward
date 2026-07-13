@@ -336,7 +336,7 @@
         }
       ],
       "default": null,
-      "description": "Short one-line summary of the query, shown next to its name. Emitted as rdfs:label.",
+      "description": "Short one-line summary of the query, shown next to its name. Mandatory when a query uses grlc notation. Emitted as rdfs:label.",
       "title": "Summary"
     },
     "description": {

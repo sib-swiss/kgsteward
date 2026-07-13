@@ -5,12 +5,14 @@ grlc parameter `defaults` substitution, query-form detection, and the
 sparql-examples RDF documentation (including the `#+ endpoint:` injection).
 No server or docker needed -- pure functions over strings and rdflib graphs.
 """
+import pytest
 from rdflib import Literal, URIRef, RDF, RDFS
 
 from src.kgsteward.grlc import (
     parse_decorators, apply_defaults, detect_form, strip_comments,
     build_graph, parse_query, subject_iri, SH, SCH, DCT,
 )
+from src.kgsteward.special import make_query_description
 
 
 # --------------------------------------------------------------------------- #
@@ -201,3 +203,25 @@ def test_no_decorator_query_passthrough():
     plain = "SELECT * WHERE { ?s ?p ?o }"
     executable, _ = parse_query( plain, "q" )
     assert executable == plain
+
+
+# --------------------------------------------------------------------------- #
+# summary is mandatory when a query uses grlc notation (enforced at upload)
+# --------------------------------------------------------------------------- #
+
+def test_grlc_summary_mandatory( tmp_path ):
+    # grlc notation without a summary -> hard stop
+    no_sum = tmp_path / "no_summary.rq"
+    no_sum.write_text( "#+ description: has a description but no summary\nSELECT * WHERE {?s ?p ?o}" )
+    with pytest.raises( SystemExit ):
+        make_query_description( "http://ctx", [ str( no_sum ) ] )
+    # grlc notation with a summary -> accepted
+    ok = tmp_path / "ok.rq"
+    ok.write_text( "#+ summary: fine\nSELECT * WHERE {?s ?p ?o}" )
+    out = make_query_description( "http://ctx", [ str( ok ) ] )
+    assert out and "INSERT DATA" in out[ 0 ]
+    # non-grlc file (no '#+') is unaffected by the requirement
+    legacy = tmp_path / "legacy.rq"
+    legacy.write_text( "# just a comment\nSELECT * WHERE {?s ?p ?o}" )
+    out2 = make_query_description( "http://ctx", [ str( legacy ) ] )
+    assert out2 and "sh:select" in out2[ 0 ]
