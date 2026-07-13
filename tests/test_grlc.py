@@ -5,7 +5,7 @@ grlc parameter `defaults` substitution, query-form detection, and the
 sparql-examples RDF documentation (including the `#+ endpoint:` injection).
 No server or docker needed -- pure functions over strings and rdflib graphs.
 """
-from rdflib import Literal, URIRef, RDF
+from rdflib import Literal, URIRef, RDF, RDFS
 
 from src.kgsteward.grlc import (
     parse_decorators, apply_defaults, detect_form, strip_comments,
@@ -112,13 +112,28 @@ def test_build_graph_sparql_examples_core():
                      endpoint = "https://passed.example.org/sparql", form = "SELECT" )
     subj = subject_iri( "q1", "https://passed.example.org/sparql" )
     assert ( subj, RDF.type, SH.SPARQLSelectExecutable ) in g
+    # rdfs:label comes from summary
+    assert ( subj, RDFS.label, Literal( "sum" ) ) in g
     # rdfs:comment prefers description over summary
-    assert any( str( o ) == "desc" for _, _, o in g.triples(( subj, None, None )) )
+    assert ( subj, RDFS.comment, Literal( "desc" ) ) in g
     # tags -> one schema:keywords Text literal each
     kw = { str( o ) for o in g.objects( subj, SCH.keywords ) }
     assert kw == { "t1", "t2" }
     # schema:target: the query's own '#+ endpoint' wins over the passed one
     assert ( subj, SCH.target, URIRef( "https://own.example.org/sparql" ) ) in g
+
+
+def test_label_summary_fallback_and_absence():
+    # summary only: label == comment (comment falls back to summary)
+    q = "#+ summary: only sum\nSELECT * WHERE {?s ?p ?o}"
+    g = build_graph( q, "q", parse_decorators( q ), form = "SELECT" )
+    subj = subject_iri( "q" )
+    assert ( subj, RDFS.label, Literal( "only sum" ) ) in g
+    assert ( subj, RDFS.comment, Literal( "only sum" ) ) in g
+    # no summary: no rdfs:label emitted
+    q2 = "#+ description: only desc\nSELECT * WHERE {?s ?p ?o}"
+    g2 = build_graph( q2, "q2", parse_decorators( q2 ), form = "SELECT" )
+    assert list( g2.objects( subject_iri( "q2" ), RDFS.label ) ) == []
 
 
 def test_source_and_citation_triples():

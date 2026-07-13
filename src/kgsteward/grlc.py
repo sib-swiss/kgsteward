@@ -37,8 +37,8 @@ from rdflib.collection import Collection
 
 description = {
     # standard grlc
-    "summary"         : "Short one-line summary of the query, shown next to its name.",
-    "description"     : "Longer human-readable description of what the query does.",
+    "summary"         : "Short one-line summary of the query, shown next to its name. Emitted as rdfs:label.",
+    "description"     : "Longer human-readable description of what the query does. Emitted as rdfs:comment (falls back to summary when absent).",
     "endpoint"        : "SPARQL endpoint the query is meant to run against. Takes precedence over any endpoint supplied by kgsteward when documenting the query (schema:target).",
     "endpoint_in_url" : "Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, not reflected in the RDF documentation.",
     "endpoint_method" : "HTTP method used to send the query to the endpoint (GET or POST). grlc HTTP-API option, not reflected in the RDF documentation.",
@@ -370,6 +370,8 @@ def build_graph( text, name, decorators, endpoint = None, form = None, graph = N
         g.add(( subj, pred, RdfLiteral( query_text )))
 
     if decorators:
+        if decorators.summary:
+            g.add(( subj, RDFS.label, RdfLiteral( decorators.summary )))
         comment = decorators.description or decorators.summary
         if comment:
             g.add(( subj, RDFS.comment, RdfLiteral( comment )))

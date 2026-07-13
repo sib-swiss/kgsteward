@@ -336,7 +336,7 @@
         }
       ],
       "default": null,
-      "description": "Short one-line summary of the query, shown next to its name.",
+      "description": "Short one-line summary of the query, shown next to its name. Emitted as rdfs:label.",
       "title": "Summary"
     },
     "description": {
@@ -349,7 +349,7 @@
         }
       ],
       "default": null,
-      "description": "Longer human-readable description of what the query does.",
+      "description": "Longer human-readable description of what the query does. Emitted as rdfs:comment (falls back to summary when absent).",
       "title": "Description"
     },
     "endpoint": {

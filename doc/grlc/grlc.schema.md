@@ -29,8 +29,8 @@ grlc decorators recognised in the `#+` comment block of a SPARQL query file
 
 | Property | Type | Required | Possible values |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Description&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|
 | -------- | ---- | -------- | --------------- | ----------- |
-| summary | `string` or `null` |  | string | Short one-line summary of the query, shown next to its name. |
-| description | `string` or `null` |  | string | Longer human-readable description of what the query does. |
+| summary | `string` or `null` |  | string | Short one-line summary of the query, shown next to its name. Emitted as rdfs:label. |
+| description | `string` or `null` |  | string | Longer human-readable description of what the query does. Emitted as rdfs:comment (falls back to summary when absent). |
 | endpoint | `string` or `null` |  | string | SPARQL endpoint the query is meant to run against. Takes precedence over any endpoint supplied by kgsteward when documenting the query (schema:target). |
 | endpoint_in_url | `boolean` or `null` |  | boolean | Whether the endpoint may be overridden through a URL parameter. grlc HTTP-API option, not reflected in the RDF documentation. |
 | endpoint-method | `string` or `null` |  | `GET` `POST` | HTTP method used to send the query to the endpoint (GET or POST). grlc HTTP-API option, not reflected in the RDF documentation. |
