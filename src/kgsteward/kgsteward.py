@@ -998,7 +998,6 @@ INSERT DATA {{
                     for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                         filename = dir + "/" + fn
                         report( "read", filename )
-                        print_break()
                         with open( filename ) as f: sparql = f.read()
                         name = re.sub( r'(.*/|)([^/]+)\.\w+$', r'\2', filename )
 #                    report( "validate", filename )
