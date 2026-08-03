@@ -38,6 +38,8 @@ import os
 import shutil
 import urllib
 
+import requests   # for requests.exceptions.ConnectionError on a server crash
+
 from .common  import *
 from .generic import GenericClient
 from .qlever  import parse_qleverfile   # reuse the Qleverfile reader verbatim
@@ -46,6 +48,16 @@ from .qlever  import parse_qleverfile   # reuse the Qleverfile reader verbatim
 # can build the (empty) bootstrap index.  Real data never goes through
 # INPUT_FILES -- it is loaded live over the Graph Store Protocol.
 _EMPTY_INPUT = "_kgsteward_empty.nt"
+
+# Compact (rebuild-index) the in-memory delta once this many triples have been
+# loaded since the last compaction.  Bounds delta RAM *within* a single large
+# dataset: without it, a big graph streamed over GSP grows the delta until the
+# qlever-server process crashes (observed on ReconXKG's SwissProt_Human at
+# ~20M triples).  Each rebuild costs ~O(total index size), so a higher value
+# means fewer/cheaper-in-aggregate rebuilds -- keep it comfortably below the
+# crash point (a 10M-triple delta is ~1.5 GB; the crash was ~20M).  Lower it on
+# tight-RAM hosts; raise it when the Docker VM has plenty of memory.
+_COMPACT_THRESHOLD_TRIPLES = 10_000_000
 
 
 class Qlever2Client( GenericClient ):
@@ -99,6 +111,9 @@ class Qlever2Client( GenericClient ):
         # is waiting for a rebuild-index.  Avoids a redundant rebuild on the
         # end-of-loop safety-net flush.
         self._pending_compaction = False
+        # Triples loaded over GSP since the last rebuild-index; drives the
+        # mid-load threshold compaction (see _flush_buf).
+        self._delta_triples = 0
 
         # Best-effort probe -- does NOT distinguish "stopped" from "unreachable".
         self.is_running = self._probe_running( echo = echo )
@@ -159,6 +174,11 @@ class Qlever2Client( GenericClient ):
         if not parser["data"].get( "DESCRIPTION", "" ).strip():
             parser["data"]["DESCRIPTION"] = "managed by kgsteward (qlever2)"
 
+        # A [data] FORMAT (e.g. nq) would mis-type the empty bootstrap input;
+        # drop it -- qlever2 never loads real data through INPUT_FILES.
+        if parser.has_option( "data", "FORMAT" ):
+            parser.remove_option( "data", "FORMAT" )
+
         if "index" not in parser: parser["index"] = {}
         parser["index"]["INPUT_FILES"]     = _EMPTY_INPUT
         parser["index"]["CAT_INPUT_FILES"] = "cat " + _EMPTY_INPUT
@@ -184,7 +204,12 @@ class Qlever2Client( GenericClient ):
         """
         run_system_cmd( self.qlever_cmd + [ "stop" ], echo = False, cwd = self.qleverdir,
                         capture_output = True, text = True )
-        args = [ "start" ] + ( [] if self._has_text else [ "--use-text-index", "no" ] )
+        # --persist-updates: write the located-triples delta to disk and replay
+        # it on restart, so GSP-loaded data is durable (without it a server
+        # restart silently drops everything not yet folded into the index).
+        args = [ "start", "--persist-updates" ]
+        if not self._has_text:
+            args += [ "--use-text-index", "no" ]
         self._qlever( *args, echo = echo )
         self.is_running = True
 
@@ -206,6 +231,62 @@ class Qlever2Client( GenericClient ):
         if not self.has_index:
             self._qlever( "index", echo = echo )   # empty bootstrap index
         self._server_start( echo = echo )
+
+    def _http_write( self, request_args, status_code_ok, echo, what ):
+        """http_call for a write op, turning a mid-op server crash into a clean stop.
+
+        A ``RemoteDisconnected`` / ``ConnectionError`` means the qlever-server
+        process died (typically delta/update pressure) and slammed the socket
+        shut -- not an HTTP error.  Surface it with actionable guidance instead
+        of letting a raw traceback escape (mirrors the static driver)."""
+        try:
+            return http_call( request_args, status_code_ok, echo )
+        except requests.exceptions.ConnectionError:
+            self.is_running = False
+            print_warn(
+                "qlever server closed the connection during " + what + ".\n"
+                "The server process most likely crashed under delta/update pressure "
+                "(a large graph loaded into the in-memory delta). Options:\n"
+                "  - lower _COMPACT_THRESHOLD_TRIPLES (kgsteward compacts mid-load),\n"
+                "  - give Docker Desktop more RAM, or\n"
+                "  - use the static 'qlever' brand (index-from-files) for very large datasets."
+            )
+            stop_error( "qlever2: connection lost during " + what )
+
+    def _rebuild_index( self, echo = True ):
+        """Fold the in-memory delta into the on-disk index (hot-swap) and reset
+        the delta counter.  No-op if the server is down or no token is set.
+
+        NON-FATAL: compaction is an optimization, not a correctness requirement
+        -- the data is safe and served from the persisted delta regardless.  A
+        ``rebuild-index`` failure (e.g. an upstream QLever engine assertion in
+        IndexRebuilder) therefore only warns and continues, leaving the data in
+        the delta; it must never abort an otherwise-successful build.
+        """
+        if not self.is_running:
+            return
+        if not self.access_token:
+            print_warn( "no ACCESS_TOKEN: skipping qlever rebuild-index (delta left uncompacted)" )
+            self._delta_triples = 0
+            return
+        r = run_system_cmd(
+            self.qlever_cmd + [ "rebuild-index", "--access-token", self.access_token ],
+            echo = echo, cwd = self.qleverdir,
+            capture_output = not echo, text = True,
+        )
+        if r.returncode != 0:
+            if not echo:
+                if r.stdout: print( r.stdout, flush = True )
+                if r.stderr: print( r.stderr, flush = True )
+            print_warn(
+                "qlever rebuild-index FAILED -- continuing with the data left in the "
+                "in-memory delta (queryable and persisted, just uncompacted).\n"
+                "This is typically an upstream QLever engine bug (e.g. an assertion in "
+                "IndexRebuilder); please report it to the QLever developers.\n"
+                "If it recurs the delta keeps growing, so RAM pressure may eventually "
+                "return -- give Docker more RAM, or use the static 'qlever' brand for the full build."
+            )
+        self._delta_triples = 0   # reset either way: retry only after the next threshold, not every chunk
 
     # ------------------------------------------------------------------ #
     # Repository lifecycle
@@ -259,11 +340,11 @@ class Qlever2Client( GenericClient ):
         if echo:
             report( "load file (GSP)", file )
         with any_open( file, 'rb' ) as f:   # any_open handles decompression
-            http_call(
+            self._http_write(
                 { 'method': 'POST', 'url': self._gsp_url( context ),
                   'headers': { **headers, 'Content-Type': guess_mime_type( file ) },
                   'data': f },
-                [ 200, 201, 204 ], echo,
+                [ 200, 201, 204 ], echo, "graph-store POST",
             )
 
     def load_from_file_using_riot( self, file, context, headers = {}, echo = True ):
@@ -278,12 +359,19 @@ class Qlever2Client( GenericClient ):
         ``application/n-triples`` (the base class hardcodes ``text/plain``,
         which QLever rejects).
         """
-        http_call(
+        n_triples = data.count( "\n" ) if isinstance( data, str ) else data.count( b"\n" )
+        self._http_write(
             { 'method': 'POST', 'url': self._gsp_url( context ),
               'headers': { 'Content-Type': 'application/n-triples' },
               'data': data.encode( 'utf-8' ) if isinstance( data, str ) else data },
-            [ 200, 201, 204 ], echo,
+            [ 200, 201, 204 ], echo, "graph-store POST",
         )
+        # Threshold compaction: drain the delta mid-load so a single large
+        # dataset cannot grow it without bound (which crashes the server).
+        self._delta_triples += n_triples
+        if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
+            report( "delta compaction", f"{self._delta_triples} triples loaded -> rebuild-index" )
+            self._rebuild_index( echo = echo )
 
     def load_url( self, path, context, echo = True ):
         # QLever cannot LOAD a remote graph; a URL dataset must be downloaded
@@ -296,12 +384,29 @@ class Qlever2Client( GenericClient ):
         )
 
     def drop_context( self, context, echo = True ):
-        """GSP DELETE the named graph (idempotent)."""
+        """GSP DELETE the named graph (idempotent).
+
+        A DELETE of a large existing graph writes that many *deletion* markers
+        into the delta, so it grows the delta just like a load -- count them
+        toward the compaction threshold and drain if a big drop crosses it
+        (a big drop alone could otherwise blow the delta before any load runs).
+        """
         self._ensure_up( echo = False )
-        http_call(
+        r = self._http_write(
             { 'method': 'DELETE', 'url': self._gsp_url( context ) },
-            [ 200, 204, 404 ], echo,   # 200/204: dropped, 404: did not exist
+            [ 200, 204, 404 ], echo, "graph-store DELETE",   # 200/204: dropped, 404: absent
         )
+        deleted = 0
+        if r is not None and getattr( r, "status_code", None ) == 200:
+            try:   # QLever returns {"operations":[{"delta-triples":{"difference":{"deleted":N}}}]}
+                ops = r.json().get( "operations", [] )
+                deleted = ops[0]["delta-triples"]["difference"]["deleted"] if ops else 0
+            except Exception:
+                deleted = 0
+        self._delta_triples += deleted
+        if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
+            report( "delta compaction", f"{self._delta_triples} delta triples (post-delete) -> rebuild-index" )
+            self._rebuild_index( echo = echo )
 
     # ------------------------------------------------------------------ #
     # SPARQL
@@ -336,13 +441,15 @@ class Qlever2Client( GenericClient ):
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         tok = self._sparql_update_started( sparql )   # logs the query pre-execution
-        r = http_call(
+        # On a server crash _http_write stop_errors here: the query stays logged
+        # with no timing row (the documented "in-flight / crashed" signature).
+        r = self._http_write(
             { 'method': 'POST', 'url': self.endpoint_update,
               'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
               'data': { 'update': sparql,
                         'access-token': self.access_token,
                         'timeout': '999999s' } },
-            status_code_ok, echo,
+            status_code_ok, echo, "SPARQL update",
         )
         self._sparql_update_finished( tok, getattr( r, "status_code", None ) )
         return r
@@ -378,16 +485,9 @@ class Qlever2Client( GenericClient ):
         """
         if not self._pending_compaction:
             return
-        if not self.is_running:
-            self._pending_compaction = False
-            return
-        if not self.access_token:
-            print_warn( "no ACCESS_TOKEN: skipping qlever rebuild-index (delta left uncompacted)" )
-            self._pending_compaction = False
-            return
-        if echo:
+        if echo and self.is_running and self.access_token:
             print_task( "compact qlever index (rebuild-index)" )
-        self._qlever( "rebuild-index", "--access-token", self.access_token, echo = echo )
+        self._rebuild_index( echo = echo )   # no-op if server down / no token
         self._pending_compaction = False
 
     def finalize( self, complete, echo = True ):
