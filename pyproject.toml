@@ -5,7 +5,7 @@ authors = [{ name = "Marco Pagni", email = "marco.pagni@sib.swiss" }]
 description = "Knowledge Graph Steward - Command line tool to manage content of RDF store"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
