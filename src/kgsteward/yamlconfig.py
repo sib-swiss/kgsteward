@@ -23,7 +23,7 @@ description = {
     `${}`, `${}` and `${}`.
     Especially useful is `${dataset.name}` that can be used in be used in `dataset.replace` clause to indicate the current "active" context/named graph.
 """,
-    "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' """,
+    "server_brand": """String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever' (static index) or 'qlever2' (live QLever loaded over the Graph Store Protocol) """,
     "location" :  """URL of the server. The SPARQL endpoint locations for queries, updates and stores are specific to a server brand.""" ,
     "public_sparql_endpoint": """Optional top-level, read-only public SPARQL endpoint URL. Independent of the server brand: it is used only to mint IRIs in published artefacts (e.g. the sparql-examples documentation written by the `sib_swiss_query` special step: the query IRIs and their schema:target). It is never contacted by kgsteward. When omitted, it defaults to the local query endpoint.""",
     "repository": """The name of the 'repository' (GraphDB/RDF4J naming) or 'dataset' (fuseki) in the triplestore.""",
@@ -182,6 +182,13 @@ class QleverConf( BaseModel ):
     qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there." )
     access_token : Optional[ str ] = Field( None, title = "Qlever access token", description = "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile." )
 
+class Qlever2Conf( BaseModel ):
+    model_config = ConfigDict( extra='allow' )
+    brand        : Literal[ "qlever2" ] = Field( title = "Qlever2 brand", description = describe( "server_brand" ))
+    qleverfile   : str = Field( title = "Qleverfile path", description = "Path to the source Qleverfile (location, repository, port and access token are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy." )
+    qleverdir    : str = Field( title = "Qlever working directory", description = "Working directory owned and managed by kgsteward: it holds the qlever index (<repository>.*), the empty bootstrap input and a working copy of the Qleverfile. Unlike the static 'qlever' brand, qlever2 loads all data live over the Graph Store Protocol, so no checkpoint files are kept here. kgsteward wipes it on a full rebuild (-I): point it at a dedicated, empty directory." )
+    access_token : Optional[ str ] = Field( None, title = "Qlever access token", description = "Overrides the ACCESS_TOKEN read from the Qleverfile. Required for privileged operations (GSP writes and rebuild-index)." )
+
 class SpecialEnum( str, Enum ):
     sib_swiss_void   = 'sib_swiss_void'
     sib_swiss_prefix = 'sib_swiss_prefix'
@@ -245,7 +252,7 @@ class QueryConf( BaseModel ):
 class KGStewardConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     version           : Literal[ "kgsteward_yaml_3" ] = Field( title = "YAML syntax version", description = "This mandatory fixed value determines the admissible YAML syntax" )
-    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf, QleverConf ] = Field( discriminator = 'brand' )
+    server            : Union[ GraphDBConf, RDF4JConf, FusekiConf, QleverConf, Qlever2Conf ] = Field( discriminator = 'brand' )
     file_loader       : Union[ SparqlFileLoader, StoreFileLoader, HttpServerFileLoader, RiotChunkStoreFileLoader ]
     url_loader        : Union[ SparqlUrlLoader, CurlRiotChunkStoreUrlLoader ]
     dataset           : List[ DatasetConf ] = Field( title = "Knowledge Graph content", description = describe( "dataset" ))

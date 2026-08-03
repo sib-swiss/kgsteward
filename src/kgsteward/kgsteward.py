@@ -19,6 +19,7 @@ from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient
 from .qlever     import QleverClient
+from .qlever2    import Qlever2Client
 # from .oxigraph   import OxigraphClient  # in preparation
 # 
 from importlib.metadata import version
@@ -575,6 +576,19 @@ def main():
             )
         except Exception as e:
             stop_error( "Failed to connect to Qlever server: " + str( e ))
+    elif config["server"]["brand"] == "qlever2":
+        try:
+            server = Qlever2Client(
+                replace_env_var( config["server"]["qleverfile"] ),
+                replace_env_var( config["server"]["qleverdir"] ),
+                access_token = replace_env_var( config["server"]["access_token"] ) if config["server"].get( "access_token" ) else None,
+                echo = args.v,
+                # Like qlever: kgsteward owns the store, so the managed dataset
+                # contexts are the authoritative graph list (avoids SELECT DISTINCT ?g).
+                managed_contexts = { item["context"] for item in config["dataset"] },
+            )
+        except Exception as e:
+            stop_error( "Failed to connect to Qlever2 server: " + str( e ))
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
