@@ -260,6 +260,23 @@ def get_sha256( config, name, echo = True ) :
     os.environ["TARGET_GRAPH_CONTEXT"] = context
     os.environ["kgsteward_dataset_name"]    = name
     os.environ["kgsteward_dataset_context"] = context
+
+    def head_info( path ):
+        """HEAD a remote resource, blaming it by name if it does not answer.
+
+        Every dataset is fingerprinted on every run, so an unresponsive or moved
+        remote used to end the run in a bare traceback -- unhelpful, as the URL
+        at fault was buried in it. Report it cleanly instead, and point at the
+        option that lets the other datasets proceed meanwhile."""
+        try:
+            return get_head_info( path, echo = echo )
+        except Exception as e:
+            stop_error(
+                "dataset '" + name + "': HEAD failed on " + path + " (" + str( e ) + ")\n"
+                "               the remote resource may be down, moved or renamed;\n"
+                "               use '-s " + name + "' to leave this dataset aside for now"
+            )
+
     sha256 = hashlib.sha256()
     #   sha256.update( target["count"].encode( 'utf-8' ))
     #   sha256.update( target["date"].encode( 'utf-8' ))
@@ -284,7 +301,7 @@ def get_sha256( config, name, echo = True ) :
             path = replace_env_var( url )
             sha256.update( path.encode('utf-8') )
             if re.search( r"https?:", path ) :
-               info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
+               info = head_info( path ) # as a side effect: verify is the server is responding
                sha256.update( info.encode('utf-8'))
             elif re.search( r"ftp:", path ):# do not run HEAD on ftp server FIXME: implement something better
                 continue
@@ -304,7 +321,7 @@ def get_sha256( config, name, echo = True ) :
                     stop_error( "stamp command failed: " + cmd + "\n" + r.stderr )
                 sha256.update( r.stdout.strip().encode('utf-8') )
             elif path.startswith( "http" ):
-                info = get_head_info( path, echo = echo ) # as a side effect: verify is the server is responding
+                info = head_info( path ) # as a side effect: verify is the server is responding
                 sha256.update( info.encode('utf-8') )
             else:  # assume local file
                 if "$(" in path:  # a botched command-capture: $(...) must be the WHOLE entry

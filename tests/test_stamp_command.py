@@ -70,3 +70,18 @@ def test_file_stamp_unaffected( tmp_path ):
     s2 = _sha( [ str( f ) ], yaml_dir = str( tmp_path ) )
     assert s1 == s2, "unchanged file stamp → stable fingerprint"
     assert s1 != _sha( [ "$(echo hello)" ] ), "file stamp differs from command stamp"
+
+
+def test_unreachable_stamp_url_stops_cleanly( capsys ):
+    """A dead remote must abort with a message naming the offending URL AND the
+    dataset it belongs to -- not a bare traceback, in which the culprit is buried.
+    Port 1 on loopback is refused immediately, so no network is involved."""
+    url = "http://127.0.0.1:1/relnotes.txt"
+    with pytest.raises( SystemExit ):
+        _sha( [ url ] )
+    cap = capsys.readouterr()
+    out = cap.out + cap.err
+    print( out )
+    assert url in out,             "the faulty URL is named"
+    assert "dataset 'ds'" in out,  "the impacted dataset is named"
+    assert "-s ds" in out,         "the way out is suggested"
