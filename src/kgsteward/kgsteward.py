@@ -72,6 +72,14 @@ def get_user_input():
                "with option -C.",
     )
     parser.add_argument(
+        '-s',
+        help = "Skip the supplied comma-separated list of dataset names (no space "
+               "in the list) for this run: they are neither reloaded nor "
+               "checksummed, so no HTTP HEAD is issued on their 'url' / 'stamp' "
+               "entries. Useful when a remote source is down or unbearably slow. "
+               "Reported as SKIPPED in the final status.",
+    )
+    parser.add_argument(
         '-C',
         action = 'store_true',
         help   = "Load missing/incomplete/outdated dataset to complete the repository."
@@ -332,9 +340,11 @@ def get_sha256( config, name, echo = True ) :
             sha256.update( key.encode( 'utf-8' ))
     return sha256.hexdigest()
 
-def update_config( server, config, name_to_update = set(), echo = True ) :
+def update_config( server, config, name_to_update = set(), name_to_skip = set(), echo = True ) :
     """ Compute, or update current status information about the records in repository.
-        Take dependency into account."""
+        Take dependency into account.
+        Datasets in <name_to_skip> (option -s) are left alone: they are not even
+        fingerprinted, hence no HTTP HEAD is issued on their url/stamp entries."""
     print_break()
     print_task( "Retrieve current status" )
     name2item = {}
@@ -381,6 +391,12 @@ WHERE{
         except Exception as e: # test before and remove this try/except block
             stop_error( "Failed parsing server response: " + str( e ))
     for item in config["dataset"]: # ordering respect dependency
+        if item["name"] in name_to_skip:
+            # -s: not fingerprinted at all, so no HEAD on its url/stamp entries.
+            # "SKIPPED" behaves like "FROZEN" below: nothing is touched and, as it
+            # is absent from the propagation set, no child is dragged in either.
+            item["status"] = "SKIPPED"
+            continue
         sha256 = get_sha256( config, item["name"], echo = echo )
         item["target_sha256"] = sha256   # current input checksum, used by server.refine_status()
         # default status is "EMPTY" if the context is not found in the repository,
@@ -637,6 +653,34 @@ def main():
             target = get_target( config, name )
             target["frozen"] = False
 
+    # -s: datasets to leave completely alone in this run. Skipping is not merely
+    # "do not reload": these datasets are never fingerprinted, so kgsteward does
+    # not HEAD their url/stamp entries either. That is the point of the option --
+    # an unreachable or unbearably slow remote source must not block the run.
+    rdf_graph_to_skip = set()
+    if args.s :
+        rdf_graph_to_skip = set( resolve_names( args.s, rdf_graph_all, "dataset" ))
+        if args.d :
+            clash = rdf_graph_to_skip & set( resolve_names( args.d, rdf_graph_all, "dataset" ))
+            if clash :
+                stop_error( "dataset name(s) given to both -d and -s: " + ", ".join( sorted( clash )))
+        # Skipping only makes sense for a dataset that is already in the store:
+        # withholding a completely absent one silently leaves a hole -- and, for a
+        # static-index backend, keeps it out of the served index -- which is never
+        # what the option is for. Presence takes both tests: list_context() is
+        # authoritative for live backends, whereas qlever answers it from the YAML
+        # (see its docstring) and reports real presence via can_restamp(), i.e. an
+        # on-disk checkpoint.
+        contexts = server.list_context( echo = args.v )
+        absent = sorted(
+            name for name in rdf_graph_to_skip
+            if name2context[ name ] not in contexts or not server.can_restamp( name2context[ name ] )
+        )
+        if absent :
+            stop_error( "-s cannot skip dataset(s) absent from the store: " + ", ".join( absent )
+                        + " -- load them first (-C / -d), or drop them from the YAML config" )
+        report( "skipped dataset(s)", ", ".join( sorted( rdf_graph_to_skip )))
+
     if args.D :
         # -D (and -F, which sets args.D) rebuilds ALL datasets EXCEPT frozen ones:
         # dragging a frozen dataset into a full rebuild can be catastrophic (e.g. a
@@ -653,15 +697,20 @@ def main():
     elif args.C :
         # A backend may resolve the update set offline (qlever, from checkpoints,
         # when its server is stopped); otherwise fall back to the online status query.
-        offline = server.update_set_offline( rdf_graph_all, config, name2context, dataset_sha256, echo = args.v )
+        # The skipped names are withheld from both paths, which would otherwise
+        # checksum them (and hence HEAD their url/stamp) to decide their status.
+        offline = server.update_set_offline( rdf_graph_all - rdf_graph_to_skip, config, name2context, dataset_sha256, echo = args.v )
         if offline is not None :
             rdf_graph_to_update |= offline
         else :
-            config = update_config( server, config, name_to_update = rdf_graph_to_update, echo = args.v ) # may takes a while
+            config = update_config( server, config, name_to_update = rdf_graph_to_update, name_to_skip = rdf_graph_to_skip, echo = args.v ) # may takes a while
             for name in rdf_graph_all :
                 target = get_target( config, name )
                 if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
                     rdf_graph_to_update.add( name )
+
+    # Single choke point for -s, covering -D, -d and -C alike.
+    rdf_graph_to_update -= rdf_graph_to_skip
 
     # Restrict an incremental index rebuild to the dependency closure of the
     # datasets being processed (no-op for live backends; qlever scopes its
@@ -887,6 +936,11 @@ INSERT DATA {{
     if args.U :
         for target in config["dataset"] :
             name = target["name"]
+            if name in rdf_graph_to_skip :
+                # -s also holds here: re-stamping needs a checksum, i.e. the very
+                # HEAD requests the user asked to avoid. Goes away with -U itself.
+                print_warn( f"-U: skipping '{name}' (-s)" )
+                continue
             if not server.can_restamp( name2context[ name ] ):
                 # Nothing to re-stamp -- no persisted data for this dataset, so any
                 # metadata we insert would be lost (e.g. wiped by the next rebuild).
@@ -1165,7 +1219,7 @@ INSERT DATA {{
     # FIXME: implement target_graph_context rewrite
     # --------------------------------------------------------- #
 
-    config = update_config( server, config, echo = args.v )
+    config = update_config( server, config, name_to_skip = rdf_graph_to_skip, echo = args.v )
     # Backend-specific status refinement (no-op for live backends; qlever marks
     # current-but-unassembled checkpoints as READY).  Report-only: the -C update
     # decision above is deliberately left untouched.

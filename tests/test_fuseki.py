@@ -93,6 +93,36 @@ def test_kgsteward_fuseki_init_complete( fuseki_url ):
         print( r_validate.stdout )
         print( r_validate.stderr )
         assert r_validate.returncode == 0, "kgsteward -V failed"
+
+        # -s: withhold a dataset from the run.  foaf_data is the parent of
+        # update_data, so this also checks that a skipped parent starts no cascade.
+        r_skip = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-C", "-s", "foaf_data"] )
+        print( r_skip.stdout )
+        print( r_skip.stderr )
+        assert r_skip.returncode == 0, "kgsteward -C -s failed"
+        assert "SKIPPED" in r_skip.stdout, "the skipped dataset is reported as SKIPPED"
+        assert "Update dataset record: foaf_data" not in r_skip.stdout, "skipped, so not reloaded"
+        assert "Update dataset record: update_data" not in r_skip.stdout, "no cascade from a skipped parent"
+
+        # An unknown name aborts cleanly...
+        r_bogus = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-C", "-s", "no_such_dataset"] )
+        print( r_bogus.stdout )
+        assert r_bogus.returncode != 0, "-s with an unknown name must abort"
+        assert "Unknown dataset name(s)" in r_bogus.stdout
+        # ...and so does the contradiction of forcing and skipping the same dataset.
+        r_clash = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-d", "foaf_data", "-s", "foaf_data"] )
+        print( r_clash.stdout )
+        assert r_clash.returncode != 0, "-d and -s on the same name must abort"
+        assert "both -d and -s" in r_clash.stdout
+
+        # Skipping a dataset that is not in the store at all would leave a hole,
+        # so it is refused.  Kept last: -I empties the repository.
+        r_wipe = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-I"] )
+        assert r_wipe.returncode == 0, "kgsteward -I failed"
+        r_absent = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-C", "-s", "foaf_data"] )
+        print( r_absent.stdout )
+        assert r_absent.returncode != 0, "-s on an absent dataset must abort"
+        assert "absent from the store" in r_absent.stdout
     finally:
         if os.path.exists( patched_yaml ):
             os.remove( patched_yaml )

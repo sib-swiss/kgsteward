@@ -849,6 +849,8 @@ class QleverClient( GenericClient ):
         for item in config["dataset"]:
             if item.get( "frozen" ):
                 continue
+            if item.get( "status" ) == "SKIPPED":
+                continue   # -s: no checksum was computed, so currency is unknown
             context = item["context"]
             if not self.has_checkpoint( context, item.get( "target_sha256" ) ):
                 continue   # no current checkpoint -> leave the base EMPTY/UPDATE status

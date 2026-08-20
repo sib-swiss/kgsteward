@@ -114,3 +114,16 @@ should trigger a rebuild, never at a file your own `system:` produces.
 | changed but `frozen: true` | **FROZEN** — skipped (use `-d` / `--force_unfreeze`) |
 | parent *content* changed, child inputs unchanged, parent **not** in set | child stays **ok** — rebuild the parent, or use `-d` |
 | `-d name` / `-D` / `-F` | forced **UPDATE** / all |
+| `-s name` | **SKIPPED** — not even checksummed, so no HEAD on its `url`/`stamp` |
+
+`-s <name>[,<name>...]` withholds datasets from the run entirely. Unlike every
+other status, `SKIPPED` is decided *before* the checksum, so a dataset whose
+`url:`/`stamp:` points at an unresponsive server no longer blocks the other
+datasets. Nothing is written for a skipped dataset: its data, its stored
+checksum and its metadata are left as they are, and — as with `frozen` — its
+children are not flipped to `PROPAGATE`, since whether it changed is unknown.
+
+Three things are refused outright: an unknown dataset name, the same name in both
+`-d` and `-s`, and — because withholding it would silently leave a hole in the
+store rather than preserve anything — a dataset **absent** from the store. Load it
+(`-C` / `-d`) or drop it from the YAML config instead.
