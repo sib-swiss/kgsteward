@@ -794,7 +794,7 @@ def main():
         if "url" in target :
             for u in target["url"] :
                 path = replace_env_var( u )
-                if config["url_loader"]["method"] == "curl_riot_store":
+                if config["url_loader"]["method"] == "curl_riot_chunk_store":
                     filename = config["url_loader"]["tmp_dir"] + "/" + path.split('/')[-1]
                     cmd = [ "curl", path, "-o", filename ]
                     print( colored( " ".join( cmd ), "cyan" ))
