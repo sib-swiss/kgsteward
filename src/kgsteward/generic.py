@@ -316,13 +316,8 @@ WHERE{{
         return True
 
     def load_url( self, path, context, echo = True ):
-        """Load a remote graph and record its ``void:dataDump`` provenance."""
+        """Load a remote graph into *context*."""
         self.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = echo )
-        self.sparql_update(
-            "PREFIX void: <http://rdfs.org/ns/void#>\n"
-            f"INSERT DATA {{ GRAPH <{context}> {{ <{context}> void:dataDump <{path}> }} }}",
-            echo = echo,
-        )
 
     def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
         """Determine the -C update set without querying the server, or None.

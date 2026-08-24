@@ -374,11 +374,8 @@ class QleverClient( GenericClient ):
     # Input staging
     # ------------------------------------------------------------------ #
 
-    def _stage_file( self, filename, context_iri, void_iri = None, echo = True ):
+    def _stage_file( self, filename, context_iri, echo = True ):
         """Copy/convert *filename* into qleverdir/input/ and return MULTI_INPUT_JSON entries.
-
-        *void_iri* overrides the IRI recorded in the void:dataDump triple.
-        Pass the original URL when staging a downloaded file so provenance points to the source.
 
         For RDF/XML / OWL / etc. that qlever can't parse natively, the file is
         converted by ``riot`` in a subprocess whose env has the JDK XML parser
@@ -433,14 +430,6 @@ class QleverClient( GenericClient ):
             fmt, cmd = "nt", f"cat input/{dest_name}"
             if echo: report( "staged (riot→nt)", dest_path )
 
-        # Bake the void:dataDump triple into the index as a sibling .nt file —
-        # avoids a separate INSERT + rebuild.
-        actual_void_iri = void_iri if void_iri is not None else f"file://{src}"
-        void_name = f"{stem}_{h8}.void.nt"
-        void_path = os.path.join( input_dir, void_name )
-        with open( void_path, "w" ) as vf:
-            vf.write( f"<{context_iri}> <http://rdfs.org/ns/void#dataDump> <{actual_void_iri}> .\n" )
-
         # ``"parallel"`` is set per-input (top-level PARALLEL_PARSING does NOT
         # propagate through MULTI_INPUT_JSON) and must be the string "true"
         # or "false" (qlever-control compares with == "true").
@@ -449,17 +438,16 @@ class QleverClient( GenericClient ):
         # multiline string literals -- a single scan via _ttl_has_multiline_literal
         # picks them out at staging time so most TTL files still parse in
         # parallel.  .nt cannot have them by spec; riot-converted files come out
-        # as .nt; the void file we emit ourselves is single-line .nt -- all safe.
+        # as .nt -- all safe.
         if fmt == "ttl" and _ttl_has_multiline_literal( src ):
             data_parallel = "false"
             if echo: report( "multiline literal", f"disabling parallel parsing for {os.path.basename(src)}" )
         else:
             data_parallel = "true"
 
-        if echo: report( "staged", f"input/{dest_name}  (+ void triple)" )
+        if echo: report( "staged", f"input/{dest_name}" )
         return [
-            { "cmd": cmd,                       "format": fmt,  "graph": context_iri, "parallel": data_parallel },
-            { "cmd": f"cat input/{void_name}",  "format": "nt", "graph": context_iri, "parallel": "true"        },
+            { "cmd": cmd, "format": fmt, "graph": context_iri, "parallel": data_parallel },
         ]
 
     # ------------------------------------------------------------------ #
@@ -728,8 +716,7 @@ class QleverClient( GenericClient ):
         return False   # static index: stage files, never SPARQL LOAD
 
     def load_url( self, path, context, echo = True ):
-        # qlever cannot defer LOAD -- download immediately and stage for indexing
-        # (void:dataDump is baked in by _stage_file).
+        # qlever cannot defer LOAD -- download immediately and stage for indexing.
         self.load_url_as_file( path, context, echo = echo )
 
     def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
@@ -871,7 +858,6 @@ class QleverClient( GenericClient ):
     def load_url_as_file( self, url, context, echo = True ):
         """Download *url* immediately and stage it for deferred indexing into graph *context*.
 
-        ``void:dataDump`` records the original *url* (not the local temp path).
         Hardened curl flags fail fast on upstream throttling / dropped connections:
 
           --connect-timeout 30           give up if no TCP handshake in 30s
@@ -907,7 +893,7 @@ class QleverClient( GenericClient ):
             r = subprocess.run( curl_cmd )
             if r.returncode != 0:
                 stop_error( f"curl download failed for: {url}  (exit {r.returncode})" )
-            self.pending_files.extend( self._stage_file( tmp_path, context, void_iri = url, echo = echo ) )
+            self.pending_files.extend( self._stage_file( tmp_path, context, echo = echo ) )
         finally:
             if os.path.exists( tmp_path ):
                 os.unlink( tmp_path )
@@ -969,12 +955,7 @@ class QleverClient( GenericClient ):
         updates immediately against an in-place running server would let the
         rebuild wipe their in-memory effect before ``dump_checkpoint`` could
         capture it — the silent metadata-loss bug we hit in production.
-
-        ``void:dataDump`` triples are dropped here — they are already baked
-        into the staged files by ``_stage_file``.
         """
-        if "void:dataDump" in sparql or "ns/void#dataDump" in sparql:
-            return
         self.pending_updates.append( sparql )
 
     def _do_sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):

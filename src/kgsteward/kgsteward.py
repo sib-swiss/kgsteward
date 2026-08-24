@@ -808,15 +808,14 @@ def main():
                     if r.returncode != 0:
                         stop_error( f"curl download failed for: {path}  (exit {r.returncode})" )
                     server.load_from_file_using_riot( filename, context, echo = args.v )
-                else: # direct: load the remote graph + record void:dataDump
+                else: # direct: load the remote graph
                     # (the server object encapsulates LOAD vs static-index staging)
                     server.load_url( path, context, echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
                 if not server.supports_sparql_load:
                     # Static-index backend (qlever): stage files directly into the
-                    # deferred index build instead of SPARQL LOAD.  void:dataDump is
-                    # baked into the staged files by the driver -- no INSERT needed.
+                    # deferred index build instead of SPARQL LOAD.
                     for path in target["file"] :
                         for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                             filename = dir + "/" + fn
@@ -841,13 +840,6 @@ def main():
                                 # see https://stackoverflow.com/questions/68021524/access-localhost-from-docker-container
                                 path = "http://host.docker.internal:" + str( config["file_loader"][ "port" ] ) + "/" + fn
                                 server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                            filename = dir + "/" + fn
-                            server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-INSERT DATA {{
-    GRAPH <{context}> {{
-        <{context}> void:dataDump <file://{filename}>
-    }}
-}}""", echo = args.v )
                     fs.terminate()
             else: # config["file_loader"]["type"] != "http_server"
                 for path in target["file"] :
@@ -861,12 +853,6 @@ INSERT DATA {{
                             server.load_from_file_using_riot( filename, context, echo = args.v )
                         else:
                             raise SystemError( "Unexpected file loader method: " + config["file_loader"]["method"] )
-                        server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-INSERT DATA {{
-    GRAPH <{context}> {{
-        <{context}> void:dataDump <file://{filename}>
-    }}
-}}""", echo = args.v)
         if "zenodo" in target :
             for id in target["zenodo"]:
                 r = requests.request( 'GET', "https://zenodo.org/api/records/" + str( id ))
@@ -876,12 +862,6 @@ INSERT DATA {{
                 for record in info["files"]:
                     path = "https://zenodo.org/records/" + str( id ) + "/files/" + record["key"]
                     server.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = args.v )
-                    server.sparql_update( f"""PREFIX void: <http://rdfs.org/ns/void#>
-INSERT DATA {{
-    GRAPH <{context}> {{
-        <{context}> void:dataDump <{path}>
-    }}
-}}""", echo = args.v )
 
         if "replace" in target:
             for key in target["replace"]:
