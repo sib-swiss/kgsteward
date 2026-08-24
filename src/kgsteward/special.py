@@ -173,10 +173,17 @@ def make_query_description( context, filenames, endpoint = None ):
             else:
                 query.append( line.rstrip().replace( "\t", "    "))
         iri = "http://rdf.example.org/queryform/" + name
-        sparql.append( """PREFIX sh: <http://www.w3.org/ns/shacl#>
+        # rdfs: MUST be declared here: it is used just below for rdfs:label /
+        # rdfs:comment.  GraphDB & co. resolve well-known prefixes from their
+        # repository-level namespace table and accept the statement without it,
+        # which hid the omission; QLever follows the spec strictly and rejects
+        # the whole INSERT with "Prefix rdfs was not registered using a PREFIX
+        # declaration".
+        sparql.append( """PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 INSERT DATA{
-    GRAPH <""" + context + """> { 
+    GRAPH <""" + context + """> {
         <""" + iri + """> a sh:SPARQLExecutable, sh:SPARQLSelectExecutable ;
             rdfs:label \"""" + name.replace( "_", " " ) + """\" ;
             rdfs:comment \"\"\"""" + escape_sparql_long_string( "\n".join( comment )) + """\"\"\" ;
