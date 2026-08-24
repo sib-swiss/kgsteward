@@ -175,6 +175,24 @@ WHERE{{
         if size > 0 :
             report( "triples so far", str( count ))
             self._flush_buf( context, "".join( buf ), headers )
+        # riot's exit code is the ONLY signal that the parse ran to completion.
+        # A parse error -- or a JVM limit such as the JDK XML entity caps (see
+        # _JDK_XML_UNLIMITED) -- makes riot stop early after having written
+        # perfectly valid N-Triples to stdout, which the loop above has just
+        # loaded.  Without this check the dataset is silently truncated and
+        # still gets stamped 'ok': observed on RHEA (107'679 of 2'046'911
+        # triples) and on SwissProt.  The chunks already POSTed cannot be
+        # recalled, but aborting here leaves the dataset unstamped, so the next
+        # run reprocesses it.  riot's own diagnostics went to stderr, which is
+        # inherited and therefore already on the terminal / in the log.
+        p.stdout.close()
+        if p.wait() != 0:
+            stop_error(
+                f"riot exited with code { p.returncode } after { count } triple(s) from: { file }\n"
+                "The data loaded so far is INCOMPLETE; this dataset is left unstamped and "
+                "will be reprocessed on the next run.\n"
+                "See riot's error message above for the cause."
+            )
 
     # ------------------------------------------------------------------ #
     # SPARQL update logging  (--sparql_logs <dir>)
