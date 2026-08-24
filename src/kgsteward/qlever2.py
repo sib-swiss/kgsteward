@@ -221,13 +221,23 @@ class Qlever2Client( GenericClient ):
     def _ensure_up( self, echo = True ):
         """Guarantee a live server before any GSP / SPARQL operation.
 
-        Lazily bootstraps: sync the Qleverfile if missing, build the empty index
-        if none exists, then start.  Idempotent -- returns immediately once up.
+        Lazily bootstraps: re-sync the Qleverfile, build the empty index if none
+        exists, then start.  Idempotent -- returns immediately once up.
+
+        The Qleverfile is re-synced from the user's source on EVERY start, never
+        only when the working copy is missing: the working copy is a derived
+        artifact, and skipping the copy silently pins the server to the settings
+        of the run that first created it.  Editing MEMORY_FOR_QUERIES /
+        CACHE_MAX_SIZE / TIMEOUT / STXXL_MEMORY in the source then had no effect
+        whatsoever -- the server kept starting with the stale values, with
+        nothing in the output to say so.  (The static driver's _patch_qleverfile
+        always re-copied for exactly this reason.)  Note this can only take
+        effect at a start: a server already running keeps the settings it was
+        started with.
         """
         if self.is_running:
             return
-        if not os.path.isfile( os.path.join( self.qleverdir, "Qleverfile" ) ):
-            self._sync_qleverfile( echo = echo )
+        self._sync_qleverfile( echo = echo )
         if not self.has_index:
             self._qlever( "index", echo = echo )   # empty bootstrap index
         self._server_start( echo = echo )
