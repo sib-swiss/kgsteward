@@ -796,9 +796,17 @@ def main():
                 path = replace_env_var( u )
                 if config["url_loader"]["method"] == "curl_riot_chunk_store":
                     filename = config["url_loader"]["tmp_dir"] + "/" + path.split('/')[-1]
-                    cmd = [ "curl", path, "-o", filename ]
+                    cmd = [ "curl", "-fsSL", path, "-o", filename ]
                     print( colored( " ".join( cmd ), "cyan" ))
-                    subprocess.run( cmd )
+                    # -f so an HTTP error is an error rather than an error page
+                    # written to disk as if it were RDF, and check the exit code:
+                    # on failure curl leaves any file already at this path (the
+                    # name is the URL basename in tmp_dir, so a previous run's
+                    # download IS sitting there) untouched, and riot would parse
+                    # that stale file happily and stamp the dataset ok.
+                    r = subprocess.run( cmd )
+                    if r.returncode != 0:
+                        stop_error( f"curl download failed for: {path}  (exit {r.returncode})" )
                     server.load_from_file_using_riot( filename, context, echo = args.v )
                 else: # direct: load the remote graph + record void:dataDump
                     # (the server object encapsulates LOAD vs static-index staging)
