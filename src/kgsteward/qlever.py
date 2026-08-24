@@ -79,24 +79,14 @@ import tempfile
 import time
 
 from .common import *
-from .generic import GenericClient
+from .generic import GenericClient, make_riot_env
 
 
 # Natively supported qlever formats (without riot conversion), ± .gz
 _QLEVER_NATIVE = { ".ttl": "ttl", ".nt": "nt" }
 
-# JVM system properties that lift JDK XML parser caps.  riot trips these
-# on big RDF/XML ontologies (RHEA, ChEBI, GO, …).  Set to 0 = unlimited.
-# Set via JAVA_TOOL_OPTIONS in the riot subprocess env — `riot --set ...`
-# only changes ARQ context, NOT JVM system properties.
-_JDK_XML_UNLIMITED = " ".join((
-    "-Djdk.xml.maxGeneralEntitySizeLimit=0",    # JAXP00010003
-    "-Djdk.xml.totalEntitySizeLimit=0",         # JAXP00010004
-    "-Djdk.xml.entityExpansionLimit=0",         # JAXP00010001
-    "-Djdk.xml.maxParameterEntitySizeLimit=0",  # JAXP00010002
-    "-Djdk.xml.elementAttributeLimit=0",
-    "-Djdk.xml.maxElementDepth=0",
-))
+# _JDK_XML_UNLIMITED / riot_env() now live in generic.py -- shared by every
+# riot invocation (this driver and the riot_chunk_store loaders alike).
 
 
 def _qlever_fmt( filename ):
@@ -422,10 +412,7 @@ class QleverClient( GenericClient ):
             dest_name = f"{stem}_{h8}.nt"
             dest_path = os.path.join( input_dir, dest_name )
             riot_cmd  = [ "riot", "--output=ntriples", src ]
-            riot_env  = os.environ.copy()
-            riot_env["JAVA_TOOL_OPTIONS"] = (
-                ( riot_env.get( "JAVA_TOOL_OPTIONS", "" ) + " " + _JDK_XML_UNLIMITED ).strip()
-            )
+            riot_env  = make_riot_env()
             if echo:
                 print( colored(
                     f"JAVA_TOOL_OPTIONS=\"{riot_env['JAVA_TOOL_OPTIONS']}\" "

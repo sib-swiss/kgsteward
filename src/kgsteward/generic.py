@@ -1,6 +1,7 @@
 # This is a very minimalistic/generic SPARQL client
 # that might work on a real triplestore (maybe?)
 
+import os
 import subprocess
 import urllib
 
@@ -9,6 +10,31 @@ import urllib
 
 from dumper  import dump
 from .common import *
+
+# JVM system properties that lift JDK XML parser caps.  riot trips these on big
+# RDF/XML ontologies (RHEA, ChEBI, GO, ...): rhea.rdf holds a 100'001-character
+# entity and the JDK caps it at 100'000.  Set to 0 = unlimited.  Applied via
+# JAVA_TOOL_OPTIONS in the riot subprocess env -- `riot --set ...` only changes
+# ARQ context, NOT JVM system properties.
+_JDK_XML_UNLIMITED = " ".join((
+    "-Djdk.xml.maxGeneralEntitySizeLimit=0",    # JAXP00010003
+    "-Djdk.xml.totalEntitySizeLimit=0",         # JAXP00010004
+    "-Djdk.xml.entityExpansionLimit=0",         # JAXP00010001
+    "-Djdk.xml.maxParameterEntitySizeLimit=0",  # JAXP00010002
+    "-Djdk.xml.elementAttributeLimit=0",
+    "-Djdk.xml.maxElementDepth=0",
+))
+
+
+def make_riot_env():
+    """os.environ + JAVA_TOOL_OPTIONS carrying _JDK_XML_UNLIMITED (appended to
+    any value the user already set), for every riot subprocess."""
+    env = os.environ.copy()
+    env["JAVA_TOOL_OPTIONS"] = (
+        ( env.get( "JAVA_TOOL_OPTIONS", "" ) + " " + _JDK_XML_UNLIMITED ).strip()
+    )
+    return env
+
 
 class GenericClient():
 
@@ -131,7 +157,7 @@ WHERE{{
             report( 'load file', file )
         cmd = [ 'riot', file ]
         print( colored( " ".join( cmd ), "cyan" ))
-        p = subprocess.Popen( cmd, stdout = subprocess.PIPE, text=True ) # riot returns nt format by default
+        p = subprocess.Popen( cmd, stdout = subprocess.PIPE, text=True, env = make_riot_env() ) # riot returns nt format by default
         buf = []
         size = 0
         count = 0
