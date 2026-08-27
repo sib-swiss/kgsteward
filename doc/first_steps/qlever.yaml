@@ -2,12 +2,13 @@ version: kgsteward_yaml_3
 server:
   brand        : qlever
   qleverfile   : ${QLEVER_FILE}         # path to Qleverfile (see doc/first_steps/Qleverfile)
-  qleverdir    : ${QLEVER_DIR}          # working directory for the qlever index
-  access_token : ${QLEVER_ACCESS_TOKEN} # optional: overrides ACCESS_TOKEN in Qleverfile
+  qleverdir    : ${QLEVER_DIR}          # working directory (empty bootstrap index + Qleverfile copy)
+  # access_token is optional here: when omitted it is read from the Qleverfile
+  # [server] ACCESS_TOKEN.  It is REQUIRED (GSP writes + rebuild-index).
 context_base_IRI: http://example.org/context/
 file_loader:
-  method: file_store
+  method: riot_chunk_store   # parse via riot, load in chunks over the Graph Store Protocol
 url_loader:
-  method: sparql_load
+  method: curl_riot_chunk_store   # QLever cannot LOAD a URL: download first, then GSP
 dataset: !include dataset.yaml
 queries: !include query.yaml

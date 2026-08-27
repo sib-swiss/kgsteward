@@ -1,129 +1,51 @@
-"""qlever driver for kgsteward.
+"""QLever driver (brand: ``qlever``) for kgsteward.
 
-Architecture
-------------
-qlever is a *static-index* triplestore: every ``qlever index`` invocation
-rebuilds the entire index from scratch from a ``MULTI_INPUT_JSON`` manifest.
-It does NOT ingest data incrementally.  SPARQL ``INSERT``/``DELETE`` only
-modify an in-memory delta that is lost when the server stops, unless that
-delta is persisted by another mechanism.
+This replaced an earlier static-index driver that rebuilt the whole on-disk
+index from files on every run.  Instead, it runs
+QLever as a **live HTTP backend** -- loading each dataset into its named graph
+over the SPARQL 1.1 Graph Store HTTP Protocol (GSP), exactly like the Fuseki
+driver -- and folds the in-memory update *delta* back into a compact on-disk
+index with ``qlever rebuild-index`` after each dataset (hot-swapped in with no
+downtime).
 
-This driver mimics the GraphDB-style "process each dataset eagerly" model
-on top of qlever's static index by maintaining one ``.nt.gz`` *checkpoint*
-per dataset in ``qleverdir``, alongside a ``.nt.gz.json`` *sidecar* that
-records the dataset's named-graph IRI.  The sidecar is written **after**
-the ``.nt.gz`` and acts as an atomic completeness marker — its presence
-means the checkpoint is good; its absence means an in-progress / crashed
-dump and the ``.nt.gz`` is ignored.
+See ``doc/drivers/qlever-design.md`` for the full rationale, benchmarks and
+trade-offs.  In short:
 
-Per-dataset flow driven by kgsteward.py
----------------------------------------
-For each dataset that kgsteward decides to (re)process:
+  * **Load path** -- GSP chunked POST per context (Fuseki model + the GSP
+    machinery inherited from :class:`GenericClient`).  The only QLever-specific
+    bit is the write auth (access token as a query param) and the
+    ``application/n-triples`` content type.
+  * **Server** -- a Docker/native QLever server managed through the ``qlever``
+    CLI (Qleverfile), started once and kept up across the session (rather than a
+    per-rebuild stop/index/start dance).
+  * **Bootstrap** -- an EMPTY index (``qlever index`` over an empty input file),
+    so the live server has something to serve before any data lands.  All real
+    data arrives via GSP, never via the Qleverfile ``INPUT_FILES``.
+  * **Compaction** -- ``qlever rebuild-index`` once per dataset (driven by the
+    ``queue_persist`` / ``flush_pending`` hooks).  Cheap and hot-swapped; see
+    the design note's benchmark for why per-dataset rebuild is fine at
+    small/medium scale.
 
-    drop_context(ctx)            # no-op for qlever
-    load_from_file / load_url_as_file(...)  # -> self.pending_files
-    sparql_update(s) for each "update:" SPARQL  # -> self.pending_updates
-    update_dataset_info(...)     # also sparql_update -> pending_updates
-    mark_rebuild(ctx)            # appends (ctx,) sentinel to pending_updates
-    server_start()               # triggers _finalize_index
-
-``_finalize_index`` is the heart of the driver:
-
-  1. Collect all completed checkpoints (excluding any whose IRI is being
-     re-processed — its fresh files are already in pending_files).
-  2. Patch ``qleverdir/Qleverfile`` with the resulting MULTI_INPUT_JSON.
-  3. Stop the server.
-  4. ``qlever index --text-index none --overwrite-existing``.
-  5. ``qlever start --use-text-index no``.
-  6. Wipe ``input/``, reset ``pending_files``.
-  7. ``_apply_pending_updates``: replay queued SPARQL strings against the
-     freshly-started server, then ``dump_checkpoint(ctx)`` at the sentinel
-     — which captures index + in-memory delta into the new ``.nt.gz``.
-
-Key properties
---------------
-**Transactional checkpoints.**  ``dump_checkpoint`` writes to a ``.tmp``
-file and atomically renames over the old ``.nt.gz``.  The sidecar is
-written last.  A crash anywhere mid-processing leaves the previous
-checkpoint intact.
-
-**Text index opt-in.**  Per-dataset rebuilds always pass
-``--text-index none`` (rebuilding a multi-GB text index N times for N
-datasets is wasteful), and ``qlever start`` is invoked with
-``--use-text-index no`` so the server doesn't try to load text files
-that aren't there.  ``complete_index()`` runs ``qlever add-text-index``
-once at session end iff ``--qlever_complete`` was passed.
-
-**Update timeout disabled.**  Every ``sparql_update`` sends
-``timeout=999999s`` along with the access token, overriding the
-Qleverfile's ``TIMEOUT`` (which is appropriate for interactive queries,
-not bulk ingestion).
-
-**Always-queue SPARQL updates.**  ``sparql_update`` appends to
-``pending_updates`` even when the server is running; updates execute
-against the rebuilt server during ``_apply_pending_updates``, so their
-effect survives the rebuild and lands in the next checkpoint dump.
+Because it is a live backend, most of the polymorphic workflow hooks
+(``can_restamp``, ``refine_status``, ``update_set_offline`` ...) keep their
+GenericClient live-backend defaults; only the server lifecycle and GSP writes
+are overridden here.
 """
 
 import configparser
 import glob
-import gzip
-import hashlib
-import json
 import os
-import re
-import requests
 import shutil
-import subprocess
-import tempfile
-import time
+import urllib
 
-from .common import *
-from .generic import GenericClient, make_riot_env
+import requests   # for requests.exceptions.ConnectionError on a server crash
 
+from .common  import *
+from .generic import GenericClient
 
-# Natively supported qlever formats (without riot conversion), ± .gz
-_QLEVER_NATIVE = { ".ttl": "ttl", ".nt": "nt" }
-
-# _JDK_XML_UNLIMITED / riot_env() now live in generic.py -- shared by every
-# riot invocation (this driver and the riot_chunk_store loaders alike).
-
-
-def _qlever_fmt( filename ):
-    """Return qlever format token ('ttl'/'nt') or None if riot conversion is needed."""
-    name = filename.lower()
-    if name.endswith( ".gz" ): name = name[ :-3 ]
-    return _QLEVER_NATIVE.get( os.path.splitext( name )[1] )
-
-
-def _ttl_has_multiline_literal( path ):
-    """Cheap scan: does *path* (.ttl or .ttl.gz) contain a triple-quoted literal?
-
-    qlever's parallel parser splits on newlines and chokes on ``\"\"\"...\"\"\"``
-    or ``'''...'''`` literals with::
-
-        Parse error at byte position N: Found a multiline string literal
-        with the parallel parser. This is not supported.
-
-    Scanning the file once at staging time is much cheaper than retrying the
-    full index build after a parser crash, and lets us safely keep
-    ``parallel: true`` for the vast majority of TTL inputs that have no such
-    literals (or only carry them in comments -- a false positive there just
-    falls back to sequential parsing, the data still loads correctly).
-    """
-    opener = gzip.open if path.lower().endswith( ".gz" ) else open
-    with opener( path, "rb" ) as f:
-        carry = b""
-        while True:
-            buf = f.read( 1 << 20 )   # 1 MiB
-            if not buf:
-                return False
-            window = carry + buf
-            if b'"""' in window or b"'''" in window:
-                return True
-            carry = buf[-2:]   # so a triple-quote straddling a 1 MiB boundary still matches
-
-
+# Name of the empty input file kgsteward writes into qleverdir so `qlever index`
+# can build the (empty) bootstrap index.  Real data never goes through
+# INPUT_FILES -- it is loaded live over the Graph Store Protocol.
 def parse_qleverfile( qleverfile ):
     """Read a Qleverfile and return (location, repository, system, access_token, text_index).
 
@@ -150,13 +72,34 @@ def parse_qleverfile( qleverfile ):
     return f"http://{host}:{port}", repository, system, access_token, text_index
 
 
+_EMPTY_INPUT = "_kgsteward_empty.nt"
+
+# Compact (rebuild-index) the in-memory delta once this many triples have been
+# loaded since the last compaction.  Bounds delta RAM *within* a single large
+# dataset: without it, a big graph streamed over GSP grows the delta until the
+# qlever-server process crashes (observed on ReconXKG's SwissProt_Human at
+# ~20M triples).  Each rebuild costs ~O(total index size), so a higher value
+# means fewer/cheaper-in-aggregate rebuilds -- keep it comfortably below the
+# crash point (a 10M-triple delta is ~1.5 GB; the crash was ~20M).  Lower it on
+# tight-RAM hosts; raise it when the Docker VM has plenty of memory.
+_COMPACT_THRESHOLD_TRIPLES = 10_000_000
+
+# Upper bound on how many triples a single DELETE removes when dropping a graph.
+# A graph drop writes one deletion marker per triple into the delta, so an
+# unbounded drop is exactly as dangerous as an unbounded load -- more so, since
+# it arrives in one operation that no threshold check can interrupt.  Keep this
+# below _COMPACT_THRESHOLD_TRIPLES so a drop always gets a chance to compact.
+_DROP_CHUNK_TRIPLES = 5_000_000
+
+
 class QleverClient( GenericClient ):
 
     # ------------------------------------------------------------------ #
     # Construction
     # ------------------------------------------------------------------ #
 
-    def __init__( self, qleverfile, qleverdir, access_token = None, echo = True, managed_contexts = None ):
+    def __init__( self, qleverfile, qleverdir, access_token = None,
+                  echo = True, managed_contexts = None ):
         for tool in ( "qlever", "riot" ):
             if shutil.which( tool ) is None:
                 stop_error( f"{tool} not found on PATH" )
@@ -166,7 +109,7 @@ class QleverClient( GenericClient ):
         )
 
         if system in ( "docker", "podman" ):
-            if run_system_cmd( [system, "info"], echo = echo, capture_output = True ).returncode != 0:
+            if run_system_cmd( [ system, "info" ], echo = echo, capture_output = True ).returncode != 0:
                 stop_error( f"{system} daemon is not running" )
         elif system != "native":
             stop_error( f"Unknown [runtime] SYSTEM in Qleverfile: '{system}'" )
@@ -178,104 +121,41 @@ class QleverClient( GenericClient ):
         if os.path.commonpath( [ real_qf, real_qd ] ) == real_qd:
             stop_error( f"qleverfile must not be located inside qleverdir: {qleverfile}" )
 
-        super().__init__( location, None, None )
-        self.repository      = repository
-        self.qleverfile      = qleverfile
-        self.qleverdir       = qleverdir
-        self.system          = system
-        self.access_token    = access_token if access_token is not None else access_token_from_file
-        self.qlever_cmd      = ["qlever"]
-        self.user_text_index = text_index   # original [index] TEXT_INDEX from user's source
-        # Context IRIs of all datasets kgsteward manages (from the YAML).  Used by
-        # list_context(): qlever cannot enumerate graphs cheaply (no G-sorted
-        # permutation -> SELECT DISTINCT ?g scans+sorts the whole index and OOMs),
-        # but kgsteward owns everything in the store, so the managed set IS the
-        # authoritative list of named graphs.
+        # QLever serves query, update AND the Graph Store Protocol at ONE URL,
+        # differentiated by HTTP verb / query params -- so all three endpoints
+        # are the same base location (simpler than Fuseki's three paths).
+        super().__init__( location, location, location )
+        self.repository       = repository
+        self.qleverfile       = qleverfile
+        self.qleverdir        = qleverdir
+        self.access_token     = access_token if access_token is not None else access_token_from_file
+        self.user_text_index  = text_index
+        self.qlever_cmd       = [ "qlever" ]
+        # Context IRIs of all datasets kgsteward manages (from the YAML).  Like
+        # the static driver, list_context() returns this set instead of issuing
+        # a SELECT DISTINCT ?g (which scans/sorts the whole index and can OOM).
         self.managed_contexts = set( managed_contexts ) if managed_contexts is not None else None
-        # MULTI_INPUT_JSON entries staged for the next _finalize_index rebuild.
-        self.pending_files   = []
-        # SPARQL updates queued for the next _apply_pending_updates flush;
-        # may include (context_iri,) sentinels from mark_rebuild().
-        self.pending_updates = []
-        # Optional set of context IRIs that incremental _finalize_index rebuilds
-        # are restricted to (the dependency closure of the datasets being
-        # processed).  None means "include every checkpoint" (the full index).
-        # complete_index() ignores this and always assembles all checkpoints.
-        self.index_scope     = None
-        # True iff build_text_index() has just produced a current text index
-        # on disk and the next server start should load it.  _finalize_index
-        # always resets this to False.
-        self._has_current_text_index = False
-        # Per-update timing/query logging state lives on GenericClient (shared by
-        # every driver, enabled via --sparql_logs); super().__init__ set it up.
+        # True once a text index has been built (finalize --qlever_complete), so
+        # the next server start loads it; empty per-dataset rebuilds never make one.
+        self._has_text        = False
+        # Set by queue_persist, consumed by flush_pending: an uncompacted delta
+        # is waiting for a rebuild-index.  Avoids a redundant rebuild on the
+        # end-of-loop safety-net flush.
+        self._pending_compaction = False
+        # Triples loaded over GSP since the last rebuild-index; drives the
+        # mid-load threshold compaction (see _flush_buf).
+        self._delta_triples = 0
 
-        # Remove any leftover input/ from a previous crashed staging phase.
-        # pending_files starts empty, so any files on disk are orphans.
-        input_dir = os.path.join( qleverdir, "input" )
-        if os.path.isdir( input_dir ):
-            shutil.rmtree( input_dir )
-            if echo: print_warn( f"Removed stale input/ from previous run: {input_dir}" )
-
-        # Best-effort probe — does NOT distinguish "stopped" from "unreachable".
-        try:
-            http_call( { 'method': 'GET', 'url': location }, [ 200, 404 ], echo = echo )
-            self.is_running = True
-        except Exception:
-            self.is_running = False
+        # Best-effort probe -- does NOT distinguish "stopped" from "unreachable".
+        self.is_running = self._probe_running( echo = echo )
         report( "qlever server", "running" if self.is_running else "stopped" )
 
-        # A leftover server container from a previous crash/kill stays in an
-        # exited state and makes the next `qlever start` fail with a cryptic
-        # "container name already in use" docker conflict.  Fail fast with an
-        # actionable message instead.
-        if not self.is_running:
-            stale = self._stale_server_container()
-            if stale:
-                stop_error(
-                    "Leftover qlever server container '" + stale + "' exists but is not "
-                    "serving\n(most likely from a previous crash or `docker kill`). A new "
-                    "`qlever start`\nwould fail with a 'container name already in use' conflict.\n"
-                    "Remove the stale container, then re-run kgsteward:\n"
-                    "    " + self.system + " rm -f " + stale
-                )
-
-    @property
-    def has_index( self ):
-        """True iff a qlever index exists in qleverdir (i.e. ``qlever index`` ran at least once)."""
-        return bool( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.index.*" ) ) )
-
     # ------------------------------------------------------------------ #
-    # Low-level invocation helpers
+    # CLI / Qleverfile plumbing
     # ------------------------------------------------------------------ #
-
-    def _stale_server_container( self ):
-        """Return the name of a leftover, non-serving qlever server container, or None.
-
-        qlever-control names its container ``qlever.server.<NAME>``.  After a crash
-        or ``docker kill`` the container lingers in an *exited* state and the next
-        ``qlever start`` fails with a cryptic ``container name ... already in use``
-        (``docker run --name`` refuses to reuse the name).  Only meaningful for
-        docker/podman; returns None for native.
-        """
-        if self.system not in ( "docker", "podman" ):
-            return None
-        name = "qlever.server." + self.repository
-        r = run_system_cmd(
-            [ self.system, "ps", "-a", "--filter", "name=" + name, "--format", "{{.Names}}" ],
-            echo = False, capture_output = True, text = True,
-        )
-        if r.returncode == 0 and name in r.stdout.split():
-            return name
-        return None
 
     def _qlever( self, *args, echo = True ):
-        """Run a qlever CLI sub-command in qleverdir; stop_error on non-zero exit.
-
-        With echo (``-v``) the child's stdout/stderr stream live to the terminal
-        -- useful for watching index builds and debugging.  Without it the output
-        is captured and printed only if the command fails, keeping normal runs
-        quiet like the HTTP drivers (whose verbosity is gated the same way).
-        """
+        """Run a ``qlever`` sub-command in qleverdir; stop_error on non-zero exit."""
         if echo:
             r = run_system_cmd( self.qlever_cmd + list( args ), echo = True, cwd = self.qleverdir )
         else:
@@ -288,648 +168,324 @@ class QleverClient( GenericClient ):
             stop_error( f"qlever {args[0]} failed" )
         return r
 
-    def _start_args( self ):
-        """argv for ``qlever start``, honouring whether a text index is currently live.
+    @property
+    def has_index( self ):
+        """True iff a qlever index exists in qleverdir (``qlever index`` ran)."""
+        return bool( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.index.*" ) ) )
 
-        qlever auto-derives ``USE_TEXT_INDEX = yes`` from ``TEXT_INDEX != none``,
-        which would cause ``qlever-server`` to ``-t`` and try to load
-        ``<NAME>.text.vocabulary``.  Per-dataset rebuilds never produce text-index
-        files, so we override with ``--use-text-index no`` until ``build_text_index``
-        flips ``_has_current_text_index`` to True.
-        """
-        if self._has_current_text_index:
-            return ( "start", )
-        return ( "start", "--use-text-index", "no" )
+    def _probe_running( self, echo = False ):
+        try:
+            http_call( { 'method': 'GET', 'url': self.endpoint_query }, [ 200, 404 ], echo )
+            return True
+        except Exception:
+            return False
 
-    # ------------------------------------------------------------------ #
-    # Qleverfile management
-    # ------------------------------------------------------------------ #
+    def _sync_qleverfile( self, echo = True ):
+        """Copy the user's Qleverfile into qleverdir (the CLI's cwd) and patch it
+        for the live model:
 
-    def _ensure_host_name_localhost( self ):
-        """Ensure ``[server] HOST_NAME = localhost`` is set in qleverdir/Qleverfile.
-
-        Without this, the qlever CLI falls back to ``socket.gethostname()`` for
-        its alive-check (``/ping``), which doesn't route to the Docker-mapped
-        port on 127.0.0.1, and ``qlever start`` spins forever.
-        """
-        dest = os.path.join( self.qleverdir, "Qleverfile" )
-        if not os.path.lexists( dest ):
-            return
-        parser = configparser.RawConfigParser( inline_comment_prefixes = ('#',) )
-        parser.optionxform = str
-        parser.read( dest )
-        if "server" not in parser:
-            parser["server"] = {}
-        if parser["server"].get( "HOST_NAME" ) != "localhost":
-            parser["server"]["HOST_NAME"] = "localhost"
-            with open( dest, "w" ) as f:
-                parser.write( f )
-            report( "forced", "[server] HOST_NAME = localhost" )
-
-    def _patch_qleverfile( self, entries, echo = True ):
-        """Re-sync qleverdir/Qleverfile from the user's source, then patch INPUT_FILES + MULTI_INPUT_JSON.
-
-        Always re-copies from the user's source so edits to SETTINGS_JSON /
-        STXXL_MEMORY / PARALLEL_PARSING / TEXT_INDEX take effect on the next
-        per-dataset rebuild.  The patch overrides only the keys we own
-        (MULTI_INPUT_JSON, INPUT_FILES, HOST_NAME), everything else from the
-        user's source is preserved.
-
-        ``inline_comment_prefixes=('#',)`` strips trailing ``# ...`` comments
-        from values; qlever-control's own parser does NOT strip them and would
-        otherwise emit them verbatim into the docker -c argument, with bash
-        treating ``#`` as a comment introducer and silently truncating the
-        rest of the command (e.g. dropping ``2>&1 | tee ...``).
+          * ``[server] HOST_NAME = localhost`` -- otherwise the CLI's alive-check
+            probes ``socket.gethostname()``, which does not route to the
+            Docker-mapped port, and ``qlever start`` spins forever.
+          * ``[data] DESCRIPTION`` -- the current qlever CLI requires one for
+            ``start``; inject a default if the user did not set it.
+          * ``[index] INPUT_FILES`` -> an empty file -- the driver loads everything
+            over GSP, so the on-disk index only ever needs the empty bootstrap.
         """
         dest = os.path.join( self.qleverdir, "Qleverfile" )
         shutil.copy2( os.path.realpath( self.qleverfile ), dest )
-        if echo: report( "synced Qleverfile from user source", dest )
-
-        parser = configparser.RawConfigParser( inline_comment_prefixes = ('#',) )
+        parser = configparser.RawConfigParser( inline_comment_prefixes = ( '#', ) )
         parser.optionxform = str    # preserve uppercase keys
         parser.read( dest )
 
-        if "index" not in parser:
-            parser["index"] = {}
-        parser.remove_option( "index", "CAT_INPUT_FILES" )
-        if "data" in parser:
+        if "server" not in parser: parser["server"] = {}
+        parser["server"]["HOST_NAME"] = "localhost"
+
+        if "data" not in parser: parser["data"] = {}
+        if not parser["data"].get( "DESCRIPTION", "" ).strip():
+            parser["data"]["DESCRIPTION"] = "managed by kgsteward"
+
+        # A [data] FORMAT (e.g. nq) would mis-type the empty bootstrap input;
+        # drop it -- real data never goes through INPUT_FILES.
+        if parser.has_option( "data", "FORMAT" ):
             parser.remove_option( "data", "FORMAT" )
 
-        file_paths = " ".join( e["cmd"].split()[-1] for e in entries )
-        parser["index"]["INPUT_FILES"]      = file_paths
-        parser["index"]["MULTI_INPUT_JSON"] = json.dumps( entries, separators = (",", ":") )
-
-        if "server" not in parser:
-            parser["server"] = {}
-        if "HOST_NAME" not in parser["server"]:
-            parser["server"]["HOST_NAME"] = "localhost"
+        if "index" not in parser: parser["index"] = {}
+        parser["index"]["INPUT_FILES"]     = _EMPTY_INPUT
+        parser["index"]["CAT_INPUT_FILES"] = "cat " + _EMPTY_INPUT
+        if parser.has_option( "index", "MULTI_INPUT_JSON" ):
+            parser.remove_option( "index", "MULTI_INPUT_JSON" )
 
         with open( dest, "w" ) as f:
             parser.write( f )
-        if echo:
-            report( "INPUT_FILES",      file_paths )
-            report( "MULTI_INPUT_JSON", f"{len(entries)} stream(s)" )
-
-    # ------------------------------------------------------------------ #
-    # Input staging
-    # ------------------------------------------------------------------ #
-
-    def _stage_file( self, filename, context_iri, echo = True ):
-        """Copy/convert *filename* into qleverdir/input/ and return MULTI_INPUT_JSON entries.
-
-        For RDF/XML / OWL / etc. that qlever can't parse natively, the file is
-        converted by ``riot`` in a subprocess whose env has the JDK XML parser
-        caps lifted (see ``_JDK_XML_UNLIMITED``).
-        """
-        input_dir = os.path.join( self.qleverdir, "input" )
-        os.makedirs( input_dir, exist_ok = True )
-
-        src  = os.path.abspath( filename )
-        h8   = hashlib.sha1( src.encode() ).hexdigest()[:8]
-        stem = os.path.splitext( re.sub( r"\.(gz|bz2|xz)$", "", os.path.basename( src ), flags = re.IGNORECASE ) )[0]
-
-        fmt = _qlever_fmt( src )
-        if fmt is not None:
-            # Native qlever format — hard-link or copy into input/.
-            is_gz     = src.lower().endswith( ".gz" )
-            ext_full  = f".{fmt}.gz" if is_gz else f".{fmt}"
-            dest_name = f"{stem}_{h8}{ext_full}"
-            dest_path = os.path.join( input_dir, dest_name )
-            if os.path.lexists( dest_path ):
-                os.remove( dest_path )
-            try:
-                os.link( src, dest_path )
-                if echo: report( "hard-link", dest_path )
-            except OSError:
-                shutil.copy2( src, dest_path )
-                if echo: report( "copy", dest_path )
-            cmd = f"zcat input/{dest_name}" if is_gz else f"cat input/{dest_name}"
-        else:
-            # Non-native (RDF/XML, OWL, …) — convert via riot to .nt.
-            dest_name = f"{stem}_{h8}.nt"
-            dest_path = os.path.join( input_dir, dest_name )
-            riot_cmd  = [ "riot", "--output=ntriples", src ]
-            riot_env  = make_riot_env()
-            if echo:
-                print( colored(
-                    f"JAVA_TOOL_OPTIONS=\"{riot_env['JAVA_TOOL_OPTIONS']}\" "
-                    + " ".join( riot_cmd ) + f" > {dest_path}",
-                    "cyan",
-                ), flush = True )
-            # stdout always goes to the .nt file; capture stderr when quiet so a
-            # successful conversion stays silent but a failure can still be shown.
-            with open( dest_path, "wb" ) as nt_out:
-                riot = subprocess.run(
-                    riot_cmd, stdout = nt_out, env = riot_env,
-                    stderr = None if echo else subprocess.PIPE, text = True,
-                )
-            if riot.returncode != 0:
-                if not echo and riot.stderr:
-                    print( riot.stderr, flush = True )
-                stop_error( f"riot conversion failed for: {src}" )
-            fmt, cmd = "nt", f"cat input/{dest_name}"
-            if echo: report( "staged (riot→nt)", dest_path )
-
-        # ``"parallel"`` is set per-input (top-level PARALLEL_PARSING does NOT
-        # propagate through MULTI_INPUT_JSON) and must be the string "true"
-        # or "false" (qlever-control compares with == "true").
-        #
-        # parallel="true" is unsafe for .ttl files containing triple-quoted
-        # multiline string literals -- a single scan via _ttl_has_multiline_literal
-        # picks them out at staging time so most TTL files still parse in
-        # parallel.  .nt cannot have them by spec; riot-converted files come out
-        # as .nt -- all safe.
-        if fmt == "ttl" and _ttl_has_multiline_literal( src ):
-            data_parallel = "false"
-            if echo: report( "multiline literal", f"disabling parallel parsing for {os.path.basename(src)}" )
-        else:
-            data_parallel = "true"
-
-        if echo: report( "staged", f"input/{dest_name}" )
-        return [
-            { "cmd": cmd, "format": fmt, "graph": context_iri, "parallel": data_parallel },
-        ]
-
-    # ------------------------------------------------------------------ #
-    # Index lifecycle
-    # ------------------------------------------------------------------ #
-
-    def _collect_checkpoint_entries( self, exclude_iris = None, include_iris = None, echo = True ):
-        """MULTI_INPUT_JSON entries for every completed checkpoint in qleverdir.
-
-        Reads ``*.nt.gz.json`` sidecar files (the atomic completeness marker),
-        builds one ``zcat <fname>`` entry per graph.
-
-        *exclude_iris*: optional set of context IRIs to skip — typically the
-        IRIs of datasets being re-processed in this run (their fresh files
-        are already in ``pending_files``).  The stale checkpoint stays on
-        disk and is overwritten atomically by the subsequent
-        ``dump_checkpoint``.
-
-        *include_iris*: optional set of context IRIs to restrict to (the
-        dependency-closure scope of an incremental run).  ``None`` means no
-        restriction — every checkpoint is included (the full index).
-        """
-        exclude = set( exclude_iris ) if exclude_iris else set()
-        include = set( include_iris ) if include_iris is not None else None
-        entries = []
-        for sidecar in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
-            try:
-                with open( sidecar ) as f:
-                    meta = json.load( f )
-                context_iri = meta["graph"]
-            except Exception as e:
-                print_warn( f"Skipping unreadable checkpoint sidecar {sidecar}: {e}" )
-                continue
-            fname = os.path.basename( sidecar[ :-5 ] )   # strip ".json"
-            if context_iri in exclude:
-                if echo: report( "checkpoint superseded by pending data", fname )
-                continue
-            if include is not None and context_iri not in include:
-                if echo: report( "checkpoint outside index scope (skipped)", fname )
-                continue
-            entries.append( { "cmd": f"zcat {fname}", "format": "nt", "graph": context_iri, "parallel": "true" } )
-            if echo: report( "checkpoint → index", fname )
-        return entries
-
-    def _abort_if_index_log_has_error( self ):
-        """stop_error if ``<repository>.index-log.txt`` contains any ERROR lines.
-
-        qlever-index runs as ``qlever-index ... | tee <log>`` inside the
-        container.  The pipe masks qlever-index's non-zero exit on parse
-        errors / runtime exceptions because bash doesn't enable pipefail.
-        Inspect the log file directly and fail loudly — otherwise the next
-        dump_checkpoint would silently produce an empty .nt.gz.
-        """
-        log_path = os.path.join( self.qleverdir, f"{self.repository}.index-log.txt" )
-        if not os.path.isfile( log_path ):
-            return
-        with open( log_path, errors = "replace" ) as f:
-            bad = [ line for line in f if " - ERROR:" in line ]
-        if not bad:
-            return
-        print_warn( "qlever index reported ERROR(s) — refusing to proceed:" )
-        for line in bad[:5]:
-            print_warn( "  " + line.strip() )
-        stop_error(
-            "qlever index failed (silent in exit code due to internal tee pipe). "
-            "Inspect " + log_path + " for full details; "
-            "after fixing the input, manually remove any empty "
-            "<dataset>_<hash>.nt.gz / .nt.gz.json checkpoints created by previous "
-            "runs before re-running."
-        )
-
-    def _finalize_index( self, echo = True ):
-        """Build the index, start the server, apply queued updates, dump the new checkpoint.
-
-        See the module-level docstring for the full per-dataset flow.  This is
-        the only method that calls ``qlever index``.
-        """
-        # Re-processed datasets have their fresh files in pending_files; their
-        # stale checkpoints must be excluded so we don't load old + new for
-        # the same graph.
-        pending_iris       = { e["graph"] for e in self.pending_files }
-        # Restrict to the dependency-closure scope of this run (if set); the
-        # pending files (the dataset(s) being processed) are always included.
-        checkpoint_entries = self._collect_checkpoint_entries( exclude_iris = pending_iris, include_iris = self.index_scope, echo = echo )
-        all_entries        = checkpoint_entries + self.pending_files
-
-        if not all_entries:
-            print_warn( "_finalize_index called with no files (no pending files, no checkpoints) — nothing to do." )
-            return
-
-        if echo: print_task( "Write MULTI_INPUT_JSON to Qleverfile" )
-        self._patch_qleverfile( all_entries, echo = echo )
-
-        if self.is_running:
-            self.server_stop( echo = echo )
-
-        # Wipe any stale <NAME>.text.* files left over from a previous
-        # build_text_index — they would otherwise mismatch the rebuilt
-        # main index, and the next server start would either refuse to
-        # load them or serve inconsistent data.
-        stale_text_files = glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) )
-        for f in stale_text_files:
-            os.remove( f )
-            if echo: report( "wiped stale text index", os.path.basename( f ) )
-        # A partial/scoped rebuild is no longer the complete production index.
-        self._clear_index_complete()
-        if echo and self.user_text_index and self.user_text_index.lower() != "none":
-            extra = " ; wiped " + str( len( stale_text_files ) ) + " stale text-index file(s)" if stale_text_files else ""
-            print_warn(
-                "Qleverfile has TEXT_INDEX = " + self.user_text_index
-                + " but per-dataset rebuild will skip it (`qlever index --text-index none`)"
-                + extra
-                + ". Pass --qlever_complete to (re)build it once at the session end."
-            )
-        self._has_current_text_index = False
-
-        self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
-        self._abort_if_index_log_has_error()
-        self._qlever( *self._start_args(), echo = echo )
-        self.is_running = True
-
-        input_dir = os.path.join( self.qleverdir, "input" )
-        if os.path.isdir( input_dir ):
-            shutil.rmtree( input_dir )
-            if echo: report( "cleanup", input_dir )
-
-        self.pending_files = []
-        self._apply_pending_updates( echo = echo )
-
-    def _apply_pending_updates( self, echo = True ):
-        """Replay every queued SPARQL update; dump a checkpoint at each sentinel.
-
-        ``pending_updates`` is a list of SPARQL strings interleaved with
-        ``(context_iri, sha256)`` sentinels from ``mark_rebuild()``.  Each
-        sentinel triggers ``dump_checkpoint(context_iri, sha256)``, whose
-        CONSTRUCT query against the running server transparently merges the
-        on-disk index with the in-memory delta produced by the preceding
-        updates — so the new ``.nt.gz`` captures the complete post-update state.
-        """
-        if not self.pending_updates:
-            return
-        n_updates = sum( 1 for u in self.pending_updates if not isinstance( u, tuple ) )
-        if echo: print_task( f"Apply {n_updates} queued SPARQL update(s) with per-dataset checkpoint" )
-        for item in self.pending_updates:
-            if isinstance( item, tuple ):
-                context_iri = item[0]
-                sha256      = item[1] if len( item ) > 1 else None
-                if context_iri:
-                    self.dump_checkpoint( context_iri, sha256 = sha256, echo = echo )
-            else:
-                self._do_sparql_update( item, echo = echo )
-        self.pending_updates = []
+        open( os.path.join( self.qleverdir, _EMPTY_INPUT ), "w" ).close()
+        if echo: report( "synced Qleverfile", dest )
 
     # ------------------------------------------------------------------ #
     # Server lifecycle
     # ------------------------------------------------------------------ #
 
-    def server_start( self, echo = True ):
-        """Bring the server to a state consistent with pending_files / pending_updates.
+    def _server_start( self, echo = True ):
+        """Start the server, first clearing any leftover/stale container.
 
-        Three cases:
-
-          * pending_files non-empty → ``_finalize_index`` (rebuild + flush).
-          * pending_files empty, pending_updates non-empty → start the server
-            from the existing index (if not already running) and flush the
-            updates against it.
-          * both empty → just start the server.
+        A stopped-but-present ``qlever.server.<NAME>`` container (from a crash or
+        ``docker kill``) makes ``qlever start`` fail with a cryptic "container
+        name already in use"; a best-effort ``qlever stop`` clears it.  Text
+        index is loaded only once ``build`` has produced one.
         """
-        if self.pending_files:
-            self._finalize_index( echo = echo )
-            return
-        if self.pending_updates:
-            if not self.has_index:
-                stop_error(
-                    "qlever server_start: pending SPARQL updates but no index exists.\n"
-                    "This usually means a file was loaded via sparql_update instead of "
-                    "load_from_file — qlever requires all file data to go through the index."
-                )
-            if not self.is_running:
-                self._qlever( *self._start_args(), echo = echo )
-                self.is_running = True
-            self._apply_pending_updates( echo = echo )
-            return
-        self._qlever( *self._start_args(), echo = echo )
+        run_system_cmd( self.qlever_cmd + [ "stop" ], echo = False, cwd = self.qleverdir,
+                        capture_output = True, text = True )
+        # --persist-updates: write the located-triples delta to disk and replay
+        # it on restart, so GSP-loaded data is durable (without it a server
+        # restart silently drops everything not yet folded into the index).
+        args = [ "start", "--persist-updates" ]
+        if not self._has_text:
+            args += [ "--use-text-index", "no" ]
+        self._qlever( *args, echo = echo )
         self.is_running = True
 
-    def server_stop( self, echo = True ):
-        self._qlever( "stop", echo = echo )
+    def _server_stop( self, echo = True ):
+        run_system_cmd( self.qlever_cmd + [ "stop" ], echo = False, cwd = self.qleverdir,
+                        capture_output = True, text = True )
         self.is_running = False
 
-    def build_text_index( self, echo = True ):
-        """Build the text index once over the current on-disk index, then restart.
+    def _ensure_up( self, echo = True ):
+        """Guarantee a live server before any GSP / SPARQL operation.
 
-        The text index is *opt-in*: per-dataset rebuilds never produce it
-        (rebuilding once per dataset is wasteful), so this method is the only
-        way to get one from kgsteward.  Reads the original ``TEXT_INDEX``
-        value from the user's Qleverfile (captured at ``__init__`` time).
-        If that value is ``none``, this is a no-op.
+        Lazily bootstraps: re-sync the Qleverfile, build the empty index if none
+        exists, then start.  Idempotent -- returns immediately once up.
+
+        The Qleverfile is re-synced from the user's source on EVERY start, never
+        only when the working copy is missing: the working copy is a derived
+        artifact, and skipping the copy silently pins the server to the settings
+        of the run that first created it.  Editing MEMORY_FOR_QUERIES /
+        CACHE_MAX_SIZE / TIMEOUT / STXXL_MEMORY in the source then had no effect
+        whatsoever -- the server kept starting with the stale values, with
+        nothing in the output to say so.  (The static driver's _patch_qleverfile
+        always re-copied for exactly this reason.)  Note this can only take
+        effect at a start: a server already running keeps the settings it was
+        started with.
         """
-        if not self.user_text_index or self.user_text_index.lower() == "none":
-            print_warn( "user's Qleverfile has TEXT_INDEX = none — nothing to build" )
+        if self.is_running:
             return
-        if self.is_running:
-            self.server_stop( echo = echo )
-        self._qlever(
-            "add-text-index",
-            "--text-index", self.user_text_index,
-            "--overwrite-existing",
-            echo = echo,
-        )
-        # Text index now on disk — restart so the server loads it.
-        self._has_current_text_index = True
-        self._qlever( *self._start_args(), echo = echo )
-        self.is_running = True
+        self._sync_qleverfile( echo = echo )
+        if not self.has_index:
+            self._qlever( "index", echo = echo )   # empty bootstrap index
+        self._server_start( echo = echo )
 
-    def complete_index( self, echo = True ):
-        """Assemble the complete index from ALL checkpoints, plus the text index.
+    def _http_write( self, request_args, status_code_ok, echo, what ):
+        """http_call for a write op, turning a mid-op server crash into a clean stop.
 
-        Unlike the incremental ``_finalize_index`` (which may be restricted to a
-        dependency-closure ``index_scope`` and always skips the text index),
-        this ignores ``index_scope``, includes *every* on-disk checkpoint, and
-        -- if the user's Qleverfile sets ``TEXT_INDEX`` -- builds the text index
-        too.  This is the only path that guarantees a complete, queryable,
-        text-indexed server.
+        A ``RemoteDisconnected`` / ``ConnectionError`` means the qlever-server
+        process died (typically delta/update pressure) and slammed the socket
+        shut -- not an HTTP error.  Surface it with actionable guidance instead
+        of letting a raw traceback escape (mirrors the static driver)."""
+        try:
+            return http_call( request_args, status_code_ok, echo )
+        except requests.exceptions.ConnectionError:
+            self.is_running = False
+            print_warn(
+                "qlever server closed the connection during " + what + ".\n"
+                "The server process most likely crashed under delta/update pressure "
+                "(a large graph loaded into the in-memory delta). Options:\n"
+                "  - lower _COMPACT_THRESHOLD_TRIPLES (kgsteward compacts mid-load),\n"
+                "  - give Docker Desktop more RAM, or\n"
+                "  - use the static 'qlever' brand (index-from-files) for very large datasets."
+            )
+            stop_error( "qlever: connection lost during " + what )
+
+    def _rebuild_index( self, echo = True ):
+        """Fold the in-memory delta into the on-disk index (hot-swap) and reset
+        the delta counter.  No-op if the server is down or no token is set.
+
+        NON-FATAL: compaction is an optimization, not a correctness requirement
+        -- the data is safe and served from the persisted delta regardless.  A
+        ``rebuild-index`` failure (e.g. an upstream QLever engine assertion in
+        IndexRebuilder) therefore only warns and continues, leaving the data in
+        the delta; it must never abort an otherwise-successful build.
         """
-        entries = self._collect_checkpoint_entries( echo = echo )   # all checkpoints, full scope
-        if not entries:
-            stop_error( "--qlever_complete: no checkpoints found to assemble into an index." )
-        print_task( "Assemble complete qlever index from all checkpoints" )
-        self._patch_qleverfile( entries, echo = echo )
-        if self.is_running:
-            self.server_stop( echo = echo )
-        # Clear the complete-marker BEFORE mutating the index: it must exist only
-        # when a complete build has fully succeeded, otherwise a crash mid-rebuild
-        # would leave a stale marker and report a broken index as 'ok'.
-        self._clear_index_complete()
-        # Wipe stale text-index files so they cannot mismatch the rebuilt main index.
-        for f in glob.glob( os.path.join( self.qleverdir, f"{self.repository}.text.*" ) ):
-            os.remove( f )
-            if echo: report( "wiped stale text index", os.path.basename( f ) )
-        self._has_current_text_index = False
-        self._qlever( "index", "--text-index", "none", "--overwrite-existing", echo = echo )
-        self._abort_if_index_log_has_error()
-        if self.user_text_index and self.user_text_index.lower() != "none":
-            self._qlever( "add-text-index", "--text-index", self.user_text_index, "--overwrite-existing", echo = echo )
-            self._has_current_text_index = True
-        else:
-            print_warn( "Qleverfile has TEXT_INDEX = none — building complete index without a text index" )
-        self._qlever( *self._start_args(), echo = echo )
-        self.is_running = True
-        # The complete production index is now in sync: mark it so refine_status
-        # reports its datasets as 'ok' rather than 'READY'.
-        self._mark_index_complete()
+        if not self.is_running:
+            return
+        if not self.access_token:
+            print_warn( "no ACCESS_TOKEN: skipping qlever rebuild-index (delta left uncompacted)" )
+            self._delta_triples = 0
+            return
+        r = run_system_cmd(
+            self.qlever_cmd + [ "rebuild-index", "--access-token", self.access_token ],
+            echo = echo, cwd = self.qleverdir,
+            capture_output = not echo, text = True,
+        )
+        if r.returncode != 0:
+            if not echo:
+                if r.stdout: print( r.stdout, flush = True )
+                if r.stderr: print( r.stderr, flush = True )
+            print_warn(
+                "qlever rebuild-index FAILED -- continuing with the data left in the "
+                "in-memory delta (queryable and persisted, just uncompacted).\n"
+                "This is typically an upstream QLever engine bug (e.g. an assertion in "
+                "IndexRebuilder); please report it to the QLever developers.\n"
+                "If it recurs the delta keeps growing, so RAM pressure may eventually "
+                "return -- give Docker more RAM, or use the static 'qlever' brand for the full build."
+            )
+        self._delta_triples = 0   # reset either way: retry only after the next threshold, not every chunk
 
     # ------------------------------------------------------------------ #
-    # Polymorphic workflow hooks (see GenericClient for the contracts)
-    #
-    # qlever is a static-index backend: data is ingested by staging files into
-    # an offline index build, SPARQL updates live in an in-memory delta lost on
-    # rebuild/restart, and per-dataset state is persisted as .nt.gz checkpoints.
-    # These overrides keep all of that off the generic kgsteward workflow.
+    # Repository lifecycle
+    # ------------------------------------------------------------------ #
+
+    def list_repository( self ):
+        """Bound to the single dataset named in the Qleverfile."""
+        return [ self.repository ]
+
+    def rewrite_repository( self, _server_config_filename = None, echo = True ):
+        """Full reset (-I): tear down the server, wipe the index, rebuild an
+        empty one and start fresh.  *_server_config_filename* is accepted for
+        cross-backend signature parity and ignored (qlever has no equivalent).
+        """
+        self._server_stop( echo = echo )
+        for path in sorted( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.*" ) ) ):
+            os.remove( path )
+            if echo: report( "wiped index file", os.path.basename( path ) )
+        for pattern in ( "previous.*", "rebuild.*" ):
+            for path in glob.glob( os.path.join( self.qleverdir, pattern ) ):
+                if os.path.isdir( path ):
+                    shutil.rmtree( path )
+                    if echo: report( "wiped rebuild dir", os.path.basename( path ) )
+        self._sync_qleverfile( echo = echo )
+        self._qlever( "index", echo = echo )   # empty bootstrap index
+        self._server_start( echo = echo )
+        self._pending_compaction = False
+
+    # ------------------------------------------------------------------ #
+    # Data loading  (Graph Store Protocol)
     # ------------------------------------------------------------------ #
 
     @property
     def supports_sparql_load( self ):
-        return False   # static index: stage files, never SPARQL LOAD
+        # QLever's SPARQL ``LOAD <url> INTO GRAPH`` is not usable; data is
+        # ingested over the Graph Store Protocol instead.
+        return False
+
+    def _gsp_url( self, context ):
+        """GSP endpoint for *context*, with the write access token + a generous
+        timeout (a big single graph can otherwise trip the operation timeout)."""
+        url = self.endpoint_store + "?graph=" + urllib.parse.quote_plus( context )
+        if self.access_token:
+            url += "&access-token=" + urllib.parse.quote_plus( self.access_token )
+        url += "&timeout=999999s"
+        return url
+
+    def load_from_file( self, file, context, headers = {}, echo = True ):
+        """GSP POST a whole file into *context* (used by the ``file_store`` loader)."""
+        self._ensure_up( echo = False )
+        if echo:
+            report( "load file (GSP)", file )
+        with any_open( file, 'rb' ) as f:   # any_open handles decompression
+            self._http_write(
+                { 'method': 'POST', 'url': self._gsp_url( context ),
+                  'headers': { **headers, 'Content-Type': guess_mime_type( file ) },
+                  'data': f },
+                [ 200, 201, 204 ], echo, "graph-store POST",
+            )
+
+    def load_from_file_using_riot( self, file, context, headers = {}, echo = True ):
+        """GSP chunked load via riot (the recommended ``riot_chunk_store`` loader)."""
+        self._ensure_up( echo = False )
+        super().load_from_file_using_riot( file, context, headers = headers, echo = echo )
+
+    def _flush_buf( self, context, data, headers = {}, echo = True ):
+        """POST one N-Triples chunk (from ``load_from_file_using_riot``) over GSP.
+
+        Overrides the GenericClient version: QLever needs the access token and
+        ``application/n-triples`` (the base class hardcodes ``text/plain``,
+        which QLever rejects).
+        """
+        n_triples = data.count( "\n" ) if isinstance( data, str ) else data.count( b"\n" )
+        self._http_write(
+            { 'method': 'POST', 'url': self._gsp_url( context ),
+              'headers': { 'Content-Type': 'application/n-triples' },
+              'data': data.encode( 'utf-8' ) if isinstance( data, str ) else data },
+            [ 200, 201, 204 ], echo, "graph-store POST",
+        )
+        # Threshold compaction: drain the delta mid-load so a single large
+        # dataset cannot grow it without bound (which crashes the server).
+        self._delta_triples += n_triples
+        if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
+            report( "delta compaction", f"{self._delta_triples} triples loaded -> rebuild-index" )
+            self._rebuild_index( echo = echo )
 
     def load_url( self, path, context, echo = True ):
-        # qlever cannot defer LOAD -- download immediately and stage for indexing.
-        self.load_url_as_file( path, context, echo = echo )
+        # QLever cannot LOAD a remote graph; a URL dataset must be downloaded
+        # first -- configure ``url_loader: {method: curl_riot_chunk_store}`` so
+        # kgsteward fetches it and hands the file to load_from_file_using_riot.
+        stop_error(
+            "qlever cannot load a URL directly (QLever has no working SPARQL LOAD).\n"
+            "Use  url_loader:\\n    method: curl_riot_chunk_store  in the YAML so the\n"
+            "file is downloaded and loaded over the Graph Store Protocol."
+        )
 
-    def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
-        """When the server is stopped, the SPARQL status query would return
-        all-EMPTY, so use the .nt.gz checkpoints as the source of truth:
-        a dataset needs (re)processing unless a *current* checkpoint exists.
-        Frozen datasets are never touched by -C.  Returns None when the server
-        is running (kgsteward then uses the online status query)."""
-        if self.is_running:
-            return None
-        if echo:
-            report( "qlever server stopped", "using checkpoints to determine update set" )
-        frozen_of = { t["name"]: bool( t.get( "frozen", False ) ) for t in config["dataset"] }
-        update = set()
-        for name in names:
-            if frozen_of.get( name ):
-                continue   # -C has no effect on frozen datasets (yaml 'frozen' contract)
-            if not self.has_checkpoint( name2context[ name ], sha_of( name ) ):
-                update.add( name )
-        return update
+    @staticmethod
+    def _deleted_count( r ):
+        """Deleted-triple count from a QLever update response, 0 if unreadable.
 
-    def plan_index_scope( self, update_names, config, name2context, echo = True ):
-        """Restrict the rebuilt index to the dependency closure of the datasets
-        being processed (update set + transitive parents).  Unrelated datasets
-        keep their checkpoints on disk but stay out of the rebuilt index until a
-        --qlever_complete run reassembles everything."""
-        if not update_names:
-            return
-        parents_of = { t["name"]: list( t.get( "parent", [] ) or [] ) for t in config["dataset"] }
-        frozen_of  = { t["name"]: bool( t.get( "frozen", False ) )     for t in config["dataset"] }
-        scope = set()
-        stack = list( update_names )
-        while stack:
-            n = stack.pop()
-            if n in scope:
-                continue
-            scope.add( n )
-            stack.extend( parents_of.get( n, [] ) )
-        # A required parent that is NOT being processed this run must already
-        # have a checkpoint, otherwise the scoped index would silently miss data
-        # that the updates query.  A *frozen* parent without one is an
-        # intentional exclusion (its dependants are rebuilt without its data).
-        for n in scope:
-            if n not in update_names and not self.has_checkpoint( name2context[ n ] ):
-                if frozen_of.get( n ):
-                    if echo:
-                        print_warn(
-                            "Frozen parent '" + n + "' has no checkpoint; excluded from the index, so "
-                            "its dependants are rebuilt WITHOUT its data. Load it explicitly with -d " + n + "."
-                        )
-                    continue
-                stop_error(
-                    "Dataset '" + n + "' is a required parent in the dependency scope but has "
-                    "no checkpoint. Include it in the run (e.g. add it to -d) or build it first."
-                )
-        self.index_scope = { name2context[ n ] for n in scope }
-        if echo:
-            report( "qlever index scope (datasets)", ", ".join( sorted( scope ) ) )
-
-    def warn_if_unindexed( self, name, context, echo = True ):
-        if echo and not self.has_checkpoint( context ) and self.has_index:
-            print_warn( f"No checkpoint for skipped dataset '{name}'; it will be absent from the index." )
-
-    def queue_persist( self, context, sha256 = None ):
-        self.mark_rebuild( context, sha256 )
-
-    def flush_pending( self, echo = True ):
-        if self.pending_files or self.pending_updates:
-            self.server_start( echo = echo )
-
-    def finalize( self, complete, echo = True ):
-        if complete:
-            print_break()
-            print_task( "Assemble complete qlever index (all checkpoints + text index)" )
-            self.complete_index( echo = echo )
-
-    def ensure_running( self, echo = True ):
-        if not self.is_running and self.has_index:
-            print_break()
-            print_task( "Start qlever server" )
-            self.server_start( echo = echo )
-
-    def can_restamp( self, context ):
-        return self.has_checkpoint( context )
-
-    def refine_status( self, config, echo = False ):
-        """Mark current-but-unassembled checkpoints as READY.
-
-        qlever lifecycle (per dataset):
-
-            EMPTY / UPDATE  --(-C / -d / --qlever_upload_quads)-->  READY
-            READY           --(--qlever_complete)----------------->  ok
-
-        A dataset is READY when a *current* checkpoint exists on disk (currency
-        is verified against the input checksum stashed in ``target_sha256``) but
-        the complete production index -- the one ``--qlever_complete`` assembles
-        from every checkpoint, including the text index -- is not in sync.  Only
-        once that complete index has been built does the dataset become ``ok``.
-
-        Frozen datasets are intentionally left untouched (their status handling
-        is a separate, future concern).
+        QLever answers an update with
+        {"operations":[{"delta-triples":{"difference":{"deleted":N}}}]}.
         """
-        complete = self._complete_index_in_sync()
-        for item in config["dataset"]:
-            if item.get( "frozen" ):
-                continue
-            if item.get( "status" ) == "SKIPPED":
-                continue   # -s: no checksum was computed, so currency is unknown
-            context = item["context"]
-            if not self.has_checkpoint( context, item.get( "target_sha256" ) ):
-                continue   # no current checkpoint -> leave the base EMPTY/UPDATE status
-            item["status"] = "ok" if complete else "READY"
-            # The live status query (update_config) only sees a running server;
-            # qlever's is usually stopped, so #triple / last modified arrive
-            # blank.  Backfill them from the checkpoint sidecar -- the offline
-            # source of truth -- so the status table matches a live backend's.
-            # Live query values (when the server IS up) take precedence: we only
-            # fill what is still blank.  Older sidecars lacking these fields just
-            # stay blank (graceful).
-            if not item.get( "count" ) or not item.get( "date" ):
-                try:
-                    with open( self.checkpoint_path( context ) + ".json" ) as f:
-                        meta = json.load( f )
-                    if not item.get( "count" ) and "triples" in meta:
-                        item["count"] = str( meta["triples"] )
-                    if not item.get( "date" ) and "modified" in meta:
-                        item["date"] = meta["modified"]
-                except ( OSError, ValueError ):
-                    pass
-
-    # ------------------------------------------------------------------ #
-    # Public data-loading API
-    # ------------------------------------------------------------------ #
-
-    def load_from_file( self, filename, context, headers = {}, echo = True ):
-        """Stage *filename* for deferred indexing into graph *context*."""
-        self.pending_files.extend( self._stage_file( filename, context, echo = echo ) )
-
-    def load_url_as_file( self, url, context, echo = True ):
-        """Download *url* immediately and stage it for deferred indexing into graph *context*.
-
-        Hardened curl flags fail fast on upstream throttling / dropped connections:
-
-          --connect-timeout 30           give up if no TCP handshake in 30s
-          --speed-time 60 --speed-limit 1024
-                                         abort if avg < 1 KB/s for 60s
-          --retry 3 --retry-delay 5      transient blip → quick retry
-        """
-        basename = url.split( "?" )[0].split( "/" )[-1]
-        _name, _ext = os.path.splitext( basename )
-        if _ext.lower() in ( ".gz", ".bz2", ".xz" ):
-            # Preserve compound extensions such as .ttl.gz, .nt.gz, .rdf.xz
-            _, _inner = os.path.splitext( _name )
-            suffix = ( _inner + _ext ) if _inner else _ext
-        else:
-            suffix = _ext
-        suffix = suffix or ".nt"
-
-        with tempfile.NamedTemporaryFile( delete = False, suffix = suffix ) as tmp:
-            tmp_path = tmp.name
         try:
-            curl_cmd = [
-                "curl", "-L",
-                "--connect-timeout", "30",
-                "--speed-time", "60", "--speed-limit", "1024",
-                "--retry", "3", "--retry-delay", "5",
-                "-o", tmp_path, url,
-            ]
-            # Quiet the progress meter unless verbose; keep errors visible.
-            if not echo:
-                curl_cmd[ 1:1 ] = [ "--silent", "--show-error" ]
-            if echo:
-                print( colored( " ".join( curl_cmd ), "cyan" ), flush = True )
-            r = subprocess.run( curl_cmd )
-            if r.returncode != 0:
-                stop_error( f"curl download failed for: {url}  (exit {r.returncode})" )
-            self.pending_files.extend( self._stage_file( tmp_path, context, echo = echo ) )
-        finally:
-            if os.path.exists( tmp_path ):
-                os.unlink( tmp_path )
+            ops = r.json().get( "operations", [] )
+            return ops[0]["delta-triples"]["difference"]["deleted"] if ops else 0
+        except Exception:
+            return 0
 
-    def mark_rebuild( self, context_iri, sha256 = None ):
-        """Queue a checkpoint-dump sentinel for *context_iri* in pending_updates.
+    def drop_context( self, context, echo = True ):
+        """Drop a named graph (idempotent), in bounded chunks.
 
-        When ``_apply_pending_updates`` hits the ``(context_iri, sha256)`` tuple
-        it calls ``dump_checkpoint`` — the CONSTRUCT queries against the running
-        server return the on-disk index merged with the in-memory delta from
-        the preceding updates, so the checkpoint captures the complete
-        post-update state.  No ``qlever rebuild-index`` is needed because the
-        next ``_finalize_index`` rebuilds the on-disk index from scratch
-        using every checkpoint + the new dataset's staged files.
+        A Graph Store Protocol DELETE of a large graph is ONE unbounded
+        operation that writes as many deletion markers as the graph has
+        triples into the in-memory delta.  On ReconXKG's MetaNetX_MNXref
+        (72.2M triples, Docker VM 25G, MEMORY_FOR_QUERIES 16G) that
+        OOM-killed qlever-server -- the process died inside the single HTTP
+        call, so the compaction check that used to sit after it never ran and
+        lowering _COMPACT_THRESHOLD_TRIPLES could not help.
 
-        *sha256* (the dataset's kgsteward checksum, if known) is recorded in the
-        checkpoint sidecar so ``has_checkpoint`` can judge currency offline.
+        SPARQL DROP GRAPH is no better: measured on this server it reports the
+        same one-deletion-marker-per-triple delta growth as the GSP DELETE, so
+        it is unbounded in exactly the same way.  QLever routes every update
+        through the delta and has no fast path for emptying a graph.
+
+        Deleting through a LIMITed subselect bounds each step instead, and
+        rebuild-index (~44s on a 155M-triple index) folds the deletions away
+        between chunks.  A short graph is still one round trip: a chunk that
+        comes back short is the last one.
         """
-        self.pending_updates.append( ( context_iri, sha256 ) )
+        self._ensure_up( echo = False )
+        total = 0
+        while True:
+            r = self.sparql_update(
+                f"DELETE {{ GRAPH <{ context }> {{ ?s ?p ?o }} }}\n"
+                f"WHERE  {{ {{ SELECT ?s ?p ?o "
+                f"WHERE {{ GRAPH <{ context }> {{ ?s ?p ?o }} }} "
+                f"LIMIT { _DROP_CHUNK_TRIPLES } }} }}",
+                echo = echo and total == 0,   # echo the shape once, not per chunk
+            )
+            deleted = self._deleted_count( r )
+            total += deleted
+            self._delta_triples += deleted
+            if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
+                report( "delta compaction",
+                        f"{ self._delta_triples } delta triples (mid-drop) -> rebuild-index" )
+                self._rebuild_index( echo = echo )
+            if deleted < _DROP_CHUNK_TRIPLES:   # short chunk => graph exhausted
+                break
+        if total:
+            report( "graph dropped", f"{ context }: { total } triple(s)" )
 
     # ------------------------------------------------------------------ #
-    # Public SPARQL API
+    # SPARQL
     # ------------------------------------------------------------------ #
-
-    def get_endpoint_update( self ):
-        # qlever exposes update on the same endpoint as query — kgsteward keeps
-        # the two endpoints separate generically, but for qlever the "update"
-        # endpoint is unused (we POST `update=` to the query URL).
-        return ""
-
-    def list_repository( self ):
-        return [ self.repository ]
 
     def sparql_query( self, sparql, status_code_ok = [ 200, 400, 500 ], echo = True, timeout = None ):
-        if not self.is_running:
-            return None
+        self._ensure_up( echo = False )
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
         r = http_call(
@@ -947,434 +503,81 @@ class QleverClient( GenericClient ):
         return r
 
     def sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        """Queue a SPARQL update for execution at the next ``_apply_pending_updates``.
+        """Execute a SPARQL update immediately against the live server.
 
-        Always queues, even when the server is running.  Rationale: the
-        per-dataset loop ends each iteration with ``server_start`` →
-        ``_finalize_index`` → rebuild → ``_apply_pending_updates``.  Executing
-        updates immediately against an in-place running server would let the
-        rebuild wipe their in-memory effect before ``dump_checkpoint`` could
-        capture it — the silent metadata-loss bug we hit in production.
+        The token + a generous timeout go in the form body (QLever's update
+        endpoint is the same base URL as query).  Shares the per-update
+        query/timing logging with every backend via GenericClient.
         """
-        self.pending_updates.append( sparql )
-
-    def _do_sparql_update( self, sparql, status_code_ok = [ 200 ], echo = True ):
-        """POST a SPARQL update to the running server and record timing stats.
-
-        Called only from ``_apply_pending_updates``; not part of the public API.
-        Adds ``timeout=999999s`` plus the access token to the form data so the
-        per-query timeout in the Qleverfile (appropriate for interactive
-        queries) doesn't abort long-running bulk updates.
-
-        Shares the per-update logging with every backend via GenericClient:
-        the query text is logged BEFORE the POST (``_sparql_update_started``)
-        and the timing row AFTER (``_sparql_update_finished``), plus qlever's
-        own server-side ``qlever_total_ms``.
-        """
+        self._ensure_up( echo = False )
         if echo:
             print_strip( sparql.replace( "\t", "    " ), color = "green" )
-        tok = self._sparql_update_started( sparql )   # logs query pre-execution
-        try:
-            r = http_call(
-                { 'method': 'POST', 'url': self.endpoint_query,
-                  'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  'data': {
-                      'update':       sparql,
-                      'access-token': self.access_token,
-                      'timeout':      '999999s',
-                  } },
-                status_code_ok, echo,
-            )
-        except requests.exceptions.ConnectionError as exc:
-            # The server slammed the socket shut without sending an HTTP response.
-            # This is NOT a SPARQL error -- those come back as HTTP 200 with a
-            # body status of "ERROR".  It means the qlever-server *process* died
-            # mid-update, almost always an out-of-memory kill while materializing
-            # the INSERT/DELETE result.  MEMORY_FOR_QUERIES bounds queries, NOT
-            # update materialization, so lowering it does not prevent this.
-            #
-            # A retry is unsafe: qlever updates live in an in-memory delta, so a
-            # crash (and the docker auto-restart that follows) discards the delta
-            # from THIS dataset's earlier updates too -- replaying just this one
-            # against the restarted server would build inconsistent data.  Fail
-            # loudly instead; transactional checkpoints keep prior datasets safe.
-            self.is_running = False
-            self._sparql_update_finished(
-                tok, "CONNECTION_LOST",
-                error = "server closed connection mid-update (likely OOM crash)",
-            )
-            stop_error(
-                "qlever server closed the connection without responding while applying "
-                f"SPARQL update #{tok['n']} "
-                f"(sha1 {tok['sha1_8']}, {tok['size_chars']} chars):\n"
-                f"    {tok['first_line']}\n"
-                "The server process crashed mid-update -- this is a hard crash, not a SPARQL "
-                "error, and is almost always an out-of-memory kill: the INSERT/DELETE result "
-                "materialization exceeded available RAM.  Note MEMORY_FOR_QUERIES limits queries, "
-                "NOT update materialization, so lowering it does not help.\n"
-                "  -> give Docker more RAM, or split/simplify this update so its intermediate "
-                "result is smaller;\n"
-                "  -> checkpoints are transactional, so already-loaded datasets are intact; this "
-                "dataset has no checkpoint and will be reprocessed on the next run.\n"
-                f"  -> underlying error: {exc}"
-            )
-
-        # Best-effort extraction of qlever's server-side timing + error.
-        qlever_total_ms = None
-        qlever_error    = None
-        try:
-            body = r.json()
-            if isinstance( body, dict ):
-                t = body.get( "time" )
-                if isinstance( t, dict ):
-                    qlever_total_ms = t.get( "total" )
-                if body.get( "status" ) == "ERROR":
-                    qlever_error = body.get( "exception" )
-                elif isinstance( body.get( "operations" ), list ) and body["operations"]:
-                    op_t = body["operations"][0].get( "time" )
-                    if isinstance( op_t, dict ) and qlever_total_ms is None:
-                        qlever_total_ms = op_t.get( "total" )
-        except Exception:
-            pass
-
-        self._sparql_update_finished(
-            tok, r.status_code,
-            qlever_total_ms = qlever_total_ms,
-            error = ( qlever_error[:200] if qlever_error else "" ),
+        tok = self._sparql_update_started( sparql )   # logs the query pre-execution
+        # On a server crash _http_write stop_errors here: the query stays logged
+        # with no timing row (the documented "in-flight / crashed" signature).
+        r = self._http_write(
+            { 'method': 'POST', 'url': self.endpoint_update,
+              'headers': { 'Content-Type': 'application/x-www-form-urlencoded' },
+              'data': { 'update': sparql,
+                        'access-token': self.access_token,
+                        'timeout': '999999s' } },
+            status_code_ok, echo, "SPARQL update",
         )
-
-        if r.status_code != 200 and r.text:
-            print_warn( r.text )
+        self._sparql_update_finished( tok, getattr( r, "status_code", None ) )
         return r
 
     def list_context( self, echo = True ):
-        """Named graphs held by the store.
-
-        qlever has no graph-sorted permutation, so ``SELECT DISTINCT ?g WHERE {
-        GRAPH ?g { ?s ?p ?o } }`` degrades to a full index scan + sort over every
-        triple and blows the per-query memory budget on a large index (returning
-        an ERROR / empty result).  But a kgsteward-managed qlever store contains
-        exactly the datasets kgsteward put there, so the managed contexts (from
-        the YAML) are the authoritative graph list -- return them and skip the
-        query entirely.  Falls back to the live query only if the managed set was
-        not supplied at construction (e.g. an ad-hoc client).
-
-        Upstream limitation (revisit if qlever gains a graph-sorted permutation):
-        https://github.com/ad-freiburg/qlever/wiki/Current-deviations-from-the-SPARQL-1.1-standard
-        """
         if self.managed_contexts is not None:
             return set( self.managed_contexts )
-        return self._store_graphs_via_sparql( echo = echo )
-
-    def _store_graphs_via_sparql( self, echo = True ):
-        """Enumerate named graphs by actually querying the running server.
-
-        Only used where the on-disk/managed set is not authoritative -- notably
-        the ``--qlever_upload_quads`` bootstrap, which must discover the graphs
-        present in a freshly bulk-loaded dump.  Expensive on large indexes (see
-        list_context); acceptable for the bootstrap one-shot."""
-        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g { ?s ?p ?o }}", echo = echo )
-        if r is None:
-            return set()
-        return { rec["g"]["value"] for rec in r.json()["results"]["bindings"] if "g" in rec }
-
-    def drop_context( self, context, echo = True ):
-        """No-op for qlever.
-
-        Removal happens through ``invalidate_checkpoint`` + the next
-        ``_finalize_index`` rebuild excluding the dropped context.  A SPARQL
-        ``DELETE WHERE { GRAPH <ctx> { ?s ?p ?o } }`` on a large graph can
-        OOM-kill qlever-server with ``RemoteDisconnected`` — kgsteward
-        used to send one here and we removed it.
-        """
-        if echo: report( "drop_context", f"no-op for qlever (will be excluded from next index rebuild): {context}" )
+        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
+        return {
+            rec["g"]["value"]
+            for rec in r.json()["results"]["bindings"]
+            if "g" in rec
+        }
 
     # ------------------------------------------------------------------ #
-    # Checkpoint management
+    # Compaction  (per-dataset rebuild-index)
     # ------------------------------------------------------------------ #
 
-    def checkpoint_path( self, context_iri ):
-        """Filesystem path of the .nt.gz checkpoint for *context_iri*."""
-        h8   = hashlib.sha1( context_iri.encode() ).hexdigest()[:8]
-        safe = re.sub( r"[^a-zA-Z0-9_-]", "_", context_iri.rstrip( "/" ).split( "/" )[-1] )[:40]
-        return os.path.join( self.qleverdir, f"{safe}_{h8}.nt.gz" )
+    def queue_persist( self, context, sha256 = None ):
+        """Mark that a dataset just landed in the delta and needs compacting.
 
-    def _complete_marker_path( self ):
-        """Path of the sentinel that records 'the complete index is in sync'.
-
-        Written by ``complete_index`` after a successful full (all-checkpoints +
-        text-index) build; cleared by any partial/bootstrap rebuild that
-        invalidates that completeness (``_finalize_index``, and -- via the
-        ``<repository>.*`` wipe -- ``rewrite_repository`` / ``upload_quads``).
-        Named ``<repository>.*`` so rewrite_repository removes it automatically.
+        The GSP writes are already durable (they live in the persisted delta);
+        this only schedules the ``rebuild-index`` that flush_pending performs.
         """
-        return os.path.join( self.qleverdir, f"{self.repository}.kgsteward-complete" )
+        self._pending_compaction = True
 
-    def _mark_index_complete( self ):
-        with open( self._complete_marker_path(), "w" ) as f:
-            f.write( "complete\n" )
+    def flush_pending( self, echo = True ):
+        """Compact the delta into the on-disk index once, if anything is pending.
 
-    def _clear_index_complete( self ):
-        marker = self._complete_marker_path()
-        if os.path.isfile( marker ):
-            os.remove( marker )
-
-    def _complete_index_in_sync( self ):
-        """True iff the on-disk index is the complete one assembled from every
-        checkpoint (so all current checkpoints are served and, if configured,
-        the text index is built).  Any per-dataset/scoped rebuild or bootstrap
-        clears the marker, so this stays False until the next --qlever_complete."""
-        return self.has_index and os.path.isfile( self._complete_marker_path() )
-
-    def has_checkpoint( self, context_iri, sha256 = None ):
-        """True iff a completed checkpoint exists for *context_iri*.
-
-        Completeness is the presence of the ``.nt.gz.json`` sidecar, which is
-        written *after* the ``.nt.gz`` and acts as the atomic completeness
-        marker.
-
-        When *sha256* (the dataset's current kgsteward checksum) is supplied the
-        check is also *currency-aware*: the checksum recorded in the sidecar
-        must match.  This lets the stopped-server ``-C`` resume tell an
-        out-of-date checkpoint from a current one without querying the index.
-        A sidecar written before checksums were recorded (no ``sha256`` field)
-        is accepted on presence alone, so pre-existing checkpoints stay valid.
+        Fires per-dataset (the main loop calls queue_persist + flush_pending each
+        iteration), so this is the per-dataset ``rebuild-index``.  The end-of-loop
+        safety-net flush is a no-op because the flag was already cleared.
         """
-        sidecar = self.checkpoint_path( context_iri ) + ".json"
-        if not os.path.isfile( sidecar ):
-            return False
-        if sha256 is None:
-            return True
-        try:
-            with open( sidecar ) as f:
-                stored = json.load( f ).get( "sha256" )
-        except Exception:
-            return False
-        if stored is None:
-            return True
-        return stored == sha256
+        if not self._pending_compaction:
+            return
+        if echo and self.is_running and self.access_token:
+            print_task( "compact qlever index (rebuild-index)" )
+        self._rebuild_index( echo = echo )   # no-op if server down / no token
+        self._pending_compaction = False
 
-    def invalidate_checkpoint( self, context_iri ):
-        """Delete the checkpoint files for *context_iri* (both ``.nt.gz`` and sidecar).
+    def finalize( self, complete, echo = True ):
+        """End-of-session finalisation: compact anything left, and build the text
+        index when ``--qlever_complete`` is set and the Qleverfile requests one."""
+        self.flush_pending( echo = echo )
+        if complete and self.user_text_index and self.user_text_index.lower() != "none":
+            print_break()
+            print_task( "Build qlever text index" )
+            self._server_stop( echo = echo )
+            self._qlever( "add-text-index", "--text-index", self.user_text_index,
+                          "--overwrite-existing", echo = echo )
+            self._has_text = True
+            self._server_start( echo = echo )
 
-        Not used by the normal per-dataset flow (which keeps the old
-        checkpoint as a transactional fallback).  Retained as a public API
-        for explicit administrative use: drop a dataset from the managed
-        set by removing its checkpoint, then trigger any rebuild — the
-        next ``_finalize_index`` will exclude this context.
-        """
-        path    = self.checkpoint_path( context_iri )
-        sidecar = path + ".json"
-        for fn in ( path, sidecar ):
-            if os.path.isfile( fn ):
-                os.remove( fn )
-                report( "invalidated checkpoint", os.path.basename( fn ) )
-
-    def dump_checkpoint( self, context_iri, sha256 = None, echo = True ):
-        """Save the named graph as ``<safe>_<h8>.nt.gz`` + ``.nt.gz.json`` sidecar.
-
-        Two-step atomic write:
-
-          1. Dump the graph (one bound CONSTRUCT per distinct predicate — see
-             below) to ``<path>.tmp``, then ``os.replace(tmp, path)`` — the
-             .nt.gz is either the OLD or the NEW content, never partial.
-          2. Write the sidecar last; its presence is the completeness marker.
-             It records the named-graph IRI and, when known, the dataset's
-             kgsteward checksum (*sha256*) so ``has_checkpoint`` can judge
-             currency offline.
-
-        Makes checkpointing transactional: until the new dump completes, the
-        old checkpoint stays on disk as a fallback.
-        """
-        path     = self.checkpoint_path( context_iri )
-        fname    = os.path.basename( path )
-        sidecar  = path + ".json"
-        tmp_path = path + ".tmp"
-        if echo:
-            print( colored( f"dump checkpoint → {fname}", "cyan" ), flush = True )
-        # A fully-unbound CONSTRUCT { ?s ?p ?o } over a named graph is SILENTLY
-        # TRUNCATED by QLever (e.g. 32 of 443 triples for ReconX_schema) while
-        # the identical SELECT returns everything — and the loss compounds across
-        # rebuilds.  Work around it by enumerating the distinct predicates and
-        # running one BOUND CONSTRUCT per predicate: QLever serializes those
-        # correctly and streams them, so we never materialize the whole graph in
-        # memory (matters for graphs like MetaNetX_MNXref, ~70M triples).
-        # Upstream bug (report pending): once QLever returns complete results for
-        # the unbound CONSTRUCT, this whole per-predicate dance can collapse back
-        # to a single CONSTRUCT { ?s ?p ?o }.
-        sel = http_call(
-            { "method": "POST", "url": self.endpoint_query,
-              "headers": { "Accept": "application/sparql-results+json",
-                           "Content-Type": "application/x-www-form-urlencoded" },
-              "data": { "query": f"SELECT DISTINCT ?p WHERE {{ GRAPH <{context_iri}> {{ ?s ?p ?o }} }}" } },
-            [ 200 ], echo = False,
-        )
-        preds = [ b["p"]["value"] for b in sel.json()["results"]["bindings"] ]
-        triples = 0
-        with gzip.open( tmp_path, "wb" ) as f:
-            for p in preds:
-                p_iri = "<" + p.replace( "\\", "\\\\" ).replace( ">", "\\>" ) + ">"
-                r = http_call(
-                    { "method": "POST", "url": self.endpoint_query,
-                      "headers": { "Accept": "application/n-triples",
-                                   "Content-Type": "application/x-www-form-urlencoded" },
-                      "data": { "query": f"CONSTRUCT {{ ?s {p_iri} ?o }} WHERE {{ GRAPH <{context_iri}> {{ ?s {p_iri} ?o }} }}" } },
-                    [ 200 ], echo = False,
-                )
-                f.write( r.content )
-                triples += r.content.count( b"\n" )
-        os.replace( tmp_path, path )    # atomic on POSIX
-        # Record triple count + modification time alongside the IRI/checksum so
-        # the status table can fill #triple / last modified OFFLINE.  qlever's
-        # server is usually stopped at status time, so the live query in
-        # update_config returns nothing and those two columns would otherwise be
-        # blank (a live backend like GraphDB always answers).  The count is the
-        # number of N-Triples lines just dumped; modified is this checkpoint's
-        # write time.
-        modified = time.strftime( "%Y-%m-%dT%H:%M:%S" )
-        with open( sidecar, "w" ) as f:
-            json.dump( { "graph": context_iri, "sha256": sha256,
-                         "triples": triples, "modified": modified }, f )
-        if echo: report( "checkpoint saved", fname )
-
-    # ------------------------------------------------------------------ #
-    # Repository / bulk-adoption operations
-    # ------------------------------------------------------------------ #
-
-    def rewrite_repository( self, _server_config_filename = None, echo = True ):
-        """Full reset of qleverdir: stop server, wipe everything kgsteward and qlever own, restore Qleverfile.
-
-        After this returns the qleverdir contains only the freshly-copied
-        Qleverfile.  The next ``_finalize_index`` rebuilds the index from
-        scratch -- which, immediately after ``-I``, means rebuilding from
-        whatever new datasets get staged (no checkpoints survived).
-
-        What gets removed:
-
-          - the running server (Docker container or native process)
-          - ``input/``                           transient staging area
-          - ``*.nt.gz``                          kgsteward checkpoints
-          - ``*.nt.gz.json``                     atomic-completion sidecars
-          - ``<NAME>.index.*``                   main index permutations
-          - ``<NAME>.internal.index.*``          ql:has-pattern internal index
-          - ``<NAME>.text.*``                    optional text index files
-          - ``<NAME>.vocabulary.*``              external on-disk vocabulary
-          - ``<NAME>.meta-data.json``            server bootstrap metadata
-          - ``<NAME>.settings.json``             parsed SETTINGS_JSON
-          - ``<NAME>.index-log.txt``             last index build log
-          - ``<NAME>.server-log.txt``            last server start log
-          - ``previous.*`` / ``rebuild.*``       leftover rebuild-index snapshots
-
-        *_server_config_filename* is accepted for cross-backend signature
-        parity (GraphDB et al. recreate the repository from a config file);
-        qlever has nothing equivalent, so the argument is ignored.
-        """
-        if self.is_running:
-            self.server_stop( echo = echo )
-
-        # Transient staging area
-        input_dir = os.path.join( self.qleverdir, "input" )
-        if os.path.isdir( input_dir ):
-            shutil.rmtree( input_dir )
-            if echo: report( "wiped", input_dir )
-
-        # kgsteward-managed checkpoints + their atomic-completion sidecars
-        for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz" ) ) ):
-            os.remove( path )
-            if echo: report( "wiped checkpoint", os.path.basename( path ) )
-        for path in sorted( glob.glob( os.path.join( self.qleverdir, "*.nt.gz.json" ) ) ):
-            os.remove( path )
-            if echo: report( "wiped checkpoint sidecar", os.path.basename( path ) )
-
-        # On-disk qlever index for this repository (everything named <NAME>.*)
-        for path in sorted( glob.glob( os.path.join( self.qleverdir, f"{self.repository}.*" ) ) ):
-            os.remove( path )
-            if echo: report( "wiped index file", os.path.basename( path ) )
-
-        # Leftover snapshot directories from a prior `qlever rebuild-index`
-        for path in sorted(
-            glob.glob( os.path.join( self.qleverdir, "previous.*" ) )
-            + glob.glob( os.path.join( self.qleverdir, "rebuild.*" ) )
-        ):
-            if os.path.isdir( path ):
-                shutil.rmtree( path )
-                if echo: report( "wiped rebuild dir", os.path.basename( path ) )
-
-        # Restore the user's Qleverfile (verbatim -- _patch_qleverfile will
-        # re-sync + patch when the next _finalize_index runs).
-        user_real = os.path.realpath( self.qleverfile )
-        dest      = os.path.join( self.qleverdir, "Qleverfile" )
-        if user_real != ( os.path.realpath( dest ) if os.path.lexists( dest ) else None ):
-            shutil.copy2( user_real, dest )
-            if echo: report( "copied Qleverfile", dest )
-
-        self.pending_files           = []
-        self.pending_updates         = []
-        self._has_current_text_index = False
-
-    def upload_quads( self, name2context, echo = True ):
-        """Bootstrap a qlever index from a quad dump, verify it, dump per-graph checkpoints.
-
-        End-to-end "adoption" operation triggered by ``--qlever_upload_quads``.
-        WARNING: wipes the entire content of qleverdir before proceeding.
-        Use case: the user has a big ``.nq.gz`` (or any qlever-loadable) dump
-        produced outside kgsteward and wants to bring its content under
-        kgsteward management.  Bulk-loading with ``qlever index`` is much
-        faster than ingesting dataset-by-dataset, so we let qlever do it
-        natively and then capture the result as per-graph checkpoints.
-
-        Returns the sorted list of dumped graph IRIs.
-        """
-        if self.is_running:
-            self.server_stop( echo = echo )
-
-        print_task( "Reset qleverdir to user's Qleverfile (wipe checkpoints, input/)" )
-        self.rewrite_repository( echo = echo )
-        self._ensure_host_name_localhost()
-
-        print_task( "Build qlever index from the configured INPUT_FILES (bulk load)" )
-        self._qlever( "index", "--overwrite-existing", echo = echo )
-
-        print_task( "Start qlever server from the freshly-built index" )
-        self._qlever( *self._start_args(), echo = echo )
-        self.is_running = True
-
-        print_task( "Verify graphs in the loaded index against the YAML datasets" )
-        # Must reflect what was ACTUALLY bulk-loaded from the dump (no checkpoints
-        # exist yet), so query the store directly rather than the managed set.
-        graphs_in_server = self._store_graphs_via_sparql( echo = False )
-        if not graphs_in_server:
-            stop_error( "No named graphs found in the loaded index — refusing to proceed.\n"
-                        "Check INPUT_FILES / CAT_INPUT_FILES in the Qleverfile and that the dump "
-                        "contains quads (e.g. .nq, .nq.gz, .trig)." )
-
-        contexts_in_yaml = set( name2context.values() )
-        matched = sorted( graphs_in_server & contexts_in_yaml )
-        orphan  = sorted( graphs_in_server - contexts_in_yaml )
-        missing = sorted( contexts_in_yaml - graphs_in_server )
-
-        context2name = { c: n for n, c in name2context.items() }
-        for g in matched:
-            report( "matched", f"{context2name[g]} ← {g}" )
-        for g in orphan:
-            print_warn( f"Graph in dump but no matching dataset in YAML: {g}  (kept as orphan-but-preserved checkpoint)" )
-        for c in missing:
-            print_warn( f"Dataset '{context2name[c]}' in YAML but no data found in the loaded index ({c})" )
-
-        print_task( f"Dump {len( graphs_in_server )} named graph(s) as checkpoints" )
-        for g in sorted( graphs_in_server ):
-            self.dump_checkpoint( g, echo = echo )
-
-        # The bulk index built here is NOT the complete production index: it has
-        # no text index and was assembled from the dump, not from the checkpoints.
-        # rewrite_repository above already cleared the complete-marker, so these
-        # datasets report READY.  Point the user at the assembling step.
-        wants_text = bool( self.user_text_index ) and self.user_text_index.lower() != "none"
-        print_warn(
-            "Datasets are READY (checkpoints captured) but not yet in production"
-            + ( " and the text index is NOT built" if wants_text else "" )
-            + ". Run with --qlever_complete to assemble the complete index"
-            + ( " + text index" if wants_text else "" )
-            + " from all checkpoints (READY -> ok)."
-        )
-        return sorted( graphs_in_server )
+    def ensure_running( self, echo = True ):
+        """Make sure the server is serving at end of session (start if stopped)."""
+        if not self.is_running:
+            print_break()
+            print_task( "Start qlever server" )
+            self._ensure_up( echo = echo )

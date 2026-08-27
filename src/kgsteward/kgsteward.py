@@ -19,7 +19,6 @@ from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient
 from .qlever     import QleverClient
-from .qlever2    import Qlever2Client
 # from .oxigraph   import OxigraphClient  # in preparation
 # 
 from importlib.metadata import version
@@ -187,29 +186,12 @@ def get_user_input():
         help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
     )
     parser.add_argument(
-        '--qlever_upload_quads',
-        action = 'store_true',
-        help = "(qlever only) One-shot bootstrap from an externally-produced quad dump. "
-               "WARNING: WIPES THE ENTIRE CONTENT OF qleverdir before proceeding. "
-               "Steps: (i) stop the server, wipe qleverdir, restore the user's Qleverfile; "
-               "(ii) build the qlever index from the INPUT_FILES configured in the Qleverfile "
-               "(typically a big .nq.gz dump); "
-               "(iii) start the server; "
-               "(iv) verify that the named graphs in the loaded index match the YAML datasets; "
-               "(v) dump every named graph as an .nt.gz + sidecar checkpoint. "
-               "After this, kgsteward's per-dataset checkpoint architecture is fully "
-               "bootstrapped from the bulk dump and normal -C/-d operations work as usual."
-    )
-    parser.add_argument(
         '--qlever_complete',
         action = 'store_true',
-        help = "(qlever only) At the end of the session, assemble the COMPLETE index from "
-               "all on-disk checkpoints and build the text index if TEXT_INDEX is set in the "
-               "Qleverfile.  Incremental runs (-C/-d) only rebuild the dependency closure of "
-               "the datasets they touch, so the served index may be partial; --qlever_complete "
-               "is the only run that guarantees a complete, queryable, text-indexed server. "
-               "Without it the text index is absent (the main triple index works fine for "
-               "everything except `?x ql:contains-word ...` queries)."
+        help = "(qlever only) At the end of the session, build the text index if TEXT_INDEX "
+               "is set in the Qleverfile.  Without it the text index is absent (the main "
+               "triple index works fine for everything except `?x ql:contains-word ...` "
+               "queries)."
     )
     parser.add_argument(
         '--sparql_logs',
@@ -423,9 +405,8 @@ WHERE{
         # or "FROZEN" if the record is frozen,
         # or "PROPAGATE" if it is not frozen but has a parent record to update.
         # or "UNKNOWN" if is is not managed by kgsteward
-        # A backend may later refine these via server.refine_status() -- notably
-        # qlever introduces "READY": a current checkpoint exists on disk but the
-        # complete (text-indexed) production index has not been assembled yet.
+        # A backend may later refine these via server.refine_status(); no shipped
+        # backend does today (the hook remains for offline/deferred-index designs).
         if item["name"] in name_to_update:
             item["status"] = "UPDATE"
         elif item["sha256"] == sha256:
@@ -563,7 +544,9 @@ def main():
             )
         except Exception as e:
             stop_error( "Failed to connect to Fuseki server: " + str( e ))
-    elif config["server"]["brand"] == "qlever":
+    elif config["server"]["brand"] in ( "qlever", "qlever2" ):
+        if config["server"]["brand"] == "qlever2":
+            print_warn( "brand 'qlever2' is a deprecated alias for 'qlever'; update the YAML." )
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["qleverfile"] ),
@@ -576,19 +559,6 @@ def main():
             )
         except Exception as e:
             stop_error( "Failed to connect to Qlever server: " + str( e ))
-    elif config["server"]["brand"] == "qlever2":
-        try:
-            server = Qlever2Client(
-                replace_env_var( config["server"]["qleverfile"] ),
-                replace_env_var( config["server"]["qleverdir"] ),
-                access_token = replace_env_var( config["server"]["access_token"] ) if config["server"].get( "access_token" ) else None,
-                echo = args.v,
-                # Like qlever: kgsteward owns the store, so the managed dataset
-                # contexts are the authoritative graph list (avoids SELECT DISTINCT ?g).
-                managed_contexts = { item["context"] for item in config["dataset"] },
-            )
-        except Exception as e:
-            stop_error( "Failed to connect to Qlever2 server: " + str( e ))
     else:
         stop_error( "Unknown server brand: " + config["server"]["brand"] )
 
@@ -632,32 +602,9 @@ def main():
         else:
             print_warn( "Option --fuseki_compress_tbd2 not supported for server brand: " + config["server"]["brand"] )
 
-    # --------------------------------------------------------- #
-    # qlever-only: bootstrap from a bulk quad dump.
-    # (i)   reset to the user's Qleverfile;
-    # (ii)  qlever index --overwrite-existing  from INPUT_FILES;
-    # (iii) qlever start;
-    # (iv)  verify named graphs in loaded index vs YAML datasets;
-    # (v)   dump every named graph as a .nt.gz + sidecar checkpoint.
-    #
-    # Placed AFTER -I (it does the equivalent reset anyway, so an
-    # explicit -I is redundant but harmless), and BEFORE the
-    # update-set determination so the freshly-created checkpoints
-    # inform has_checkpoint() in -C stopped-server fallback mode.
-    # --------------------------------------------------------- #
-
-    if args.qlever_upload_quads:
-        if config["server"]["brand"] != "qlever":
-            stop_error( "--qlever_upload_quads is only valid for the qlever backend" )
-        print_break()
-        print_task( "Bootstrap qlever from quad dump and capture checkpoints" )
-        dumped = server.upload_quads( name2context, echo = args.v )
-        report( "checkpoints created", len( dumped ) )
-
-    if args.qlever_complete and config["server"]["brand"] != "qlever":
+    if args.qlever_complete and config["server"]["brand"] not in ( "qlever", "qlever2" ):
         stop_error( "--qlever_complete is only valid for the qlever backend" )
-    # (No early action needed — --qlever_complete only triggers the one-shot
-    # complete_index() call at the session end.)
+    # (No early action needed -- --qlever_complete only affects finalize().)
 
     # --------------------------------------------------------- #
     # Establish the list of contexts to update
@@ -696,12 +643,11 @@ def main():
             if clash :
                 stop_error( "dataset name(s) given to both -d and -s: " + ", ".join( sorted( clash )))
         # Skipping only makes sense for a dataset that is already in the store:
-        # withholding a completely absent one silently leaves a hole -- and, for a
-        # static-index backend, keeps it out of the served index -- which is never
+        # withholding a completely absent one silently leaves a hole, which is never
         # what the option is for. Presence takes both tests: list_context() is
-        # authoritative for live backends, whereas qlever answers it from the YAML
-        # (see its docstring) and reports real presence via can_restamp(), i.e. an
-        # on-disk checkpoint.
+        # authoritative for live backends, while a backend that owns its store may
+        # answer it from the YAML (qlever does) and report real presence via
+        # can_restamp().
         contexts = server.list_context( echo = args.v )
         absent = sorted(
             name for name in rdf_graph_to_skip
@@ -715,7 +661,7 @@ def main():
     if args.D :
         # -D (and -F, which sets args.D) rebuilds ALL datasets EXCEPT frozen ones:
         # dragging a frozen dataset into a full rebuild can be catastrophic (e.g. a
-        # huge frozen graph OOM-crashing the qlever index build).  -C already skips
+        # huge frozen graph OOM-crashing the store).  -C already skips
         # frozen (update_set_offline) and -d is explicit-by-name, so only -D needs
         # this guard.  --force_unfreeze runs just above and clears frozen, so
         # `-F --force_unfreeze` still rebuilds everything (the escape hatch holds).
@@ -726,8 +672,8 @@ def main():
     elif args.d : # status not checked here
         rdf_graph_to_update.update( resolve_names( args.d, rdf_graph_all, "dataset" ))
     elif args.C :
-        # A backend may resolve the update set offline (qlever, from checkpoints,
-        # when its server is stopped); otherwise fall back to the online status query.
+        # A backend may resolve the update set offline without querying the server;
+        # otherwise fall back to the online status query.
         # The skipped names are withheld from both paths, which would otherwise
         # checksum them (and hence HEAD their url/stamp) to decide their status.
         offline = server.update_set_offline( rdf_graph_all - rdf_graph_to_skip, config, name2context, dataset_sha256, echo = args.v )
@@ -744,8 +690,7 @@ def main():
     rdf_graph_to_update -= rdf_graph_to_skip
 
     # Restrict an incremental index rebuild to the dependency closure of the
-    # datasets being processed (no-op for live backends; qlever scopes its
-    # rebuilt index and validates required parents).
+    # datasets being processed (no-op for live backends).
     server.plan_index_scope( rdf_graph_to_update, config, name2context, echo = args.v )
 
     # --------------------------------------------------------- #
@@ -761,21 +706,17 @@ def main():
         context = name2context[ name ]
 
         if not name in rdf_graph_to_update :
-            # Dataset is up-to-date — nothing to reprocess.  For static-index
-            # backends, warn if it lacks a checkpoint and would be dropped from
-            # the served index (no-op for live backends).
+            # Dataset is up-to-date -- nothing to reprocess.  Hook for a backend
+            # that must warn about data it holds but would not serve; no-op for
+            # every shipped backend.
             server.warn_if_unindexed( name, context, echo = args.v )
             continue
 
         print_break()
         print_task( "Update dataset record: " + name )
-        # For qlever: do NOT delete the old checkpoint here.  It stays on disk as a
-        # last-known-good fallback and is excluded from the next index rebuild because
-        # this dataset's context will be present in pending_files (see
-        # _collect_checkpoint_entries' exclude_iris parameter).  dump_checkpoint
-        # atomically replaces the .nt.gz at the end of processing, so a crash anywhere
-        # in between leaves the OLD checkpoint intact rather than losing both old and new.
-        # drop_context is a no-op for qlever (see qlever.py docstring).
+        # Empty the graph before reloading it.  Backends differ in how: qlever
+        # deletes in bounded chunks because one unbounded drop would blow its
+        # in-memory delta (see QleverClient.drop_context).
         server.drop_context( context, echo = args.v )
 
         os.environ["TARGET_GRAPH_CONTEXT"] = context
@@ -809,13 +750,13 @@ def main():
                         stop_error( f"curl download failed for: {path}  (exit {r.returncode})" )
                     server.load_from_file_using_riot( filename, context, echo = args.v )
                 else: # direct: load the remote graph
-                    # (the server object encapsulates LOAD vs static-index staging)
+                    # (the server object encapsulates LOAD vs its own loader)
                     server.load_url( path, context, echo = args.v )
         if "file" in target :
             if config["file_loader"]["method"] == "http_server":
                 if not server.supports_sparql_load:
-                    # Static-index backend (qlever): stage files directly into the
-                    # deferred index build instead of SPARQL LOAD.
+                    # Backend without SPARQL LOAD (qlever): hand the file to the
+                    # backend's own loader instead.
                     for path in target["file"] :
                         for dir, fn in expand_path( path, config["kgsteward_yaml_directory"] ):
                             filename = dir + "/" + fn
@@ -905,18 +846,18 @@ def main():
                         print_warn( "Key not found in YAML config: queries" )
     
         update_dataset_info( server, config, name, echo = args.v )
-        # Persist this dataset (no-op for live backends, whose SPARQL writes are
-        # already durable; static-index backends queue a checkpoint + rebuild)
-        # then flush so per-dataset state mirrors the GraphDB persistence model.
+        # Persist this dataset, then flush, so per-dataset state mirrors the
+        # GraphDB persistence model.  A no-op where SPARQL writes are already
+        # durable; qlever uses it to compact its delta into the on-disk index.
         server.queue_persist( context, dataset_sha256( name ) )
         server.flush_pending( echo = args.v )
 
-    # Safety net: flush anything staged but not yet finalized (no-op for live
-    # backends; normally a static-index backend already flushed per-dataset above).
+    # Safety net: flush anything staged but not yet finalized (normally already
+    # flushed per-dataset above).
     server.flush_pending( echo = args.v )
 
-    # End-of-session finalisation: static-index backends assemble the complete
-    # index (+ text index) when --qlever_complete is set; no-op otherwise.
+    # End-of-session finalisation: qlever compacts the delta and, when
+    # --qlever_complete is set, builds the text index; no-op elsewhere.
     server.finalize( args.qlever_complete, echo = args.v )
 
     # --------------------------------------------------------- #
@@ -946,10 +887,8 @@ def main():
     # WITHOUT reloading the source data.  Useful when persisted data
     # exists but its metadata is missing or stale.
     #
-    # Each refresh is queued via queue_persist + flush_pending; for a
-    # static-index backend that re-dumps a fresh checkpoint per refreshed
-    # context (otherwise the in-memory metadata would be lost at the next
-    # rebuild), and is a no-op for live backends.
+    # Each refresh is queued via queue_persist + flush_pending, so a backend
+    # that has to materialise state does so once per refreshed context.
     # --------------------------------------------------------- #
 
     if args.U :
@@ -969,7 +908,7 @@ def main():
             print_task( "Refresh dataset info: " + name )
             update_dataset_info( server, config, name, echo = args.v )
             server.queue_persist( name2context[ name ], dataset_sha256( name ) )
-        # Flush queued metadata + re-dump checkpoints (no-op for live backends).
+        # Flush the queued metadata.
         server.flush_pending( echo = args.v )
 
     # --------------------------------------------------------- #
@@ -1239,9 +1178,8 @@ def main():
     # --------------------------------------------------------- #
 
     config = update_config( server, config, name_to_skip = rdf_graph_to_skip, echo = args.v )
-    # Backend-specific status refinement (no-op for live backends; qlever marks
-    # current-but-unassembled checkpoints as READY).  Report-only: the -C update
-    # decision above is deliberately left untouched.
+    # Backend-specific status refinement (no-op for every shipped backend).
+    # Report-only: the -C update decision above is deliberately left untouched.
     server.refine_status( config )
 
     if args.dependency_graph:
@@ -1268,8 +1206,8 @@ def main():
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
     print_break()
 
-    # Ensure the server is serving queries at the end of the session (no-op for
-    # live backends; static-index backends start if an index exists).
+    # Ensure the server is serving queries at the end of the session (no-op
+    # where it never stopped; qlever restarts it if it is down).
     server.ensure_running( echo = args.v )
 
     # Confirm the SPARQL logs at session end (they were streamed live; nothing to

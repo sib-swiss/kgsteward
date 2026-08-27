@@ -2,6 +2,14 @@
 
 # Design note: a second QLever driver (`qlever2`)
 
+> **Status (2026-08).** This driver has since REPLACED the static-index one.
+> It is now selected with `brand: qlever`; `qlever2` remains accepted as a
+> deprecated alias. The static driver, its checkpoint machinery and
+> `--qlever_upload_quads` were removed. Below is the original design note,
+> written while the two drivers were siblings, and it is kept as a record of
+> the reasoning -- read `qlever2` in it as `qlever`.
+
+
 > Status: **design only, not implemented.** This note records the strategy,
 > the evidence behind it, and the trade-offs, so the driver can be built (or
 > rejected) deliberately. It does not change any existing code.
