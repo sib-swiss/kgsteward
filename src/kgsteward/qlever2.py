@@ -59,6 +59,13 @@ _EMPTY_INPUT = "_kgsteward_empty.nt"
 # tight-RAM hosts; raise it when the Docker VM has plenty of memory.
 _COMPACT_THRESHOLD_TRIPLES = 10_000_000
 
+# Upper bound on how many triples a single DELETE removes when dropping a graph.
+# A graph drop writes one deletion marker per triple into the delta, so an
+# unbounded drop is exactly as dangerous as an unbounded load -- more so, since
+# it arrives in one operation that no threshold check can interrupt.  Keep this
+# below _COMPACT_THRESHOLD_TRIPLES so a drop always gets a chance to compact.
+_DROP_CHUNK_TRIPLES = 5_000_000
+
 
 class Qlever2Client( GenericClient ):
 
@@ -393,30 +400,61 @@ class Qlever2Client( GenericClient ):
             "file is downloaded and loaded over the Graph Store Protocol."
         )
 
-    def drop_context( self, context, echo = True ):
-        """GSP DELETE the named graph (idempotent).
+    @staticmethod
+    def _deleted_count( r ):
+        """Deleted-triple count from a QLever update response, 0 if unreadable.
 
-        A DELETE of a large existing graph writes that many *deletion* markers
-        into the delta, so it grows the delta just like a load -- count them
-        toward the compaction threshold and drain if a big drop crosses it
-        (a big drop alone could otherwise blow the delta before any load runs).
+        QLever answers an update with
+        {"operations":[{"delta-triples":{"difference":{"deleted":N}}}]}.
+        """
+        try:
+            ops = r.json().get( "operations", [] )
+            return ops[0]["delta-triples"]["difference"]["deleted"] if ops else 0
+        except Exception:
+            return 0
+
+    def drop_context( self, context, echo = True ):
+        """Drop a named graph (idempotent), in bounded chunks.
+
+        A Graph Store Protocol DELETE of a large graph is ONE unbounded
+        operation that writes as many deletion markers as the graph has
+        triples into the in-memory delta.  On ReconXKG's MetaNetX_MNXref
+        (72.2M triples, Docker VM 25G, MEMORY_FOR_QUERIES 16G) that
+        OOM-killed qlever-server -- the process died inside the single HTTP
+        call, so the compaction check that used to sit after it never ran and
+        lowering _COMPACT_THRESHOLD_TRIPLES could not help.
+
+        SPARQL DROP GRAPH is no better: measured on this server it reports the
+        same one-deletion-marker-per-triple delta growth as the GSP DELETE, so
+        it is unbounded in exactly the same way.  QLever routes every update
+        through the delta and has no fast path for emptying a graph.
+
+        Deleting through a LIMITed subselect bounds each step instead, and
+        rebuild-index (~44s on a 155M-triple index) folds the deletions away
+        between chunks.  A short graph is still one round trip: a chunk that
+        comes back short is the last one.
         """
         self._ensure_up( echo = False )
-        r = self._http_write(
-            { 'method': 'DELETE', 'url': self._gsp_url( context ) },
-            [ 200, 204, 404 ], echo, "graph-store DELETE",   # 200/204: dropped, 404: absent
-        )
-        deleted = 0
-        if r is not None and getattr( r, "status_code", None ) == 200:
-            try:   # QLever returns {"operations":[{"delta-triples":{"difference":{"deleted":N}}}]}
-                ops = r.json().get( "operations", [] )
-                deleted = ops[0]["delta-triples"]["difference"]["deleted"] if ops else 0
-            except Exception:
-                deleted = 0
-        self._delta_triples += deleted
-        if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
-            report( "delta compaction", f"{self._delta_triples} delta triples (post-delete) -> rebuild-index" )
-            self._rebuild_index( echo = echo )
+        total = 0
+        while True:
+            r = self.sparql_update(
+                f"DELETE {{ GRAPH <{ context }> {{ ?s ?p ?o }} }}\n"
+                f"WHERE  {{ {{ SELECT ?s ?p ?o "
+                f"WHERE {{ GRAPH <{ context }> {{ ?s ?p ?o }} }} "
+                f"LIMIT { _DROP_CHUNK_TRIPLES } }} }}",
+                echo = echo and total == 0,   # echo the shape once, not per chunk
+            )
+            deleted = self._deleted_count( r )
+            total += deleted
+            self._delta_triples += deleted
+            if self._delta_triples >= _COMPACT_THRESHOLD_TRIPLES:
+                report( "delta compaction",
+                        f"{ self._delta_triples } delta triples (mid-drop) -> rebuild-index" )
+                self._rebuild_index( echo = echo )
+            if deleted < _DROP_CHUNK_TRIPLES:   # short chunk => graph exhausted
+                break
+        if total:
+            report( "graph dropped", f"{ context }: { total } triple(s)" )
 
     # ------------------------------------------------------------------ #
     # SPARQL
