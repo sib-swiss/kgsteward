@@ -324,7 +324,7 @@ WHERE{{
 
         Returns None for live backends: kgsteward then falls back to the
         online status query (``update_config``).  qlever overrides this to use
-        on-disk checkpoints when its server is stopped.
+        its own on-disk state when its server is stopped.
         """
         return None
 
@@ -347,15 +347,15 @@ WHERE{{
         """Queue a dataset to be persisted at the next ``flush_pending``.
 
         No-op for live backends: their SPARQL writes are already durable.
-        qlever queues a checkpoint-dump + index rebuild.
+        qlever uses it to schedule a delta compaction (rebuild-index).
         """
         pass
 
     def flush_pending( self, echo = True ):
         """Apply anything queued by ``queue_persist`` / staged loads.
 
-        No-op for live backends; qlever rebuilds the index and dumps
-        checkpoints for the staged datasets.
+        No-op for live backends; qlever folds its in-memory delta into the
+        on-disk index.
         """
         pass
 
@@ -379,7 +379,7 @@ WHERE{{
         """True iff -U can re-stamp metadata for *context* without reloading.
 
         Always True for live backends (the data is in the repository); qlever
-        requires a checkpoint, otherwise the metadata would be lost at the next
+        must materialise it, otherwise the metadata would be lost at the next
         rebuild.
         """
         return True
@@ -392,10 +392,7 @@ WHERE{{
         already authoritative.
 
         Backends that stage content separately from what they serve override
-        this.  qlever is the first such backend (its on-disk ``.nt.gz``
-        checkpoints are the source of truth, and a checkpoint can be current yet
-        absent from the complete production index until ``--qlever_complete``
-        assembles it).  The same hook would let another brand surface a READY
-        state should it grow checkpoint-dumping later.
+        this.  No shipped backend does today: the hook is kept for a design
+        whose served state can lag behind its managed state.
         """
         pass

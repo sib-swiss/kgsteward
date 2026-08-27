@@ -231,7 +231,7 @@
       "properties": {
         "brand": {
           "const": "fuseki",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' or 'qlever' (live QLever loaded over the Graph Store Protocol)",
           "title": "Fuseki brand",
           "type": "string"
         },
@@ -292,7 +292,7 @@
       "properties": {
         "brand": {
           "const": "graphdb",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' or 'qlever' (live QLever loaded over the Graph Store Protocol)",
           "title": "GraphDB brand",
           "type": "string"
         },
@@ -397,17 +397,17 @@
       "properties": {
         "brand": {
           "const": "qlever",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' or 'qlever' (live QLever loaded over the Graph Store Protocol)",
           "title": "Qlever brand",
           "type": "string"
         },
         "qleverfile": {
-          "description": "Path to the source Qleverfile (location, repository and other settings are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy, so a Qleverfile inside qleverdir would be overwritten or wiped.",
+          "description": "Path to the source Qleverfile (location, repository, port and access token are read from it). It MUST be located outside qleverdir: kgsteward copies it into qleverdir as a working copy and regenerates that copy.",
           "title": "Qleverfile path",
           "type": "string"
         },
         "qleverdir": {
-          "description": "Working directory owned and managed by kgsteward for this repository: it holds the qlever index (<repository>.*), the per-dataset checkpoints (*.nt.gz plus their *.nt.gz.json sidecars), a transient input/ staging area, and a working copy of the Qleverfile. kgsteward wipes these on a full rebuild (-I), so point it at a dedicated, empty directory and do not store other files there.",
+          "description": "Working directory owned and managed by kgsteward: it holds the qlever index (<repository>.*), the empty bootstrap input and a working copy of the Qleverfile. All data is loaded live over the Graph Store Protocol, so no checkpoint files are kept here. kgsteward wipes it on a full rebuild (-I): point it at a dedicated, empty directory.",
           "title": "Qlever working directory",
           "type": "string"
         },
@@ -421,7 +421,7 @@
             }
           ],
           "default": null,
-          "description": "Overrides the ACCESS_TOKEN read from the Qleverfile. Useful for passing the token via an environment variable without storing it in the Qleverfile.",
+          "description": "Overrides the ACCESS_TOKEN read from the Qleverfile. Required for privileged operations (GSP writes and rebuild-index).",
           "title": "Qlever access token"
         }
       },
@@ -511,7 +511,7 @@
       "properties": {
         "brand": {
           "const": "rdf4j",
-          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki', 'qlever'",
+          "description": "String identifying the server brand. One of 'graphdb', 'rdf4j', 'fuseki' or 'qlever' (live QLever loaded over the Graph Store Protocol)",
           "title": "RDF4J brand",
           "type": "string"
         },

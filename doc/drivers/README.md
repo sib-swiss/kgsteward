@@ -20,11 +20,9 @@ The drivers fall into two families that behave very differently:
   server serves *is* what `kgsteward` manages**, so a dataset's status can be
   read back directly from the live store.
 
-* **Static-index backend** — qlever. There is no live mutation: every
-  `qlever index` invocation rebuilds the *entire* index from scratch from a
-  manifest, and SPARQL updates only modify an in-memory delta that is lost when
-  the server stops. `kgsteward` therefore keeps the authoritative state on disk
-  (one checkpoint file per dataset) and assembles the served index from it.
+* **qlever** — also live, but with a twist: writes land in an in-memory *delta*
+  rather than in the on-disk index, so `kgsteward` folds the delta back into the
+  index with `qlever rebuild-index` and manages the server process itself.
 
 Most of the per-backend remarks below were gathered while scaling real research
 projects up; see also the [user guide](../user_guide/README.md).
@@ -59,80 +57,61 @@ projects up; see also the [user guide](../user_guide/README.md).
   the sizes are otherwise uncontrolled.
 * Fuseki applies HTTP basic authentication on every call.
 
-## Static-index backend: qlever
+## qlever
 
-qlever is the most different of the drivers, because it is not a live, mutable
-store. The driver mimics the GraphDB-style "process each dataset eagerly" model
-on top of a static index.
+QLever serves queries from a compact on-disk index. Writes (Graph Store Protocol
+loads and SPARQL updates) do not touch that index: they accumulate in an
+in-memory **delta** which is merged into every query result. `kgsteward` starts
+the server with `--persist-updates`, so the delta survives a restart, and folds
+it into the index with `qlever rebuild-index` — a hot swap, with no downtime.
 
-### Checkpoints are the source of truth
+### Bounding the delta
 
-For each managed dataset, `kgsteward` keeps a per-graph **checkpoint** in
-`qleverdir`:
+An unbounded delta is the failure mode of this design: it costs RAM and slows
+every query, and past a few tens of millions of triples the server process is
+killed. `kgsteward` therefore compacts on two triggers:
 
-* `<safe>_<h8>.nt.gz` — the dataset's full, current content as gzipped
-  N-Triples (`<safe>` is a sanitised tail of the context IRI, `<h8>` an IRI-derived
-  hash for disambiguation).
-* `<safe>_<h8>.nt.gz.json` — a **sidecar** written *after* the `.nt.gz`. Its
-  presence is the atomic completeness marker (a crash mid-dump leaves the old
-  checkpoint intact), and it records the named-graph IRI and the dataset's
-  `kgsteward` checksum so an out-of-date checkpoint can be told from a current one.
+* **per dataset** — `queue_persist` + `flush_pending` rebuild the index once a
+  dataset has finished loading;
+* **mid-operation** — a running count crosses `_COMPACT_THRESHOLD_TRIPLES`
+  (10 M) during a long load *or* a long drop, and a rebuild drains it there and
+  then.
 
-The qlever index itself (`<repository>.*`), the `input/` staging area and any
-`previous.*`/`rebuild.*` snapshots are **derived artifacts**, fully rebuildable
-from the checkpoints. See the YAML reference for the `qleverfile` / `qleverdir`
-fields — in particular, the source Qleverfile must live **outside** the
-`kgsteward`-managed `qleverdir`.
+Dropping a graph needs the same care as loading one, because a drop writes one
+deletion marker per triple. A Graph Store Protocol `DELETE` (and SPARQL
+`DROP GRAPH`, measured to behave identically) is a single unbounded operation
+that no threshold can interrupt, so `drop_context` deletes through a `LIMIT`ed
+subselect instead, compacting between chunks.
 
-### Per-dataset flow
+### Loading
 
-For each dataset that is (re)processed: stage its files into `input/`, queue any
-`update:` SPARQL, then rebuild the index from all checkpoints (plus the fresh
-files), restart the server, replay the queued updates against it, and finally
-dump the new checkpoint (which captures index + in-memory delta). An incremental
-run (`-C` / `-d`) restricts the rebuilt index to the dependency closure of the
-datasets it touches, so unrelated checkpoints stay on disk but out of the served
-index until the index is reassembled in full.
+QLever has no usable SPARQL `LOAD`, so `url:` datasets must be downloaded first:
+use `url_loader: {method: curl_riot_chunk_store}`. Files go in over the Graph
+Store Protocol, chunked through `riot`
+(`file_loader: {method: riot_chunk_store}`).
 
-### Two extra steps to reach production
+The index itself is only ever an **empty bootstrap** built from a stub input
+file, so that the server has something to serve before any data lands; real data
+never goes through the Qleverfile `INPUT_FILES`.
 
-Because the served index is only ever a *subset* unless explicitly reassembled,
-qlever exposes two driver-specific options:
+### `--qlever_complete`
 
-* `--qlever_complete` — at the end of the session, assemble the **complete**
-  index from every checkpoint and build the text index (if `TEXT_INDEX` is set in
-  the Qleverfile). This is the only run that guarantees a complete, queryable,
-  text-indexed server.
-* `--qlever_upload_quads` — a one-shot **bootstrap** from an externally produced
-  quad dump (e.g. a big `.nq.gz`): build the index natively from the Qleverfile's
-  `INPUT_FILES`, verify the named graphs against the YAML, and capture every graph
-  as a checkpoint. ⚠️ This **wipes the entire content of `qleverdir`** first.
-
-### Status: the `READY` state
-
-Because of the assemble-to-publish step, qlever adds a status value the live
-backends never need:
-
-```
-EMPTY / UPDATE  ──(-C / -d / --qlever_upload_quads)──▶  READY  ──(--qlever_complete)──▶  ok
-```
-
-`READY` means *a current checkpoint exists on disk, but the complete
-(text-indexed) production index has not been assembled yet*. It is reported, not
-acted upon: it tells you the data is staged and up to date, and that a
-`--qlever_complete` run is what will put it into production (`ok`).
+Builds the text index at the end of the session, if `TEXT_INDEX` is set in the
+Qleverfile. Without it the text index is absent, which only affects
+`?x ql:contains-word ...` queries.
 
 ## Driver comparison
 
-| | Live HTTP backends (GraphDB / RDF4J / Fuseki) | qlever |
+| | GraphDB / RDF4J / Fuseki | qlever |
 |---|---|---|
-| ingestion (`load_from_file`) | HTTP POST / graph-store to the running server, immediately | stage file into `input/`, defer to the next index build |
-| `sparql_update` | HTTP POST, persisted immediately | queued, applied after the rebuild, then captured into a checkpoint |
-| named graphs | standard SPARQL `INTO GRAPH` at load time | `multi_input_json` `graph` key at index time |
-| `rewrite_repository` (`-I`) | drop + recreate the repository | wipe `qleverdir`, restore the Qleverfile |
-| `drop_context` | `DROP GRAPH` via SPARQL | no-op (the context is simply excluded from the next rebuild) |
-| server lifecycle | external, unmanaged | managed via `qlever start` / `stop` / index rebuild |
-| served vs managed | identical (status read from the live store) | served index is a subset of the checkpoints; hence the `READY` status |
+| ingestion (`load_from_file`) | HTTP POST / graph-store to the running server | graph-store POST, chunked through `riot` |
+| `sparql_update` | HTTP POST, persisted immediately | HTTP POST into the delta, persisted, compacted later |
+| named graphs | standard SPARQL `INTO GRAPH` at load time | `?graph=` on the graph-store endpoint |
+| `rewrite_repository` (`-I`) | drop + recreate the repository | wipe `qleverdir`, rebuild the empty bootstrap index |
+| `drop_context` | `DROP GRAPH` via SPARQL | `DELETE` in bounded chunks, compacting between them |
+| URL datasets | SPARQL `LOAD` | must be downloaded first (`curl_riot_chunk_store`) |
+| server lifecycle | external, unmanaged | managed via `qlever start` / `stop` / `rebuild-index` |
+| served vs managed | identical (status read from the live store) | identical |
 
 ## Other servers
 

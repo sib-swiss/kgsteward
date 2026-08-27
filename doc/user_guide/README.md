@@ -51,7 +51,7 @@ diffed, **not** to retrieve RDF for further processing. It intentionally drops
 datatype and language tags so that trivial serialization differences between stores
 do not register as diffs, which also means it is *not* a faithful RDF serialization.
 To move actual RDF between stores use the normal load path, or — for qlever — the
-checkpoint / quad-dump mechanisms described in [triplestore
+delta-compaction mechanism described in [triplestore
 drivers](../drivers/README.md).
 
 ## Develop on GraphDB, deploy where you need

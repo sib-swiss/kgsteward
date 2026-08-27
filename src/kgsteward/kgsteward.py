@@ -544,9 +544,7 @@ def main():
             )
         except Exception as e:
             stop_error( "Failed to connect to Fuseki server: " + str( e ))
-    elif config["server"]["brand"] in ( "qlever", "qlever2" ):
-        if config["server"]["brand"] == "qlever2":
-            print_warn( "brand 'qlever2' is a deprecated alias for 'qlever'; update the YAML." )
+    elif config["server"]["brand"] == "qlever":
         try:
             server = QleverClient(
                 replace_env_var( config["server"]["qleverfile"] ),
@@ -602,7 +600,7 @@ def main():
         else:
             print_warn( "Option --fuseki_compress_tbd2 not supported for server brand: " + config["server"]["brand"] )
 
-    if args.qlever_complete and config["server"]["brand"] not in ( "qlever", "qlever2" ):
+    if args.qlever_complete and config["server"]["brand"] != "qlever":
         stop_error( "--qlever_complete is only valid for the qlever backend" )
     # (No early action needed -- --qlever_complete only affects finalize().)
 
