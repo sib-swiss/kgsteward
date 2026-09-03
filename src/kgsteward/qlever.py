@@ -26,10 +26,10 @@ trade-offs.  In short:
     the design note's benchmark for why per-dataset rebuild is fine at
     small/medium scale.
 
-Because it is a live backend, most of the polymorphic workflow hooks
-(``can_restamp``, ``refine_status``, ``update_set_offline`` ...) keep their
-GenericClient live-backend defaults; only the server lifecycle and GSP writes
-are overridden here.
+Because it is a live backend, only the server lifecycle hooks
+(``queue_persist``, ``flush_pending``, ``finalize``, ``ensure_running``) and the
+GSP writes are overridden here; the rest of the workflow keeps its GenericClient
+defaults.
 """
 
 import configparser

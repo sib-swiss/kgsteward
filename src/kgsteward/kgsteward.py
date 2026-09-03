@@ -19,8 +19,6 @@ from .graphdb    import GraphDBClient
 from .fuseki     import FusekiClient
 from .rdf4j      import RFD4JClient
 from .qlever     import QleverClient
-# from .oxigraph   import OxigraphClient  # in preparation
-# 
 from importlib.metadata import version
 __version__ = version("kgsteward")
 
@@ -398,15 +396,13 @@ WHERE{
             item["status"] = "SKIPPED"
             continue
         sha256 = get_sha256( config, item["name"], echo = echo )
-        item["target_sha256"] = sha256   # current input checksum, used by server.refine_status()
+        item["target_sha256"] = sha256   # current input checksum
         # default status is "EMPTY" if the context is not found in the repository,
         # otherwise "ok" if the checksum is the same,
         # or "UPDATE" if the checksum is different,
         # or "FROZEN" if the record is frozen,
         # or "PROPAGATE" if it is not frozen but has a parent record to update.
         # or "UNKNOWN" if is is not managed by kgsteward
-        # A backend may later refine these via server.refine_status(); no shipped
-        # backend does today (the hook remains for offline/deferred-index designs).
         if item["name"] in name_to_update:
             item["status"] = "UPDATE"
         elif item["sha256"] == sha256:
@@ -642,14 +638,11 @@ def main():
                 stop_error( "dataset name(s) given to both -d and -s: " + ", ".join( sorted( clash )))
         # Skipping only makes sense for a dataset that is already in the store:
         # withholding a completely absent one silently leaves a hole, which is never
-        # what the option is for. Presence takes both tests: list_context() is
-        # authoritative for live backends, while a backend that owns its store may
-        # answer it from the YAML (qlever does) and report real presence via
-        # can_restamp().
+        # what the option is for.  list_context() is authoritative on presence.
         contexts = server.list_context( echo = args.v )
         absent = sorted(
             name for name in rdf_graph_to_skip
-            if name2context[ name ] not in contexts or not server.can_restamp( name2context[ name ] )
+            if name2context[ name ] not in contexts
         )
         if absent :
             stop_error( "-s cannot skip dataset(s) absent from the store: " + ", ".join( absent )
@@ -659,10 +652,11 @@ def main():
     if args.D :
         # -D (and -F, which sets args.D) rebuilds ALL datasets EXCEPT frozen ones:
         # dragging a frozen dataset into a full rebuild can be catastrophic (e.g. a
-        # huge frozen graph OOM-crashing the store).  -C already skips
-        # frozen (update_set_offline) and -d is explicit-by-name, so only -D needs
-        # this guard.  --force_unfreeze runs just above and clears frozen, so
-        # `-F --force_unfreeze` still rebuilds everything (the escape hatch holds).
+        # huge frozen graph OOM-crashing the store).  -C already skips frozen
+        # (their status never enters the update set) and -d is explicit-by-name,
+        # so only -D needs this guard.  --force_unfreeze runs just above and
+        # clears frozen, so `-F --force_unfreeze` still rebuilds everything
+        # (the escape hatch holds).
         rdf_graph_to_update = {
             name for name in rdf_graph_all
             if not get_target( config, name )["frozen"]
@@ -670,26 +664,17 @@ def main():
     elif args.d : # status not checked here
         rdf_graph_to_update.update( resolve_names( args.d, rdf_graph_all, "dataset" ))
     elif args.C :
-        # A backend may resolve the update set offline without querying the server;
-        # otherwise fall back to the online status query.
-        # The skipped names are withheld from both paths, which would otherwise
-        # checksum them (and hence HEAD their url/stamp) to decide their status.
-        offline = server.update_set_offline( rdf_graph_all - rdf_graph_to_skip, config, name2context, dataset_sha256, echo = args.v )
-        if offline is not None :
-            rdf_graph_to_update |= offline
-        else :
-            config = update_config( server, config, name_to_update = rdf_graph_to_update, name_to_skip = rdf_graph_to_skip, echo = args.v ) # may takes a while
-            for name in rdf_graph_all :
-                target = get_target( config, name )
-                if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
-                    rdf_graph_to_update.add( name )
+        # Resolve the update set from the online status query.  The skipped names
+        # are withheld, which would otherwise be checksummed (and hence HEAD their
+        # url/stamp) to decide their status.
+        config = update_config( server, config, name_to_update = rdf_graph_to_update, name_to_skip = rdf_graph_to_skip, echo = args.v ) # may takes a while
+        for name in rdf_graph_all :
+            target = get_target( config, name )
+            if target["status"] in { "EMPTY", "UPDATE", "PROPAGATE" } :
+                rdf_graph_to_update.add( name )
 
     # Single choke point for -s, covering -D, -d and -C alike.
     rdf_graph_to_update -= rdf_graph_to_skip
-
-    # Restrict an incremental index rebuild to the dependency closure of the
-    # datasets being processed (no-op for live backends).
-    server.plan_index_scope( rdf_graph_to_update, config, name2context, echo = args.v )
 
     # --------------------------------------------------------- #
     # Drop previous data, upload new data in their respective
@@ -704,11 +689,7 @@ def main():
         context = name2context[ name ]
 
         if not name in rdf_graph_to_update :
-            # Dataset is up-to-date -- nothing to reprocess.  Hook for a backend
-            # that must warn about data it holds but would not serve; no-op for
-            # every shipped backend.
-            server.warn_if_unindexed( name, context, echo = args.v )
-            continue
+            continue # dataset is up-to-date -- nothing to reprocess
 
         print_break()
         print_task( "Update dataset record: " + name )
@@ -896,11 +877,6 @@ def main():
                 # -s also holds here: re-stamping needs a checksum, i.e. the very
                 # HEAD requests the user asked to avoid. Goes away with -U itself.
                 print_warn( f"-U: skipping '{name}' (-s)" )
-                continue
-            if not server.can_restamp( name2context[ name ] ):
-                # Nothing to re-stamp -- no persisted data for this dataset, so any
-                # metadata we insert would be lost (e.g. wiped by the next rebuild).
-                print_warn( f"-U: skipping '{name}' (no persisted data to re-stamp)" )
                 continue
             print_break()
             print_task( "Refresh dataset info: " + name )
@@ -1176,9 +1152,6 @@ def main():
     # --------------------------------------------------------- #
 
     config = update_config( server, config, name_to_skip = rdf_graph_to_skip, echo = args.v )
-    # Backend-specific status refinement (no-op for every shipped backend).
-    # Report-only: the -C update decision above is deliberately left untouched.
-    server.refine_status( config )
 
     if args.dependency_graph:
         print_break()

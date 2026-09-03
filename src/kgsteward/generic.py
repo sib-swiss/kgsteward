@@ -319,30 +319,6 @@ WHERE{{
         """Load a remote graph into *context*."""
         self.sparql_update( f"LOAD <{path}> INTO GRAPH <{context}>", echo = echo )
 
-    def update_set_offline( self, names, config, name2context, sha_of, echo = True ):
-        """Determine the -C update set without querying the server, or None.
-
-        Returns None for live backends: kgsteward then falls back to the
-        online status query (``update_config``).  qlever overrides this to use
-        its own on-disk state when its server is stopped.
-        """
-        return None
-
-    def plan_index_scope( self, update_names, config, name2context, echo = True ):
-        """Restrict an incremental index rebuild to a dependency closure.
-
-        No-op for live backends (they apply each update directly); qlever uses
-        it to scope the rebuilt index and validate required parents.
-        """
-        pass
-
-    def warn_if_unindexed( self, name, context, echo = True ):
-        """Warn that a skipped dataset will be absent from the served data.
-
-        No-op for live backends, where skipped datasets simply stay in place.
-        """
-        pass
-
     def queue_persist( self, context, sha256 = None ):
         """Queue a dataset to be persisted at the next ``flush_pending``.
 
@@ -372,27 +348,5 @@ WHERE{{
 
         No-op for live backends (always up); qlever starts its server if an
         index exists but the server is stopped.
-        """
-        pass
-
-    def can_restamp( self, context ):
-        """True iff -U can re-stamp metadata for *context* without reloading.
-
-        Always True for live backends (the data is in the repository); qlever
-        must materialise it, otherwise the metadata would be lost at the next
-        rebuild.
-        """
-        return True
-
-    def refine_status( self, config, echo = False ):
-        """Report-only refinement of each dataset's ``status`` field.
-
-        No-op for live backends: what the server serves IS the managed content,
-        so the status derived from the server query (see ``update_config``) is
-        already authoritative.
-
-        Backends that stage content separately from what they serve override
-        this.  No shipped backend does today: the hook is kept for a design
-        whose served state can lag behind its managed state.
         """
         pass
