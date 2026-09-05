@@ -98,7 +98,7 @@ class RFD4JClient( GenericClient ):
                 'method'  : 'POST',
                 'url'     : self.endpoint_update,
                 'headers' : self.headers,
-                'params'  : { 'update': sparql },
+                'data'    : { 'update': sparql }, # POST body, per SPARQL 1.1 Protocol (not the URL query string)
             },
             status_code_ok,
             echo
