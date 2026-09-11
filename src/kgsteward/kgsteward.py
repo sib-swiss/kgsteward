@@ -636,17 +636,20 @@ def main():
             clash = rdf_graph_to_skip & set( resolve_names( args.d, rdf_graph_all, "dataset" ))
             if clash :
                 stop_error( "dataset name(s) given to both -d and -s: " + ", ".join( sorted( clash )))
-        # Skipping only makes sense for a dataset that is already in the store:
-        # withholding a completely absent one silently leaves a hole, which is never
-        # what the option is for.  list_context() is authoritative on presence.
+        # Skipping a dataset that is not in the store preserves nothing: it leaves a
+        # hole instead.  That is worth saying out loud, but not worth refusing -- -s
+        # is already an explicit, per-run gesture, and refusing would make -s unusable
+        # with -I/-F, which empty the repository just above.
         contexts = server.list_context( echo = args.v )
         absent = sorted(
             name for name in rdf_graph_to_skip
             if name2context[ name ] not in contexts
         )
         if absent :
-            stop_error( "-s cannot skip dataset(s) absent from the store: " + ", ".join( absent )
-                        + " -- load them first (-C / -d), or drop them from the YAML config" )
+            print_warn( "-s: nothing is preserved by skipping dataset(s) absent from the"
+                        " store: " + ", ".join( absent )
+                        + "\n               the repository is left INCOMPLETE here;"
+                          " a later run without -s will load them" )
         report( "skipped dataset(s)", ", ".join( sorted( rdf_graph_to_skip )))
 
     if args.D :

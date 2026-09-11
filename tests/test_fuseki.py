@@ -115,14 +115,26 @@ def test_kgsteward_fuseki_init_complete( fuseki_url ):
         assert r_clash.returncode != 0, "-d and -s on the same name must abort"
         assert "both -d and -s" in r_clash.stdout
 
-        # Skipping a dataset that is not in the store at all would leave a hole,
-        # so it is refused.  Kept last: -I empties the repository.
+        # Skipping a dataset that is not in the store leaves a hole rather than
+        # preserving anything, so it warns -- but it must not abort: that is the
+        # only way to rebuild while holding back a dataset whose source is broken.
+        # Kept last: -I empties the repository.
         r_wipe = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-I"] )
         assert r_wipe.returncode == 0, "kgsteward -I failed"
         r_absent = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-C", "-s", "foaf_data"] )
         print( r_absent.stdout )
-        assert r_absent.returncode != 0, "-s on an absent dataset must abort"
-        assert "absent from the store" in r_absent.stdout
+        assert r_absent.returncode == 0, "-s on an absent dataset must warn, not abort"
+        assert "absent from the" in r_absent.stdout, "the hole is reported"
+        assert "Update dataset record: foaf_data" not in r_absent.stdout, "still skipped"
+        assert "Update dataset record: foaf_ontology" in r_absent.stdout, "the others still load"
+
+        # -F empties the repository too, so it used to hit the same refusal: a full
+        # rebuild holding back one broken dataset was simply not expressible.
+        r_force = run_cmd( ["uv", "run", "kgsteward", patched_yaml, "-F", "-s", "foaf_data"] )
+        print( r_force.stdout )
+        assert r_force.returncode == 0, "-F -s must rebuild everything but the skipped dataset"
+        assert "Update dataset record: foaf_data" not in r_force.stdout, "still skipped"
+        assert "Update dataset record: foaf_ontology" in r_force.stdout, "the others rebuilt"
     finally:
         if os.path.exists( patched_yaml ):
             os.remove( patched_yaml )
