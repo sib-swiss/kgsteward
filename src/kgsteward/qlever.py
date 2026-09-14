@@ -99,7 +99,7 @@ class QleverClient( GenericClient ):
     # ------------------------------------------------------------------ #
 
     def __init__( self, qleverfile, qleverdir, access_token = None,
-                  echo = True, managed_contexts = None ):
+                  echo = True ):
         for tool in ( "qlever", "riot" ):
             if shutil.which( tool ) is None:
                 stop_error( f"{tool} not found on PATH" )
@@ -131,10 +131,6 @@ class QleverClient( GenericClient ):
         self.access_token     = access_token if access_token is not None else access_token_from_file
         self.user_text_index  = text_index
         self.qlever_cmd       = [ "qlever" ]
-        # Context IRIs of all datasets kgsteward manages (from the YAML).  Like
-        # the static driver, list_context() returns this set instead of issuing
-        # a SELECT DISTINCT ?g (which scans/sorts the whole index and can OOM).
-        self.managed_contexts = set( managed_contexts ) if managed_contexts is not None else None
         # True once a text index has been built (finalize --qlever_complete), so
         # the next server start loads it; empty per-dataset rebuilds never make one.
         self._has_text        = False
@@ -527,9 +523,10 @@ class QleverClient( GenericClient ):
         return r
 
     def list_context( self, echo = True ):
-        if self.managed_contexts is not None:
-            return set( self.managed_contexts )
-        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g {}}", echo = echo )
+        # QLever returns nothing for the empty `GRAPH ?g {}` form the other
+        # drivers use, so name a triple pattern.  It is answered from the graph
+        # index, not by scanning: 27 graphs in 11 ms over 155M triples.
+        r = self.sparql_query( "SELECT DISTINCT ?g WHERE{ GRAPH ?g { ?s ?p ?o }}", echo = echo )
         return {
             rec["g"]["value"]
             for rec in r.json()["results"]["bindings"]

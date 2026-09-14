@@ -116,3 +116,13 @@ def test_qlever_data_is_served( qlever_workdir ):
         f"\nqlever served: ontology={count_in(ctx_ontology)} "
         f"data={count_in(ctx_data)} triples"
     )
+
+    # list_context() must report what the SERVER holds.  It used to answer from
+    # the YAML instead, which made every declared dataset look present and left
+    # unmanaged graphs unreportable.
+    contexts = client.list_context( echo = False )
+    print( f"qlever list_context: {sorted( contexts )}" )
+    assert ctx_ontology in contexts, "a loaded graph must be listed"
+    assert ctx_data     in contexts, "a loaded graph must be listed"
+    assert "http://example.org/context/never_loaded" not in contexts, \
+        "a graph the store does not hold must not be listed"
