@@ -8,8 +8,7 @@ driver -- and folds the in-memory update *delta* back into a compact on-disk
 index with ``qlever rebuild-index`` after each dataset (hot-swapped in with no
 downtime).
 
-See ``doc/drivers/qlever-design.md`` for the full rationale, benchmarks and
-trade-offs.  In short:
+See ``doc/drivers/README.md`` for the operational picture.  In short:
 
   * **Load path** -- GSP chunked POST per context (Fuseki model + the GSP
     machinery inherited from :class:`GenericClient`).  The only QLever-specific

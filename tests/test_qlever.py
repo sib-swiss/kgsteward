@@ -22,9 +22,9 @@ pytestmark = pytest.mark.skipif(
 
 # ---------------------------------------------------------------------------
 
-QLEVER2_PORT = 7025   # avoid clash with test_qlever (7021/7023) and the bench ports
+QLEVER_PORT = 7025   # avoid clash with the bench ports
 ROOT_DIR     = env["KGSTEWARD_ROOT_DIR"]
-QLEVER2_YAML = os.path.join( ROOT_DIR, "doc/first_steps/qlever.yaml" )
+QLEVER_YAML = os.path.join( ROOT_DIR, "doc/first_steps/qlever.yaml" )
 
 QLEVERFILE_TEMPLATE = """\
 [data]
@@ -36,7 +36,7 @@ INPUT_FILES     = *.nt
 CAT_INPUT_FILES = cat ${INPUT_FILES}
 
 [server]
-PORT         = """ + str( QLEVER2_PORT ) + """
+PORT         = """ + str( QLEVER_PORT ) + """
 HOST_NAME    = localhost
 ACCESS_TOKEN = kgsteward_test
 
@@ -75,15 +75,15 @@ def test_kgsteward_qlever_init_complete_validate( qlever_workdir ):
     a SPARQL update) are loaded, then the shipped validation queries must pass
     (query.yaml pins 445 rows for the query test, 0 for the validations).
     """
-    r_init = run_cmd( ["uv", "run", "kgsteward", QLEVER2_YAML, "-I"] )
+    r_init = run_cmd( ["uv", "run", "kgsteward", QLEVER_YAML, "-I"] )
     print( r_init.stdout ); print( r_init.stderr )
     assert r_init.returncode == 0, "kgsteward -I failed"
 
-    r_complete = run_cmd( ["uv", "run", "kgsteward", QLEVER2_YAML, "-C"] )
+    r_complete = run_cmd( ["uv", "run", "kgsteward", QLEVER_YAML, "-C"] )
     print( r_complete.stdout ); print( r_complete.stderr )
     assert r_complete.returncode == 0, "kgsteward -C failed"
 
-    r_validate = run_cmd( ["uv", "run", "kgsteward", QLEVER2_YAML, "-V"] )
+    r_validate = run_cmd( ["uv", "run", "kgsteward", QLEVER_YAML, "-V"] )
     print( r_validate.stdout ); print( r_validate.stderr )
     assert r_validate.returncode == 0, "kgsteward -V failed"
 
