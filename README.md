@@ -70,3 +70,5 @@ Start documentation website in development:
 ```bash
 uv run mkdocs serve
 ```
+
+[A paper has been submitted](https://arxiv.org/abs/2609.21564) describing the principles behind kgsteward and some examples of its applications.
