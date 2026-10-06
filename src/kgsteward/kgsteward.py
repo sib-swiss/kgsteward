@@ -1154,7 +1154,7 @@ def main():
         print_break()
         print_task( "Set GraphDB repository in free read-only mode" )     
         if not config["server"]["brand"] == "graphdb":
-            print_warn( "Option --graphdb_upload_queries not supported for server brand: " + config["server"]["brand"] )
+            print_warn( "Option --graphdb_free_access not supported for server brand: " + config["server"]["brand"] )
         else:
             server.free_access()
 
