@@ -19,8 +19,9 @@ flowchart TD
     B --> C[Connect to backend<br/>graphdb / rdf4j / fuseki / qlever]
     C --> D{-I given?}
     D -- yes --> E[Rewrite repository<br/>ERASE all RDF data]
-    D -- no --> F
-    E --> F[Select the UPDATE SET<br/>-D/-F: all · -d: named · -C: status-driven · none: report-only]
+    D -- no --> R
+    E --> R["--graphdb_reset_autocomplete?<br/>empty the autocomplete index<br/>(GraphDB only, frees disk before the load)"]
+    R --> F[Select the UPDATE SET<br/>-D/-F: all · -d: named · -C: status-driven · none: report-only]
     F --> H[Per-dataset loop, in declaration order<br/>system → url → file → update → special]
     H --> I[Post-processing:<br/>prefixes, -U restamp,<br/>-V validate, -Q queries, dumps]
     I --> J[Recompute status]

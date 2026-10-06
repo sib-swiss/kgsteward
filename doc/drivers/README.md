@@ -41,6 +41,57 @@ projects up; see also the [user guide](../user_guide/README.md).
 * Ingestion is immediate: `load_from_file` does an HTTP POST to the running
   server, and each `sparql_update` is persisted as it is sent.
 
+#### Reclaiming the autocomplete index — `--graphdb_reset_autocomplete`
+
+GraphDB's autocomplete plugin maintains a Lucene suggester under
+`<data>/repositories/<repo>/storage/autocomplete/v2/index`. `kgsteward` switches
+the plugin on whenever it creates a repository (`-I`), and nothing in the normal
+lifecycle ever reclaims what that index accumulates afterwards. On a large
+repository rebuilt many times it has been measured at **114 GB**, outweighing
+everything else in the data directory — the same repository's Lucene *connector*
+index was 823 MB. Short of deleting the repository there was no way to get the
+space back.
+
+Switching the plugin off does **not** free anything: it only flips a
+configuration flag, and the Lucene segments stay on disk. What releases them is
+rebuilding the index with nothing configured, which is what this flag does,
+entirely over HTTP — so it works against a server whose filesystem is out of
+reach as well:
+
+1. switch the plugin on — `reIndex` refuses to run while it is off, and a
+   repository left disabled with a huge index is exactly the case to clean;
+2. interrupt any indexing in progress, with retries, as that request may itself
+   have to wait behind a running build;
+3. remove every configured label predicate, then set `indexIRIs` to false;
+4. rebuild, **in a request of its own**;
+5. poll the plugin status until it leaves `BUILDING`;
+6. restore the on/off state the repository was found in.
+
+The flag runs right after the repository rewrite and *before* any data is
+loaded, so the reclaimed space is available to the ingest that follows.
+
+Measured on a test repository of 600k labels over two predicates plus IRI local
+names, the index went from 74 MB and 38 Lucene files to 8 KB and a single empty
+`segments_*` file.
+
+Two traps are worth knowing, as neither of them produces an error. With
+`auto:` standing for `http://www.ontotext.com/plugins/autocomplete#`:
+
+* a rebuild batched into the same `INSERT DATA` as the configuration it depends
+  on runs against the **previous** configuration;
+* `auto:reIndex` returns within seconds while the rebuild goes on for hours, so
+  completion has to be polled on `auto:status`, which reads `BUILDING`, `READY`,
+  `NONE` (plugin off) or `CANCELED` — the last being sticky, an interrupted
+  build never turning `READY` by itself. While a large build runs the server may
+  stop answering plugin queries altogether, so an empty result means nothing.
+
+Autocomplete stops suggesting afterwards, since the label predicates are gone —
+which is precisely what frees the disk. Configure them again from the Workbench,
+or with `INSERT DATA { <predicate> auto:addLabelConfig "" }`, which starts a
+fresh build. That build is expensive, hours at hundreds of MB per minute, so
+avoid driving the configuration from an ordinary `update:` dataset: an edit to
+the list of predicates would silently launch it inside a routine run.
+
 ### RDF4J
 
 * GraphDB is built on top of RDF4J, so one might have expected the migration from

@@ -54,6 +54,18 @@ To move actual RDF between stores use the normal load path, or — for qlever �
 delta-compaction mechanism described in [triplestore
 drivers](../drivers/README.md).
 
+## Watching the disk, not only the triples
+
+A store's data directory holds more than the triples. On GraphDB the
+autocomplete suggester is the one component that grows without bound across
+repeated rebuilds and that nothing reclaims on its own — it has been found at
+114 GB next to a 823 MB connector index. Disabling the plugin does not give the
+space back; `kgsteward config.yaml --graphdb_reset_autocomplete` does, over HTTP,
+and is detailed in [triplestore drivers](../drivers/README.md). The same caution
+applies to Fuseki's TDB2 indexes, which grow under sequential updates and have
+to be compacted (`--fuseki_compress_tbd2`), and to qlever's delta, which
+`kgsteward` compacts for you.
+
 ## Develop on GraphDB, deploy where you need
 
 A practical workflow that has worked well: **author and debug a project against

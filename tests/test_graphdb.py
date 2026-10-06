@@ -3,6 +3,8 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
 from docker.errors import DockerException
 import os
+import time
+import requests
 from pathlib import Path
 
 from . import run_cmd, env
@@ -79,6 +81,7 @@ cmd_graphdb = [
     "kgsteward doc/first_steps/graphdb.yaml --graphdb_upload_queries -v",
     "kgsteward doc/first_steps/graphdb.yaml --graphdb_upload_prefixes -v",
     "kgsteward doc/first_steps/graphdb.yaml --graphdb_free_access -v",
+    "kgsteward doc/first_steps/graphdb.yaml --graphdb_reset_autocomplete -v",
 ]
 
 @pytest.mark.parametrize( "cmd", cmd_base + cmd_graphdb )
@@ -99,3 +102,58 @@ def test_dump_unknown_dataset_name_errors( triplestore ):
     print(res.stderr)
     assert res.returncode != 0, "expected non-zero exit on unknown dataset name"
     assert "Unknown dataset name(s): does_not_exist" in ( res.stdout + res.stderr )
+
+
+AUTO = "http://www.ontotext.com/plugins/autocomplete#"
+
+def test_graphdb_reset_autocomplete( triplestore ):
+    """The autocomplete index is emptied and the plugin left as it was found.
+
+    Everything is asserted over HTTP, as the flag itself works: the Lucene
+    segments on disk are not reachable from here, but a suggester that stops
+    answering with no label predicate left configured is what releases them."""
+    auth = ( env["GRAPHDB_USERNAME"], env["GRAPHDB_PASSWORD"] )
+    repo = triplestore + "/repositories/first_steps"
+
+    def update( triple ):
+        r = requests.post( repo + "/statements", auth = auth,
+                           data = { "update": "INSERT DATA { " + triple + " . }" } )
+        assert r.status_code == 204, r.text
+
+    def select( sparql ):
+        r = requests.post( repo, auth = auth, data = { "query": sparql },
+                           headers = { "Accept": "application/sparql-results+json" } )
+        assert r.status_code == 200, r.text
+        return r.json()["results"]["bindings"]
+
+    def enabled():
+        r = requests.get( triplestore + "/rest/autocomplete/enabled", auth = auth,
+                          headers = { "X-GraphDB-Repository": "first_steps" } )
+        return r.text.strip().lower() == "true"
+
+    # Index the first_steps data, the configuration and the rebuild being sent
+    # separately, as a rebuild batched with the configuration it depends upon
+    # would run against the previous one.
+    update( f'[] <{AUTO}enabled> true' )
+    update( f'<http://xmlns.com/foaf/0.1/name> <{AUTO}addLabelConfig> ""' )
+    update( f'[] <{AUTO}indexIRIs> true' )
+    update( f'[] <{AUTO}reIndex> ""' )
+    for _ in range( 120 ):
+        status = select( f"SELECT ?o WHERE {{ ?s <{AUTO}status> ?o }}" )
+        if status and status[0]["o"]["value"] == "READY":
+            break
+        time.sleep( 1 )
+    else:
+        pytest.fail( "autocomplete index did not build" )
+    assert select( f"SELECT ?p WHERE {{ ?p <{AUTO}labelConfig> ?lang }}" ), "nothing configured to index"
+    assert select( f'SELECT ?s WHERE {{ ?s <{AUTO}query> "Ali" }}' ), "suggester answers nothing to start with"
+    assert enabled()
+
+    res = run_cmd( "kgsteward doc/first_steps/graphdb.yaml --graphdb_reset_autocomplete".split( " " ), env )
+    print( res.stdout )
+    print( res.stderr )
+    assert res.returncode == 0, f"Command failed:\n{res.stdout}\n{res.stderr}"
+
+    assert select( f"SELECT ?p WHERE {{ ?p <{AUTO}labelConfig> ?lang }}" ) == [], "label configuration not emptied"
+    assert select( f'SELECT ?s WHERE {{ ?s <{AUTO}query> "Ali" }}' ) == [], "suggester still answering"
+    assert enabled(), "plugin was switched on, it must be left on"

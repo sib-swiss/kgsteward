@@ -184,6 +184,18 @@ def get_user_input():
         help = "Compact GraphDB indexes after data upload/insert/delete. It may take a while, but improves query performance. "
     )
     parser.add_argument(
+        '--graphdb_reset_autocomplete',
+        action = 'store_true',
+        help = "Empty the GraphDB autocomplete index and reclaim the disk space it occupies, "
+               "which nothing else in the kgsteward lifecycle ever does and which may grow to "
+               "outweigh all the rest of the data directory. Merely switching the plugin off "
+               "does not free anything, as it only flips a flag. Any indexing in progress is "
+               "interrupted, the list of indexed label predicates is emptied, and the index is "
+               "rebuilt empty, which is what releases the Lucene segments. The plugin is left "
+               "switched on or off as it was found, but with nothing configured, so autocomplete "
+               "stops suggesting until label predicates are configured again. "
+    )
+    parser.add_argument(
         '--qlever_complete',
         action = 'store_true',
         help = "(qlever only) At the end of the session, build the text index if TEXT_INDEX "
@@ -584,6 +596,14 @@ def main():
             server.rewrite_repository( config_file )
         else:
              server.rewrite_repository()
+
+    if args.graphdb_reset_autocomplete:
+        print_break()
+        print_task( "Reset GraphDB autocomplete index" )
+        if not config["server"]["brand"] == "graphdb":
+            print_warn( "Option --graphdb_reset_autocomplete not supported for server brand: " + config["server"]["brand"] )
+        else:
+            server.reset_autocomplete( echo = args.v )
 
     if args.fuseki_compress_tbd2: # FIXME: check that index type is really TDB2 (and not TDB)
         if config["server"]["brand"] == "fuseki":
