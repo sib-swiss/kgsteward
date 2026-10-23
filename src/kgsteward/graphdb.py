@@ -235,17 +235,17 @@ class GraphDBClient( GenericClient ):
             'Accept' : 'application/json', 
             'Content-Type': 'application/x-www-form-urlencoded' 
         }
-        params = { 'query' : sparql }
+        data = { 'query' : sparql }
         if timeout is not None :
-            params["timeout"] = timeout
-            status_code_ok.append( 503 )
-            status_code_ok.append( 500 ) # is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
+            data["timeout"] = timeout
+            # rebind, never append: the default list is shared by every call
+            status_code_ok = status_code_ok + [ 503, 500 ] # 500 is returned by GraphDB on timeout of SPARQL queries with a SERVICE clause ?!?
         r = http_call(
             {
-                'method'  : 'POST',  # allows for big query string
+                'method'  : 'POST',
                 'url'     : self.endpoint_query,
                 'headers' : { **self.headers, **headers },
-                'params'  : params,
+                'data'    : data, # POST body, per SPARQL 1.1 Protocol (not the URL query string)
             },
             status_code_ok,
             echo

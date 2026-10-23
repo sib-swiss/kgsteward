@@ -158,9 +158,8 @@ class FusekiClient( GenericClient ):
         if timeout is not None:
             # Inherited from GraphDB; Fuseki may behave differently but the
             # extra accepted codes are harmless.
-            for code in ( 500, 503 ):
-                if code not in status_code_ok:
-                    status_code_ok.append( code )
+            # rebind, never append: the default list is shared by every call
+            status_code_ok = status_code_ok + [ c for c in ( 500, 503 ) if c not in status_code_ok ]
             data["timeout"] = timeout
         r = http_call(
             { 'method':  'POST',  # POST allows for big query strings
