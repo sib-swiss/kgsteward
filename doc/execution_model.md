@@ -127,3 +127,13 @@ Three things are refused outright: an unknown dataset name, the same name in bot
 `-d` and `-s`, and — because withholding it would silently leave a hole in the
 store rather than preserve anything — a dataset **absent** from the store. Load it
 (`-C` / `-d`) or drop it from the YAML config instead.
+
+## Graphs no longer in the config (`--drop_unknown`)
+
+Removing a dataset from the YAML config does not remove its graph from the
+store: the final status lists it as `UNKNOWN`, and its triples stay. With
+`--drop_unknown`, kgsteward drops such a graph, but only if it holds
+kgsteward's own record about itself (`<graph> a kgsteward:Dataset`, written
+each time a dataset is loaded), so a graph written by other means is never
+touched. The drop uses the same per-backend `drop_context()` as a reload
+(bounded chunks on QLever), and the graph is reported as `DROPPED`.

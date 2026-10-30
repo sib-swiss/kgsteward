@@ -83,6 +83,14 @@ def get_user_input():
         help   = "Load missing/incomplete/outdated dataset to complete the repository."
     )
     parser.add_argument(
+        '--drop_unknown',
+        action = 'store_true',
+        help   = "Drop the graphs that kgsteward loaded in an earlier run but that are no longer "
+                 "the context of any dataset in the YAML config (reported as UNKNOWN otherwise). "
+                 "Graphs without kgsteward's own record are never touched. Reported as DROPPED in "
+                 "the final status."
+    )
+    parser.add_argument(
         '-U',
         action = 'store_true',
         help   = 'Force update internal checksum without updating the data. '
@@ -428,6 +436,32 @@ WHERE{
                 if name2item[parent_name]["status"] in { "EMPTY", "UPDATE", "PROPAGATE" }: # ignore FROZEN
                     item["status"] = "PROPAGATE"
     return config
+
+def find_unknown_contexts( server, config, echo = True ) :
+    """Graphs kgsteward loaded in an earlier run that are no longer in the config.
+
+    A graph qualifies when it is not the context of any dataset of the config
+    AND it holds kgsteward's own record about itself (written by
+    update_dataset_info(), or by older versions as void:Dataset). Graphs
+    written by other means have no such record and are left alone.
+    """
+    configured = { item["context"] for item in config["dataset"] }
+    r = server.sparql_query( """
+PREFIX void:      <http://rdfs.org/ns/void#>
+PREFIX kgsteward: <https://purl.expasy.org/kgsteward/>
+
+SELECT DISTINCT ?context
+WHERE {
+    VALUES ?record_type { kgsteward:Dataset void:Dataset }
+    GRAPH ?context { ?context a ?record_type }
+}
+""", echo = echo )
+    recorded = {
+        rec["context"]["value"]
+        for rec in r.json()["results"]["bindings"]
+        if "context" in rec
+    }
+    return sorted( recorded - configured )
 
 def update_dataset_info( server, config, name, echo = True ) :
     """Re-stamp the kgsteward:Dataset metadata for *name*.
@@ -851,6 +885,18 @@ def main():
         server.queue_persist( context, dataset_sha256( name ) )
         server.flush_pending( echo = args.v )
 
+    # --drop_unknown: drop the graphs of datasets that left the config.  Each
+    # backend drops the way it reloads (qlever in bounded chunks), and the
+    # deletions are queued for the same compaction as a reload.
+    dropped_contexts = []
+    if args.drop_unknown :
+        for context in find_unknown_contexts( server, config, echo = args.v ) :
+            print_break()
+            print_task( "Drop graph no longer in the config: " + context )
+            server.drop_context( context, echo = args.v )
+            server.queue_persist( context )
+            dropped_contexts.append( context )
+
     # Safety net: flush anything staged but not yet finalized (normally already
     # flushed per-dataset above).
     server.flush_pending( echo = args.v )
@@ -1195,6 +1241,8 @@ def main():
             contexts.remove( context )
     for name in contexts:
         print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "UNKNOWN" ), "blue" ))
+    for name in dropped_contexts:
+        print( colored( '{:>32} : {:>12}    {:>20} {}'.format( name, "", "", "DROPPED" ), "blue" ))
     print_break()
 
     # Ensure the server is serving queries at the end of the session (no-op
