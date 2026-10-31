@@ -698,7 +698,7 @@ wheels = [
 
 [[package]]
 name = "kgsteward"
-version = "3.7.1"
+version = "3.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "dumper" },
