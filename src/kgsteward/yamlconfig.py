@@ -146,7 +146,16 @@ def flatten_nested_list(v: Any) -> List[str]:
         return result
     else:
         raise TypeError(f"Invalid item: {v} (must be str or list)")
-    
+
+def flatten_nested_record_list(v: Any) -> List[Any]:
+    if isinstance(v, list):
+        result = []
+        for i in v:
+            result.extend(flatten_nested_record_list(i))
+        return result
+    else:
+        return [v]
+
 class GraphDBConf( BaseModel ):
     model_config = ConfigDict( extra='allow' )
     brand             : Literal[ "graphdb" ] = Field( title = "GraphDB brand", description = describe( "server_brand" ))
@@ -253,6 +262,9 @@ class KGStewardConf( BaseModel ):
     public_sparql_endpoint : Optional[ str ] = Field( None, title = "Public SPARQL endpoint", description = describe( "public_sparql_endpoint" ))
     queries           : Optional[ List[ QueryConf ]] = Field( title = "Collection of SPARQL queries", description = describe( "collection_queries" ))
     # validations       : Optional[ List[ str ]]  = Field( None, title = "Validation queries", description = describe( "validations" ))
+    @validator( 'dataset', 'queries', pre=True )
+    def flatten_lists( cls, v ):
+        return v if v is None else flatten_nested_record_list( v )
 
 def parse_yaml_conf( path : str ):
     """Parsing kgsteward YAML config file(s) is a four step process:
